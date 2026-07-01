@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Çivi Sayacı</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    font-family: -apple-system, system-ui, sans-serif;
+    background: linear-gradient(160deg, #1a1a2e 0%, #16213e 100%);
+    color: #fff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+  h1 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin: 10px 0 4px;
+    color: #f0a500;
+  }
+  .subtitle {
+    color: #9aa5b1;
+    font-size: 0.85rem;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  .counter-box {
+    background: rgba(255,255,255,0.05);
+    border: 2px solid #f0a500;
+    border-radius: 24px;
+    padding: 30px 50px;
+    text-align: center;
+    margin-bottom: 20px;
+    box-shadow: 0 0 30px rgba(240,165,0,0.15);
+    transition: transform 0.1s;
+  }
+  .counter-box.pulse { transform: scale(1.08); }
+  #count {
+    font-size: 5rem;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1;
+  }
+  .label { color: #9aa5b1; font-size: 0.9rem; margin-top: 6px; }
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 18px;
+    font-size: 0.9rem;
+    color: #9aa5b1;
+  }
+  .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #555;
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .dot.active {
+    background: #2ecc71;
+    box-shadow: 0 0 10px #2ecc71;
+  }
+
+  .meter-wrap {
+    width: 100%;
+    max-width: 320px;
+    height: 8px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  #meter {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #2ecc71, #f0a500, #e74c3c);
+    transition: width 0.05s linear;
+  }
+
+  button {
+    border: none;
+    border-radius: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .main-btn {
+    width: 100%;
+    max-width: 320px;
+    padding: 18px;
+    font-size: 1.1rem;
+    background: #f0a500;
+    color: #1a1a2e;
+    margin-bottom: 14px;
+  }
+  .main-btn.listening { background: #e74c3c; color: #fff; }
+
+  .row {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+    max-width: 320px;
+    margin-bottom: 14px;
+  }
+  .row button {
+    flex: 1;
+    padding: 16px;
+    font-size: 1.4rem;
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+  }
+  .row button:active { background: rgba(255,255,255,0.18); }
+
+  .reset-btn {
+    width: 100%;
+    max-width: 320px;
+    padding: 12px;
+    font-size: 0.9rem;
+    background: transparent;
+    color: #e74c3c;
+    border: 1px solid #e74c3c;
+  }
+
+  .settings {
+    width: 100%;
+    max-width: 320px;
+    margin-top: 20px;
+    padding: 14px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 14px;
+  }
+  .settings label {
+    font-size: 0.8rem;
+    color: #9aa5b1;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  input[type=range] { width: 100%; }
+
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .checkbox-row span { font-size: 0.82rem; color: #cfd6dd; }
+  .switch {
+    position: relative;
+    width: 46px;
+    height: 26px;
+    flex-shrink: 0;
+  }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch-track {
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.15);
+    border-radius: 999px;
+    transition: background 0.2s;
+    cursor: pointer;
+  }
+  .switch-track::before {
+    content: '';
+    position: absolute;
+    width: 20px; height: 20px;
+    left: 3px; top: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .switch input:checked + .switch-track { background: #2ecc71; }
+  .switch input:checked + .switch-track::before { transform: translateX(20px); }
+
+  .hint {
+    margin-top: 16px;
+    font-size: 0.78rem;
+    color: #6b7787;
+    text-align: center;
+    max-width: 320px;
+    line-height: 1.4;
+  }
+
+  .video-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 320px;
+    aspect-ratio: 4/3;
+    border-radius: 18px;
+    overflow: hidden;
+    margin-bottom: 16px;
+    background: #000;
+    border: 2px solid rgba(255,255,255,0.1);
+    display: none;
+  }
+  .video-wrap.show { display: block; }
+  #video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .flash {
+    position: absolute;
+    inset: 0;
+    background: #2ecc71;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .flash.go {
+    animation: flashAnim 0.35s ease-out;
+  }
+  @keyframes flashAnim {
+    0% { opacity: 0.75; }
+    100% { opacity: 0; }
+  }
+  .video-count-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.4rem;
+    padding: 4px 12px;
+    border-radius: 10px;
+  }
+  .camera-toggle {
+    width: 100%;
+    max-width: 320px;
+    padding: 12px;
+    font-size: 0.9rem;
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+    margin-bottom: 14px;
+  }
+
+  .stats-panel {
+    width: 100%;
+    max-width: 320px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .stats-title {
+    font-size: 0.8rem;
+    color: #9aa5b1;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 10px;
+  }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .stat-item {
+    background: rgba(255,255,255,0.04);
+    border-radius: 12px;
+    padding: 10px 12px;
+  }
+  .stat-value {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #f0a500;
+  }
+  .stat-label {
+    font-size: 0.7rem;
+    color: #9aa5b1;
+    margin-top: 2px;
+  }
+  .batch-history {
+    margin-top: 12px;
+    font-size: 0.75rem;
+    color: #9aa5b1;
+    line-height: 1.6;
+    max-height: 90px;
+    overflow-y: auto;
+  }
+  .batch-history div { display: flex; justify-content: space-between; }
+  .batch-history .batch-num { color: #fff; }
+
+  .sound-toggle {
+    width: 100%;
+    max-width: 320px;
+    padding: 10px;
+    font-size: 0.85rem;
+    background: rgba(255,255,255,0.06);
+    color: #9aa5b1;
+    margin-bottom: 14px;
+  }
+  .sound-toggle.on { color: #2ecc71; }
+
+  .report-btn {
+    width: 100%;
+    max-width: 320px;
+    padding: 14px;
+    font-size: 0.95rem;
+    background: rgba(46,204,113,0.12);
+    color: #2ecc71;
+    border: 1px solid rgba(46,204,113,0.4);
+    margin-bottom: 14px;
+  }
+
+  .wake-status {
+    font-size: 0.72rem;
+    color: #6b7787;
+    text-align: center;
+    margin-top: -10px;
+    margin-bottom: 14px;
+  }
+
+</style>
+</head>
+<body>
+
+<h1>🔩 Çivi Sayacı</h1>
+<div class="subtitle">Kutuya düşen çivilerin sesini dinleyip otomatik sayar</div>
+
+<div id="diagBanner" style="display:none; width:100%; max-width:320px; background:rgba(231,76,60,0.15); border:1px solid #e74c3c; color:#ffb3a7; padding:10px 14px; border-radius:12px; font-size:0.8rem; margin-bottom:14px; line-height:1.4;"></div>
+
+<div class="counter-box" id="counterBox">
+  <div id="count">0</div>
+  <div class="label">çivi</div>
+</div>
+
+<div class="status">
+  <div class="dot" id="dot"></div>
+  <span id="statusText">Dinleme kapalı</span>
+</div>
+
+<div class="meter-wrap"><div id="meter"></div></div>
+
+<div class="stats-panel">
+  <div class="stats-title">📊 İstatistikler</div>
+  <div class="stats-grid">
+    <div class="stat-item">
+      <div class="stat-value" id="statElapsed">00:00</div>
+      <div class="stat-label">Geçen süre</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="statPace">—</div>
+      <div class="stat-label">sn / çivi</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="statPerMin">—</div>
+      <div class="stat-label">çivi / dk</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="statEst50">—</div>
+      <div class="stat-label">50 çivi tahmini süre</div>
+    </div>
+  </div>
+  <div class="batch-history" id="batchHistory"></div>
+</div>
+
+<button class="sound-toggle on" id="soundToggle">🔊 Onay sesi açık</button>
+
+<button class="camera-toggle" id="cameraBtn">📷 Kamerayı Aç</button>
+
+<div class="video-wrap" id="videoWrap">
+  <video id="video" autoplay playsinline muted></video>
+  <div class="flash" id="flash"></div>
+  <div class="video-count-badge" id="videoBadge">0</div>
+</div>
+
+<button class="main-btn" id="listenBtn">🎤 Dinlemeyi Başlat</button>
+
+<div class="row">
+  <button id="minusBtn">−1</button>
+  <button id="plusBtn">+1</button>
+</div>
+
+<button class="reset-btn" id="resetBtn">Sıfırla</button>
+
+<button class="report-btn" id="reportBtn">📧 Günü Bitir ve Raporu Gönder</button>
+
+<div class="wake-status" id="wakeStatus"></div>
+
+<div class="settings">
+  <label>Hassasiyet (eşik) <span id="threshVal">28</span></label>
+  <input type="range" id="threshSlider" min="5" max="80" value="28">
+  <label style="margin-top:10px;">Algılama aralığı (ms) <span id="cooldownVal">250</span></label>
+  <input type="range" id="cooldownSlider" min="100" max="800" value="250" step="10">
+
+  <div class="checkbox-row">
+    <span>🗣️ Konuşmayı sayma (frekans filtresi)</span>
+    <label class="switch">
+      <input type="checkbox" id="voiceFilterToggle" checked>
+      <span class="switch-track"></span>
+    </label>
+  </div>
+</div>
+
+<div class="hint">
+  Ses çok hassas sayıyorsa hassasiyet değerini yükselt. Çivi seslerini kaçırıyorsa düşür.
+  Yanlış sayımları +1 / −1 ile elle düzeltebilirsin.
+</div>
+
+<script>
+let count = 0;
+let listening = false;
+let audioCtx, analyser, micStream, dataArray, rafId;
+let lastTriggerTime = 0;
+let threshold = 28;
+let cooldown = 250;
+
+const countEl = document.getElementById('count');
+const counterBox = document.getElementById('counterBox');
+const listenBtn = document.getElementById('listenBtn');
+const dot = document.getElementById('dot');
+const statusText = document.getElementById('statusText');
+const meter = document.getElementById('meter');
+const threshSlider = document.getElementById('threshSlider');
+const threshVal = document.getElementById('threshVal');
+const cooldownSlider = document.getElementById('cooldownSlider');
+const cooldownVal = document.getElementById('cooldownVal');
+const cameraBtn = document.getElementById('cameraBtn');
+const videoWrap = document.getElementById('videoWrap');
+const video = document.getElementById('video');
+const flash = document.getElementById('flash');
+const videoBadge = document.getElementById('videoBadge');
+const diagBanner = document.getElementById('diagBanner');
+const statElapsed = document.getElementById('statElapsed');
+const statPace = document.getElementById('statPace');
+const statPerMin = document.getElementById('statPerMin');
+const statEst50 = document.getElementById('statEst50');
+const batchHistory = document.getElementById('batchHistory');
+const soundToggle = document.getElementById('soundToggle');
+
+let nailTimestamps = [];      // timestamp of each confirmed nail
+let batchTimes = [];          // duration (ms) for each completed batch of 50
+let lastBatchMark = 0;        // timestamp when the last batch boundary was crossed
+let soundOn = true;
+let beepCtx = null;
+
+function ensureBeepCtx() {
+  if (!beepCtx) {
+    try { beepCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch (e) { beepCtx = null; }
+  }
+  return beepCtx;
+}
+
+function playBeep() {
+  if (!soundOn) return;
+  const ctx = ensureBeepCtx();
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = 880;
+  gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.12);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + 0.13);
+}
+
+soundToggle.addEventListener('click', () => {
+  soundOn = !soundOn;
+  soundToggle.textContent = soundOn ? '🔊 Onay sesi açık' : '🔇 Onay sesi kapalı';
+  soundToggle.classList.toggle('on', soundOn);
+  if (soundOn) ensureBeepCtx();
+});
+
+function formatDuration(ms) {
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function renderBatchHistory() {
+  if (batchTimes.length === 0) {
+    batchHistory.innerHTML = '';
+    return;
+  }
+  let html = '';
+  batchTimes.forEach((ms, i) => {
+    const batchNum = (i + 1) * 50;
+    html += `<div><span class="batch-num">${batchNum}. çivi</span><span>${formatDuration(ms)}</span></div>`;
+  });
+  batchHistory.innerHTML = html;
+}
+
+function updateStats() {
+  if (nailTimestamps.length === 0) {
+    statElapsed.textContent = '00:00';
+    statPace.textContent = '—';
+    statPerMin.textContent = '—';
+    statEst50.textContent = '—';
+    return;
+  }
+  const start = nailTimestamps[0];
+  const now = Date.now();
+  const elapsed = now - start;
+  statElapsed.textContent = formatDuration(elapsed);
+
+  const n = nailTimestamps.length;
+  if (n >= 2) {
+    const avgMsPerNail = elapsed / (n - 1 === 0 ? 1 : n);
+    const secPerNail = avgMsPerNail / 1000;
+    statPace.textContent = secPerNail.toFixed(1);
+    statPerMin.textContent = (60 / secPerNail).toFixed(1);
+    statEst50.textContent = formatDuration(secPerNail * 1000 * 50);
+  } else {
+    statPace.textContent = '—';
+    statPerMin.textContent = '—';
+    statEst50.textContent = '—';
+  }
+}
+
+setInterval(updateStats, 1000);
+
+// ---- Wake Lock: keep screen on while listening ----
+const wakeStatus = document.getElementById('wakeStatus');
+let wakeLock = null;
+
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) {
+    wakeStatus.textContent = '⚠️ Bu tarayıcı ekranı açık tutmayı desteklemiyor.';
+    return;
+  }
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeStatus.textContent = '🔆 Ekran açık tutuluyor';
+    wakeLock.addEventListener('release', () => {
+      wakeStatus.textContent = '';
+    });
+  } catch (err) {
+    wakeStatus.textContent = '';
+  }
+}
+
+function releaseWakeLock() {
+  if (wakeLock) {
+    wakeLock.release().catch(() => {});
+    wakeLock = null;
+    wakeStatus.textContent = '';
+  }
+}
+
+// Re-acquire wake lock if tab becomes visible again while still listening
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && listening && !wakeLock) {
+    requestWakeLock();
+  }
+});
+
+// ---- Daily report via email ----
+const reportBtn = document.getElementById('reportBtn');
+const dayStartTime = Date.now();
+
+reportBtn.addEventListener('click', () => {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('tr-TR');
+  const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+
+  let body = `Çivi Sayacı - Günlük Rapor (${dateStr} ${timeStr})\n\n`;
+  body += `Toplam çivi: ${count}\n`;
+
+  if (nailTimestamps.length >= 2) {
+    const start = nailTimestamps[0];
+    const end = nailTimestamps[nailTimestamps.length - 1];
+    const elapsed = end - start;
+    const secPerNail = elapsed / (nailTimestamps.length - 1);
+    body += `Toplam süre (ilk-son çivi arası): ${formatDuration(elapsed)}\n`;
+    body += `Ortalama hız: ${secPerNail.toFixed(1)} sn/çivi (${(60/secPerNail).toFixed(1)} çivi/dk)\n`;
+    body += `50 çivilik tahmini süre: ${formatDuration(secPerNail * 1000 * 50)}\n\n`;
+  } else {
+    body += `Yeterli veri yok (en az 2 çivi gerekli).\n\n`;
+  }
+
+  if (batchTimes.length > 0) {
+    body += `Tamamlanan 50'lik turlar:\n`;
+    batchTimes.forEach((ms, i) => {
+      body += `  - ${(i + 1) * 50}. çivi: ${formatDuration(ms)}\n`;
+    });
+  } else {
+    body += `Henüz 50'lik bir tur tamamlanmadı.\n`;
+  }
+
+  const subject = encodeURIComponent(`Çivi Sayacı Raporu - ${dateStr}`);
+  const encodedBody = encodeURIComponent(body);
+  window.location.href = `mailto:?subject=${subject}&body=${encodedBody}`;
+});
+
+
+function showDiag(msg) {
+  diagBanner.textContent = msg;
+  diagBanner.style.display = 'block';
+}
+function clearDiag() {
+  diagBanner.style.display = 'none';
+}
+
+// Run an early environment check so failures are never silent
+window.addEventListener('DOMContentLoaded', () => {
+  if (!window.isSecureContext) {
+    showDiag('⚠️ Bu sayfa güvenli (https) bağlantı üzerinden açılmamış. Mikrofon/kamera tarayıcı tarafından tamamen engelleniyor. Sayfayı sohbet içindeki önizlemeden "yeni sekmede aç" ile açmayı dene.');
+  } else if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showDiag('⚠️ Bu ortam mikrofon/kamera API’sini desteklemiyor (muhtemelen kısıtlı bir önizleme penceresi). Sayfayı ayrı bir sekmede/tarayıcıda açmayı dene.');
+  }
+});
+
+let cameraOn = false;
+let camStream = null;
+
+async function toggleCamera() {
+  if (cameraOn) {
+    if (camStream) camStream.getTracks().forEach(t => t.stop());
+    video.srcObject = null;
+    videoWrap.classList.remove('show');
+    cameraBtn.textContent = '📷 Kamerayı Aç';
+    cameraOn = false;
+    return;
+  }
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } },
+      audio: false
+    });
+    video.srcObject = camStream;
+    videoWrap.classList.add('show');
+    cameraBtn.textContent = '📷 Kamerayı Kapat';
+    cameraOn = true;
+  } catch (err) {
+    showDiag('📷 Kameraya erişilemedi: ' + err.message + '. İzinleri kontrol et veya sayfayı ayrı sekmede aç.');
+  }
+}
+
+cameraBtn.addEventListener('click', toggleCamera);
+
+threshSlider.addEventListener('input', () => {
+  threshold = parseInt(threshSlider.value);
+  threshVal.textContent = threshold;
+});
+cooldownSlider.addEventListener('input', () => {
+  cooldown = parseInt(cooldownSlider.value);
+  cooldownVal.textContent = cooldown;
+});
+
+function updateCount(delta) {
+  count = Math.max(0, count + delta);
+  countEl.textContent = count;
+  videoBadge.textContent = count;
+  counterBox.classList.add('pulse');
+  setTimeout(() => counterBox.classList.remove('pulse'), 100);
+
+  if (delta > 0) {
+    flash.classList.remove('go');
+    void flash.offsetWidth; // restart animation
+    flash.classList.add('go');
+    playBeep();
+
+    const now = Date.now();
+    nailTimestamps.push(now);
+
+    // check if we just completed a new batch of 50
+    if (count % 50 === 0 && count > 0) {
+      const batchStart = lastBatchMark || nailTimestamps[0];
+      batchTimes.push(now - batchStart);
+      lastBatchMark = now;
+      renderBatchHistory();
+    }
+  } else {
+    // undo: remove the most recent timestamp
+    nailTimestamps.pop();
+  }
+
+  updateStats();
+  if (navigator.vibrate) navigator.vibrate(40);
+}
+
+document.getElementById('plusBtn').addEventListener('click', () => updateCount(1));
+document.getElementById('minusBtn').addEventListener('click', () => updateCount(-1));
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (confirm('Sayacı ve istatistikleri sıfırlamak istediğine emin misin?')) {
+    count = 0;
+    countEl.textContent = 0;
+    videoBadge.textContent = 0;
+    nailTimestamps = [];
+    batchTimes = [];
+    lastBatchMark = 0;
+    renderBatchHistory();
+    updateStats();
+  }
+});
+
+let freqData = null;
+let armed = true; // hysteresis gate: must drop below release level before re-triggering
+let voiceFilterOn = true;
+
+const voiceFilterToggle = document.getElementById('voiceFilterToggle');
+voiceFilterToggle.addEventListener('change', () => {
+  voiceFilterOn = voiceFilterToggle.checked;
+});
+
+async function startListening() {
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioCtx.createMediaStreamSource(micStream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 1024;
+    analyser.smoothingTimeConstant = 0.15;
+    source.connect(analyser);
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+    freqData = new Uint8Array(analyser.frequencyBinCount);
+    armed = true;
+
+    listening = true;
+    listenBtn.textContent = '⏹ Dinlemeyi Durdur';
+    listenBtn.classList.add('listening');
+    dot.classList.add('active');
+    statusText.textContent = 'Dinleniyor...';
+
+    requestWakeLock();
+    detectLoop();
+  } catch (err) {
+    showDiag('🎤 Mikrofona erişilemedi: ' + err.message + '. İzinleri kontrol et veya sayfayı ayrı sekmede aç.');
+  }
+}
+
+function startListeningSafe() {
+  if (!window.isSecureContext || !navigator.mediaDevices) {
+    showDiag('⚠️ Bu ortamda mikrofon desteklenmiyor (https gerekli). Sayfayı ayrı bir sekmede açmayı dene.');
+    return;
+  }
+  clearDiag();
+  startListening();
+}
+
+function stopListening() {
+  listening = false;
+  if (rafId) cancelAnimationFrame(rafId);
+  if (micStream) micStream.getTracks().forEach(t => t.stop());
+  if (audioCtx) audioCtx.close();
+  releaseWakeLock();
+  listenBtn.textContent = '🎤 Dinlemeyi Başlat';
+  listenBtn.classList.remove('listening');
+  dot.classList.remove('active');
+  statusText.textContent = 'Dinleme kapalı';
+  meter.style.width = '0%';
+}
+
+// Returns true if the current sound's frequency profile looks like a sharp
+// metallic impact rather than a sustained human voice.
+// Voice energy concentrates heavily in the low band (~85-1000Hz).
+// A nail/metal clink spreads more energy into higher frequency bins.
+function isImpactLike() {
+  if (!voiceFilterOn || !audioCtx) return true;
+  analyser.getByteFrequencyData(freqData);
+
+  const binHz = audioCtx.sampleRate / analyser.fftSize;
+  const lowCutoffBin = Math.max(1, Math.round(1000 / binHz));
+
+  let lowEnergy = 0;
+  let totalEnergy = 0;
+  for (let i = 0; i < freqData.length; i++) {
+    const v = freqData[i];
+    totalEnergy += v;
+    if (i <= lowCutoffBin) lowEnergy += v;
+  }
+  if (totalEnergy < 5) return false; // basically silence, ignore
+
+  const lowRatio = lowEnergy / totalEnergy;
+  // Voice: lowRatio typically high (>0.6). Metal impact: more spread out, lower ratio.
+  return lowRatio < 0.62;
+}
+
+function detectLoop() {
+  if (!listening) return;
+  analyser.getByteTimeDomainData(dataArray);
+
+  // calculate volume as deviation from center (128)
+  let sumSquares = 0;
+  let peak = 0;
+  for (let i = 0; i < dataArray.length; i++) {
+    const dev = Math.abs(dataArray[i] - 128);
+    sumSquares += dev * dev;
+    if (dev > peak) peak = dev;
+  }
+  const rms = Math.sqrt(sumSquares / dataArray.length);
+  const level = Math.min(100, (peak / 128) * 100);
+  meter.style.width = level + '%';
+
+  const now = Date.now();
+  const releaseLevel = threshold * 0.55;
+
+  if (armed && peak > threshold && (now - lastTriggerTime) > cooldown) {
+    if (isImpactLike()) {
+      lastTriggerTime = now;
+      armed = false; // must drop below release level before counting again
+      updateCount(1);
+    }
+  }
+
+  // re-arm once the signal has settled back down (prevents double counts
+  // from a single decaying clang) regardless of cooldown timer
+  if (!armed && peak < releaseLevel) {
+    armed = true;
+  }
+
+  rafId = requestAnimationFrame(detectLoop);
+}
+
+listenBtn.addEventListener('click', () => {
+  if (listening) {
+    stopListening();
+  } else {
+    startListeningSafe();
+  }
+});
+</script>
+</body>
+</html>
