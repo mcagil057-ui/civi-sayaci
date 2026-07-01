@@ -1388,7 +1388,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 // için özel olarak destekliyor, bu yüzden birincil sağlayıcı yapıldı.
 // jsonblob.com ikincil yedek olarak kaldı; olası bir CORS ön-uçuş (preflight)
 // hatasını azaltmak için artık Content-Type başlığı zorlanmıyor. ----
-const SYNC_POLL_MS = 2000;
+const SYNC_POLL_MS = 1000; // izleyen cihazın veriyi hızlı görmesi için sık sık yoklanıyor
 
 function syncSleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
@@ -1603,7 +1603,8 @@ let syncWatchProviderKey = null; // izlerken hangi servis kullanılıyor
 let syncPollInterval = null;
 let syncHeartbeatInterval = null;
 let lastSyncPushAt = 0;
-const SYNC_PUSH_MIN_GAP_MS = 1200; // avoid hammering the API on rapid nail counts
+let syncPushTimeout = null;
+const SYNC_PUSH_MIN_GAP_MS = 400; // avoid hammering the API on rapid nail counts
 
 function showSyncDiag(msg) {
   syncDiag.textContent = msg;
@@ -1656,9 +1657,23 @@ async function pushSyncData() {
 function pushSyncIfBroadcasting() {
   if (syncMode !== 'broadcast') return;
   const now = Date.now();
-  if (now - lastSyncPushAt < SYNC_PUSH_MIN_GAP_MS) return;
-  lastSyncPushAt = now;
-  pushSyncData();
+  const elapsed = now - lastSyncPushAt;
+  if (elapsed >= SYNC_PUSH_MIN_GAP_MS) {
+    lastSyncPushAt = now;
+    pushSyncData();
+    return;
+  }
+  // Hız sınırına takıldık (art arda hızlı çivi sayımı): son durumu sessizce
+  // atlamak yerine, izin verilen en erken anda otomatik olarak tekrar
+  // gönderiyoruz — aksi halde bir sonraki güncelleme ancak birkaç saniye
+  // sonraki heartbeat ile gidiyor ve diğer cihaza geç ulaşıyordu.
+  if (!syncPushTimeout) {
+    syncPushTimeout = setTimeout(() => {
+      syncPushTimeout = null;
+      lastSyncPushAt = Date.now();
+      pushSyncData();
+    }, SYNC_PUSH_MIN_GAP_MS - elapsed);
+  }
 }
 
 async function startBroadcast() {
@@ -1674,8 +1689,9 @@ async function startBroadcast() {
     syncCode.textContent = makeSyncCode(syncProviderKey, syncBucketId);
     syncShowState();
     pushSyncData();
-    // heartbeat push every few seconds so elapsed-time keeps advancing on the viewer
-    syncHeartbeatInterval = setInterval(() => pushSyncData(), 4000);
+    // heartbeat push every couple seconds so elapsed-time keeps advancing on the viewer
+    // and any missed push gets caught up quickly
+    syncHeartbeatInterval = setInterval(() => pushSyncData(), 2000);
     addLog(`Yayın başlatıldı (kod: ${syncCode.textContent}, servis: ${SYNC_PROVIDERS[syncProviderKey].label})`);
   } catch (err) {
     showSyncDiag('⚠️ Yayın başlatılamadı: ' + err.message + '. Birkaç saniye sonra "Tekrar Dene"yi deneyebilirsin. Israrla devam ederse mobil veri yerine Wi-Fi ile (veya tam tersini) denemeni öneririz — bazı operatörler bu tür paylaşım servislerini engelleyebiliyor.');
@@ -1692,6 +1708,7 @@ function stopBroadcast() {
   syncBucketId = null;
   syncProviderKey = null;
   if (syncHeartbeatInterval) clearInterval(syncHeartbeatInterval);
+  if (syncPushTimeout) { clearTimeout(syncPushTimeout); syncPushTimeout = null; }
   resetSyncQr();
   syncShowState();
   addLog('Yayın durduruldu');
