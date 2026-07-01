@@ -6,47 +6,71 @@
 <title>Çivi Sayacı</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --bg-1: #0b0d18;
+    --bg-2: #171b32;
+    --accent: #ffb020;
+    --accent-2: #34d399;
+    --danger: #ff5c5c;
+    --surface: rgba(255,255,255,0.055);
+    --surface-2: rgba(255,255,255,0.095);
+    --border: rgba(255,255,255,0.11);
+    --text: #f5f7fb;
+    --text-dim: #98a2b8;
+    --text-faint: #626d80;
+    --radius-lg: 20px;
+    --radius-md: 15px;
+    --radius-sm: 10px;
+  }
   body {
     margin: 0;
-    font-family: -apple-system, system-ui, sans-serif;
-    background: linear-gradient(160deg, #1a1a2e 0%, #16213e 100%);
-    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: radial-gradient(circle at 50% -10%, #262c52 0%, var(--bg-2) 42%, var(--bg-1) 100%) var(--bg-1);
+    color: var(--text);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 20px;
+    padding: 24px 18px 40px;
+    -webkit-font-smoothing: antialiased;
   }
   h1 {
-    font-size: 1.3rem;
-    font-weight: 600;
-    margin: 10px 0 4px;
-    color: #f0a500;
+    font-size: 1.45rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin: 6px 0 4px;
+    background: linear-gradient(90deg, var(--accent), #ffdb8a);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
   .subtitle {
-    color: #9aa5b1;
+    color: var(--text-dim);
     font-size: 0.85rem;
-    margin-bottom: 20px;
+    margin-bottom: 22px;
     text-align: center;
   }
   .counter-box {
-    background: rgba(255,255,255,0.05);
-    border: 2px solid #f0a500;
-    border-radius: 24px;
-    padding: 30px 50px;
+    background: linear-gradient(150deg, rgba(255,255,255,0.075), rgba(255,255,255,0.015));
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,176,32,0.35);
+    border-radius: var(--radius-lg);
+    padding: 32px 50px;
     text-align: center;
     margin-bottom: 20px;
-    box-shadow: 0 0 30px rgba(240,165,0,0.15);
-    transition: transform 0.1s;
+    box-shadow: 0 10px 40px rgba(240,165,0,0.14), inset 0 1px 0 rgba(255,255,255,0.07);
+    transition: transform 0.15s ease;
   }
-  .counter-box.pulse { transform: scale(1.08); }
+  .counter-box.pulse { transform: scale(1.06); }
   #count {
     font-size: 5rem;
     font-weight: 800;
+    letter-spacing: -0.02em;
     color: #fff;
     line-height: 1;
   }
-  .label { color: #9aa5b1; font-size: 0.9rem; margin-top: 6px; }
+  .label { color: var(--text-dim); font-size: 0.85rem; margin-top: 8px; letter-spacing: 0.02em; }
 
   .status {
     display: flex;
@@ -54,7 +78,7 @@
     gap: 8px;
     margin-bottom: 18px;
     font-size: 0.9rem;
-    color: #9aa5b1;
+    color: var(--text-dim);
   }
   .dot {
     width: 10px; height: 10px; border-radius: 50%;
@@ -62,37 +86,41 @@
     transition: background 0.2s, box-shadow 0.2s;
   }
   .dot.active {
-    background: #2ecc71;
-    box-shadow: 0 0 10px #2ecc71;
+    background: var(--accent-2);
+    box-shadow: 0 0 10px var(--accent-2);
   }
 
   .meter-wrap {
     width: 100%;
     max-width: 320px;
     height: 8px;
-    background: rgba(255,255,255,0.08);
-    border-radius: 4px;
+    background: var(--surface);
+    border-radius: 999px;
     overflow: hidden;
     margin-bottom: 24px;
   }
 
   button {
     border: none;
-    border-radius: 16px;
+    border-radius: var(--radius-md);
     font-weight: 700;
     cursor: pointer;
     font-family: inherit;
+    transition: transform 0.08s ease, filter 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
   }
+  button:active { transform: scale(0.97); }
+
   .main-btn {
     width: 100%;
     max-width: 320px;
     padding: 18px;
-    font-size: 1.1rem;
-    background: #f0a500;
+    font-size: 1.05rem;
+    background: linear-gradient(135deg, var(--accent), #ffcb61);
     color: #1a1a2e;
     margin-bottom: 14px;
+    box-shadow: 0 8px 22px rgba(255,176,32,0.25);
   }
-  .main-btn.listening { background: #e74c3c; color: #fff; }
+  .main-btn.listening { background: linear-gradient(135deg, #ff7a59, var(--danger)); color: #fff; box-shadow: 0 8px 22px rgba(255,92,92,0.25); }
 
   .row {
     display: flex;
@@ -105,37 +133,43 @@
     flex: 1;
     padding: 16px;
     font-size: 1.4rem;
-    background: rgba(255,255,255,0.08);
+    background: var(--surface);
+    border: 1px solid var(--border);
     color: #fff;
   }
-  .row button:active { background: rgba(255,255,255,0.18); }
+  .row button:active { background: var(--surface-2); }
 
   .reset-btn {
     width: 100%;
     max-width: 320px;
     padding: 12px;
     font-size: 0.9rem;
-    background: transparent;
-    color: #e74c3c;
-    border: 1px solid #e74c3c;
+    background: rgba(255,92,92,0.08);
+    color: #ff8a8a;
+    border: 1px solid rgba(255,92,92,0.35);
+    border-radius: 999px;
   }
 
   .settings {
     width: 100%;
     max-width: 320px;
     margin-top: 20px;
-    padding: 14px;
-    background: rgba(255,255,255,0.04);
-    border-radius: 14px;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
   }
   .settings label {
     font-size: 0.8rem;
-    color: #9aa5b1;
+    color: var(--text-dim);
     display: flex;
     justify-content: space-between;
     margin-bottom: 6px;
   }
-  input[type=range] { width: 100%; }
+  input[type=range] {
+    width: 100%;
+    accent-color: var(--accent);
+  }
 
   .checkbox-row {
     display: flex;
@@ -143,7 +177,7 @@
     justify-content: space-between;
     margin-top: 14px;
     padding-top: 12px;
-    border-top: 1px solid rgba(255,255,255,0.08);
+    border-top: 1px solid var(--border);
   }
   .checkbox-row span { font-size: 0.82rem; color: #cfd6dd; }
   .switch {
@@ -170,16 +204,20 @@
     border-radius: 50%;
     transition: transform 0.2s;
   }
-  .switch input:checked + .switch-track { background: #2ecc71; }
+  .switch input:checked + .switch-track { background: var(--accent-2); }
   .switch input:checked + .switch-track::before { transform: translateX(20px); }
 
   .hint {
     margin-top: 16px;
     font-size: 0.78rem;
-    color: #6b7787;
+    color: var(--text-faint);
     text-align: center;
     max-width: 320px;
-    line-height: 1.4;
+    line-height: 1.5;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
   }
 
   .video-wrap {
@@ -187,11 +225,12 @@
     width: 100%;
     max-width: 320px;
     aspect-ratio: 4/3;
-    border-radius: 18px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
     margin-bottom: 16px;
     background: #000;
-    border: 2px solid rgba(255,255,255,0.1);
+    border: 1px solid var(--border);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
     display: none;
   }
   .video-wrap.show { display: block; }
@@ -203,7 +242,7 @@
   .flash {
     position: absolute;
     inset: 0;
-    background: #2ecc71;
+    background: var(--accent-2);
     opacity: 0;
     pointer-events: none;
   }
@@ -219,36 +258,42 @@
     top: 8px;
     right: 8px;
     background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(6px);
     color: #fff;
     font-weight: 700;
     font-size: 1.4rem;
     padding: 4px 12px;
-    border-radius: 10px;
+    border-radius: var(--radius-sm);
+    z-index: 3;
   }
   .camera-toggle {
     width: 100%;
     max-width: 320px;
     padding: 12px;
     font-size: 0.9rem;
-    background: rgba(255,255,255,0.08);
+    background: var(--surface);
+    border: 1px solid var(--border);
     color: #fff;
     margin-bottom: 14px;
+    border-radius: 999px;
   }
 
   .stats-panel {
     width: 100%;
     max-width: 320px;
-    background: rgba(255,255,255,0.04);
-    border-radius: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     padding: 16px;
     margin-bottom: 16px;
   }
   .stats-title {
-    font-size: 0.8rem;
-    color: #9aa5b1;
+    font-size: 0.78rem;
+    color: var(--text-dim);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
     margin-bottom: 10px;
+    font-weight: 700;
   }
   .stats-grid {
     display: grid;
@@ -256,24 +301,25 @@
     gap: 12px;
   }
   .stat-item {
-    background: rgba(255,255,255,0.04);
-    border-radius: 12px;
+    background: rgba(255,255,255,0.045);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
     padding: 10px 12px;
   }
   .stat-value {
     font-size: 1.3rem;
     font-weight: 700;
-    color: #f0a500;
+    color: var(--accent);
   }
   .stat-label {
     font-size: 0.7rem;
-    color: #9aa5b1;
+    color: var(--text-dim);
     margin-top: 2px;
   }
   .batch-history {
     margin-top: 12px;
     font-size: 0.75rem;
-    color: #9aa5b1;
+    color: var(--text-dim);
     line-height: 1.6;
     max-height: 90px;
     overflow-y: auto;
@@ -286,26 +332,29 @@
     max-width: 320px;
     padding: 10px;
     font-size: 0.85rem;
-    background: rgba(255,255,255,0.06);
-    color: #9aa5b1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
     margin-bottom: 14px;
+    border-radius: 999px;
   }
-  .sound-toggle.on { color: #2ecc71; }
+  .sound-toggle.on { color: var(--accent-2); border-color: rgba(52,211,153,0.4); }
 
   .report-btn {
     width: 100%;
     max-width: 320px;
     padding: 14px;
     font-size: 0.95rem;
-    background: rgba(46,204,113,0.12);
-    color: #2ecc71;
-    border: 1px solid rgba(46,204,113,0.4);
+    background: rgba(52,211,153,0.12);
+    color: var(--accent-2);
+    border: 1px solid rgba(52,211,153,0.4);
     margin-bottom: 14px;
+    border-radius: 999px;
   }
 
   .wake-status {
     font-size: 0.72rem;
-    color: #6b7787;
+    color: var(--text-faint);
     text-align: center;
     margin-top: -10px;
     margin-bottom: 14px;
@@ -313,45 +362,77 @@
 
   .tabs {
     display: flex;
-    gap: 8px;
+    gap: 4px;
     width: 100%;
     max-width: 320px;
-    margin-bottom: 16px;
+    margin-bottom: 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px;
   }
   .tab-btn {
     flex: 1;
-    padding: 10px;
-    font-size: 0.85rem;
-    background: rgba(255,255,255,0.05);
-    color: #9aa5b1;
-    border: 1px solid rgba(255,255,255,0.1);
+    padding: 9px;
+    font-size: 0.83rem;
+    background: transparent;
+    color: var(--text-dim);
+    border: none;
+    border-radius: 999px;
   }
   .tab-btn.active {
-    background: rgba(240,165,0,0.15);
-    color: #f0a500;
-    border-color: #f0a500;
+    background: linear-gradient(135deg, var(--accent), #ffcb61);
+    color: #1a1a2e;
+    box-shadow: 0 4px 14px rgba(255,176,32,0.3);
   }
-  .tab-panel { width: 100%; display: flex; flex-direction: column; align-items: center; }
+  .tab-panel { width: 100%; display: flex; flex-direction: column; align-items: center; animation: fadeIn 0.2s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
   .box-guide {
     position: absolute;
-    left: 14%; right: 14%; top: 10%; bottom: 16%;
-    border: 2px dashed rgba(46,204,113,0.9);
-    border-radius: 12px;
+    left: 14%; top: 10%; width: 72%; height: 74%;
+    border: 2px solid rgba(52,211,153,0.9);
+    border-radius: 14px;
+    box-shadow: 0 0 0 1000px rgba(0,0,0,0.28);
     pointer-events: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
   }
-  .box-guide::after {
-    content: 'Kutu ağzını buraya hizala';
+  .box-guide.manual { border-color: rgba(255,176,32,0.95); }
+  .box-guide .corner {
     position: absolute;
-    bottom: -20px; left: 50%;
+    width: 16px; height: 16px;
+    border: 3px solid var(--accent-2);
+  }
+  .box-guide.manual .corner { border-color: var(--accent); }
+  .box-guide .corner.tl { top: -3px; left: -3px; border-right: none; border-bottom: none; border-radius: 6px 0 0 0; }
+  .box-guide .corner.tr { top: -3px; right: -3px; border-left: none; border-bottom: none; border-radius: 0 6px 0 0; }
+  .box-guide .corner.bl { bottom: -3px; left: -3px; border-right: none; border-top: none; border-radius: 0 0 0 6px; }
+  .box-guide .corner.br { bottom: -3px; right: -3px; border-left: none; border-top: none; border-radius: 0 0 6px 0; }
+  .guide-label {
+    position: absolute;
+    bottom: -22px; left: 50%;
     transform: translateX(-50%);
     font-size: 0.62rem;
-    color: #2ecc71;
+    color: var(--accent-2);
     white-space: nowrap;
-    background: rgba(0,0,0,0.55);
+    background: rgba(0,0,0,0.6);
     padding: 2px 7px;
     border-radius: 6px;
   }
+  .box-guide.manual .guide-label { color: var(--accent); }
+
+  .draw-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    touch-action: none;
+    cursor: crosshair;
+    z-index: 4;
+  }
+  .draw-layer.active { pointer-events: auto; background: rgba(0,0,0,0.1); }
+
+  .roi-controls { width: 100%; max-width: 320px; margin-bottom: 14px; display: none; }
+  .roi-hint { margin-top: 8px; font-size: 0.72rem; color: var(--accent); text-align: center; }
 
   .preset-row {
     display: flex;
@@ -362,15 +443,15 @@
     flex: 1;
     padding: 9px 4px;
     font-size: 0.72rem;
-    background: rgba(255,255,255,0.07);
+    background: var(--surface);
     color: #cfd6dd;
-    border-radius: 10px;
+    border-radius: var(--radius-sm);
     border: 1px solid transparent;
   }
   .preset-btn.active {
-    background: rgba(46,204,113,0.15);
-    color: #2ecc71;
-    border-color: #2ecc71;
+    background: rgba(52,211,153,0.15);
+    color: var(--accent-2);
+    border-color: var(--accent-2);
   }
 
   .notes-log {
@@ -382,14 +463,35 @@
     line-height: 1.7;
   }
   .notes-log .day-header {
-    color: #f0a500;
+    color: var(--accent);
     font-weight: 700;
     margin: 10px 0 4px;
     font-size: 0.75rem;
   }
   .notes-log .log-row { display: flex; gap: 8px; }
-  .notes-log .log-time { color: #6b7787; flex-shrink: 0; }
-  .notes-empty { color: #6b7787; font-size: 0.8rem; text-align: center; padding: 12px 0; }
+  .notes-log .log-time { color: var(--text-faint); flex-shrink: 0; }
+  .notes-empty { color: var(--text-faint); font-size: 0.8rem; text-align: center; padding: 12px 0; }
+
+  .qr-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(5,6,12,0.94);
+    backdrop-filter: blur(6px);
+    z-index: 100;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    gap: 14px;
+  }
+  .qr-modal.show { display: flex; }
+  .qr-modal video {
+    width: 100%; max-width: 320px;
+    border-radius: var(--radius-lg);
+    border: 2px solid var(--accent-2);
+  }
+  .qr-modal-hint { color: var(--text-dim); font-size: 0.85rem; text-align: center; max-width: 300px; }
 
 </style>
 </head>
@@ -420,17 +522,26 @@
       <div id="syncCode" style="font-size:1.7rem; font-weight:800; color:#f0a500; letter-spacing:0.04em; word-break:break-all;">------</div>
     </div>
     <button class="camera-toggle" id="syncCopyBtn">📋 Kodu Kopyala</button>
+    <button class="camera-toggle" id="syncShowQrBtn">📷 QR Kod Göster</button>
+    <div id="syncQrWrap" style="display:none; text-align:center; margin-bottom:10px; background:#fff; padding:12px; border-radius:14px;"></div>
     <button class="reset-btn" id="syncStopBtn" style="margin-top:8px;">Yayını Durdur</button>
   </div>
   <div id="syncConnectForm" style="display:none;">
     <input type="text" id="syncCodeInput" placeholder="Kodu buraya yapıştır" style="width:100%; padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); color:#fff; font-size:1rem; margin-bottom:8px; box-sizing:border-box;">
     <button class="camera-toggle" id="syncConnectBtn">Bağlan</button>
+    <button class="camera-toggle" id="syncScanQrBtn">📷 QR Tara ve Bağlan</button>
   </div>
   <div id="syncWatching" style="display:none;">
     <div style="text-align:center; font-size:0.82rem; color:#2ecc71; margin-bottom:8px;">🟢 Canlı izleniyor</div>
     <button class="reset-btn" id="syncDisconnectBtn">Bağlantıyı Kes</button>
   </div>
   <div id="syncDiag" style="display:none; font-size:0.75rem; color:#ffb3a7; margin-top:8px; line-height:1.4;"></div>
+</div>
+
+<div class="qr-modal" id="qrScanModal">
+  <video id="qrScanVideo" autoplay playsinline muted></video>
+  <div class="qr-modal-hint">Diğer cihazdaki QR kodu kameraya göster</div>
+  <button class="reset-btn" id="qrScanCancelBtn" style="max-width:200px;">İptal</button>
 </div>
 
 <div class="counter-box" id="counterBox">
@@ -472,9 +583,24 @@
 
 <div class="video-wrap" id="videoWrap">
   <video id="video" autoplay playsinline muted></video>
-  <div class="box-guide" id="boxGuide"></div>
+  <div class="box-guide" id="boxGuide">
+    <span class="corner tl"></span>
+    <span class="corner tr"></span>
+    <span class="corner bl"></span>
+    <span class="corner br"></span>
+    <span class="guide-label" id="guideLabel">Otomatik alan</span>
+  </div>
+  <div class="draw-layer" id="drawLayer"></div>
   <div class="flash" id="flash"></div>
   <div class="video-count-badge" id="videoBadge">0</div>
+</div>
+
+<div class="roi-controls" id="roiControls">
+  <div class="preset-row">
+    <button class="preset-btn roi-btn active" id="roiAutoBtn" type="button">🎯 Otomatik Alan</button>
+    <button class="preset-btn roi-btn" id="roiManualBtn" type="button">✏️ Elle Çiz</button>
+  </div>
+  <div class="roi-hint" id="roiHint" style="display:none;">Parmağınla video üzerinde kutunun ağzını çiz</div>
 </div>
 
 <button class="main-btn" id="motionToggle" style="display:none;">⏸ Algılamayı Duraklat</button>
@@ -509,7 +635,8 @@
 </div>
 
 <div class="hint" id="hintBox">
-  Kamerayı aç, telefonu kutunun ağzına yakın ve sabit tut — noktalı yeşil çerçeveyi kutunun ağzına hizala. Algılama, kamera açılır açılmaz otomatik ve hassas şekilde başlar.<br><br>
+  Kamerayı aç, telefonu kutunun ağzına yakın ve sabit tut. Yeşil köşeli çerçeve algılanan alanı gösterir; algılama, kamera açılır açılmaz bu alanda otomatik ve hassas şekilde başlar.<br><br>
+  Alan otomatik konumu tam uymuyorsa video üzerindeki "✏️ Elle Çiz" ile kutunun ağzını parmağınla çizip kendi alanını tanımlayabilirsin — çizdiğin alan hatırlanır, "🎯 Otomatik Alan"a basarak istediğin zaman geri dönebilirsin.<br><br>
   Ekrandaki "Hareket seviyesi" sayısını izle: birkaç çivi at, hangi değerlere çıktığını gör, sonra "Hareket hassasiyeti" kaydırıcısını veya hazır ayarlardan birini (Az Hassas / Orta / Çok Hassas) seç. Yandan atışlarda kaçırma yaşarsan "Çok Hassas" ayarında kal; çok fazla yanlış sayım olursa "Az Hassas"a geç.<br><br>
   Yanlış sayımları her zaman +1 / −1 ile elle düzeltebilirsin. Ne yaptığın "Notlar" sekmesine otomatik olarak kaydediliyor.
 </div>
@@ -526,6 +653,8 @@
   <button class="reset-btn" id="notesClearBtn">Günlüğü Temizle</button>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 let count = 0;
 
@@ -738,6 +867,9 @@ async function toggleCamera() {
     stopMotionDetection();
     motionToggle.style.display = 'none';
     motionMeterWrap.style.display = 'none';
+    roiControls.style.display = 'none';
+    drawLayer.classList.remove('active');
+    roiHint.style.display = 'none';
     statusText.textContent = 'Kamera kapalı';
     dot.classList.remove('active');
     addLog('Kamera kapatıldı');
@@ -753,9 +885,20 @@ async function toggleCamera() {
     cameraBtn.textContent = '📷 Kamerayı Kapat';
     cameraOn = true;
     motionToggle.style.display = 'block';
+    roiControls.style.display = 'block';
     addLog('Kamera açıldı, otomatik algılama başlatılıyor');
     // Kamera açılır açılmaz otomatik ve hassas şekilde algılamayı başlat.
-    startMotionDetection();
+    // Video boyutları hazır olmadan alan hesaplanamayacağı için metadata'yı bekliyoruz.
+    const beginDetection = () => {
+      applyRoiToGuide();
+      recomputeVideoRect();
+      startMotionDetection();
+    };
+    if (video.readyState >= 1 && video.videoWidth) {
+      beginDetection();
+    } else {
+      video.addEventListener('loadedmetadata', beginDetection, { once: true });
+    }
   } catch (err) {
     showDiag('📷 Kameraya erişilemedi: ' + err.message + '. İzinleri kontrol et veya sayfayı ayrı sekmede aç.');
     addLog('Kamera açılamadı: ' + err.message);
@@ -763,6 +906,7 @@ async function toggleCamera() {
 }
 
 cameraBtn.addEventListener('click', toggleCamera);
+window.addEventListener('resize', () => { if (cameraOn) recomputeVideoRect(); });
 
 // ---- Motion-based detection (visual nail-drop detection) ----
 const motionToggle = document.getElementById('motionToggle');
@@ -791,6 +935,162 @@ motionCanvas.width = 96;
 motionCanvas.height = 72;
 const motionCtx = motionCanvas.getContext('2d', { willReadFrequently: true });
 
+// ---- Algılama Alanı (ROI): otomatik ortalanmış kutu veya kullanıcının elle
+// çizdiği alan. Sadece bu alan analiz edilir — hem kutunun dışındaki
+// gereksiz hareketi göz ardı eder hem de küçük/hızlı hareketlere (yandan
+// atılan çiviler gibi) daha yüksek etkin çözünürlük ayırarak yardımcı olur.
+const ROI_STORAGE_KEY = 'civiSayaciRoi';
+const DEFAULT_ROI = { x0: 0.14, y0: 0.10, x1: 0.86, y1: 0.84 };
+let roiMode = 'auto'; // 'auto' | 'manual'
+let manualRoi = null;
+let currentVideoRect = null; // video kaynak piksel uzayında {sx,sy,sw,sh}
+
+const boxGuide = document.getElementById('boxGuide');
+const guideLabel = document.getElementById('guideLabel');
+const roiControls = document.getElementById('roiControls');
+const roiAutoBtn = document.getElementById('roiAutoBtn');
+const roiManualBtn = document.getElementById('roiManualBtn');
+const roiHint = document.getElementById('roiHint');
+const drawLayer = document.getElementById('drawLayer');
+
+function loadRoi() {
+  try {
+    const raw = localStorage.getItem(ROI_STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data && data.mode === 'manual' && data.roi) {
+      roiMode = 'manual';
+      manualRoi = data.roi;
+    }
+  } catch (e) { /* bozuk veri: yoksay, otomatike düş */ }
+}
+function saveRoi() {
+  try {
+    localStorage.setItem(ROI_STORAGE_KEY, JSON.stringify({ mode: roiMode, roi: manualRoi }));
+  } catch (e) { /* depolama erişilemez olabilir, sessizce geç */ }
+}
+
+function activeRoi() {
+  return (roiMode === 'manual' && manualRoi) ? manualRoi : DEFAULT_ROI;
+}
+
+function applyRoiToGuide() {
+  const roi = activeRoi();
+  boxGuide.style.left = (roi.x0 * 100) + '%';
+  boxGuide.style.top = (roi.y0 * 100) + '%';
+  boxGuide.style.width = ((roi.x1 - roi.x0) * 100) + '%';
+  boxGuide.style.height = ((roi.y1 - roi.y0) * 100) + '%';
+  boxGuide.classList.toggle('manual', roiMode === 'manual');
+  guideLabel.textContent = roiMode === 'manual' ? 'Elle çizilen alan' : 'Otomatik alan';
+  roiAutoBtn.classList.toggle('active', roiMode === 'auto');
+  roiManualBtn.classList.toggle('active', roiMode === 'manual');
+}
+
+// Video, object-fit:cover ile gösterildiği için ekranda görünen (kırpılmış)
+// alanla asıl video kaynağının piksel koordinatları farklıdır. Bu fonksiyon
+// ekran-oranlı ROI'yi video kaynak piksel dikdörtgenine çevirir.
+function roiToVideoRect(roi) {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const cw = videoWrap.clientWidth, ch = videoWrap.clientHeight;
+  if (!vw || !vh || !cw || !ch) return null;
+  const scale = Math.max(cw / vw, ch / vh);
+  const offX = (vw * scale - cw) / 2;
+  const offY = (vh * scale - ch) / 2;
+  const toSrcX = (frac) => (frac * cw + offX) / scale;
+  const toSrcY = (frac) => (frac * ch + offY) / scale;
+  let sx0 = toSrcX(roi.x0), sx1 = toSrcX(roi.x1);
+  let sy0 = toSrcY(roi.y0), sy1 = toSrcY(roi.y1);
+  sx0 = Math.max(0, Math.min(vw, sx0)); sx1 = Math.max(0, Math.min(vw, sx1));
+  sy0 = Math.max(0, Math.min(vh, sy0)); sy1 = Math.max(0, Math.min(vh, sy1));
+  return { sx: sx0, sy: sy0, sw: Math.max(1, sx1 - sx0), sh: Math.max(1, sy1 - sy0) };
+}
+
+function recomputeVideoRect() {
+  currentVideoRect = roiToVideoRect(activeRoi());
+}
+
+function setRoiMode(mode) {
+  roiMode = mode;
+  if (mode === 'auto') manualRoi = null;
+  applyRoiToGuide();
+  recomputeVideoRect();
+  saveRoi();
+  prevGray = null; // alan değişti: eski kareyle kıyaslarsak sahte bir tetikleme oluşur
+}
+
+roiAutoBtn.addEventListener('click', () => {
+  drawLayer.classList.remove('active');
+  roiHint.style.display = 'none';
+  setRoiMode('auto');
+  addLog('Algılama alanı otomatike döndürüldü');
+});
+
+roiManualBtn.addEventListener('click', () => {
+  drawLayer.classList.add('active');
+  roiHint.style.display = 'block';
+  roiManualBtn.classList.add('active');
+  roiAutoBtn.classList.remove('active');
+});
+
+let drawingRoi = null;
+function pointFromEvent(e) {
+  const rect = videoWrap.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const y = (e.clientY - rect.top) / rect.height;
+  return { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) };
+}
+function normalizeRoi(r) {
+  return {
+    x0: Math.min(r.x0, r.x1), y0: Math.min(r.y0, r.y1),
+    x1: Math.max(r.x0, r.x1), y1: Math.max(r.y0, r.y1)
+  };
+}
+function renderDrawingRoi() {
+  const roi = normalizeRoi(drawingRoi);
+  boxGuide.style.left = (roi.x0 * 100) + '%';
+  boxGuide.style.top = (roi.y0 * 100) + '%';
+  boxGuide.style.width = ((roi.x1 - roi.x0) * 100) + '%';
+  boxGuide.style.height = ((roi.y1 - roi.y0) * 100) + '%';
+  boxGuide.classList.add('manual');
+  guideLabel.textContent = 'Çiziliyor...';
+}
+drawLayer.addEventListener('pointerdown', (e) => {
+  if (!drawLayer.classList.contains('active')) return;
+  e.preventDefault();
+  const p = pointFromEvent(e);
+  drawingRoi = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+  renderDrawingRoi();
+});
+drawLayer.addEventListener('pointermove', (e) => {
+  if (!drawingRoi) return;
+  e.preventDefault();
+  const p = pointFromEvent(e);
+  drawingRoi.x1 = p.x;
+  drawingRoi.y1 = p.y;
+  renderDrawingRoi();
+});
+window.addEventListener('pointerup', () => {
+  if (!drawingRoi) return;
+  const roi = normalizeRoi(drawingRoi);
+  drawingRoi = null;
+  if ((roi.x1 - roi.x0) < 0.05 || (roi.y1 - roi.y0) < 0.05) {
+    applyRoiToGuide(); // çok küçük/yanlışlıkla dokunma: çizimi iptal say
+    return;
+  }
+  manualRoi = roi;
+  roiMode = 'manual';
+  applyRoiToGuide();
+  recomputeVideoRect();
+  saveRoi();
+  prevGray = null; // alan değişti: eski kareyle kıyaslarsak sahte bir tetikleme oluşur
+  drawLayer.classList.remove('active');
+  roiHint.style.display = 'none';
+  addLog('Algılama alanı elle çizildi');
+});
+
+loadRoi();
+applyRoiToGuide();
+
 const MOTION_PRESETS = { low: 8, mid: 4, high: 2 };
 function applyMotionPreset(key) {
   const val = MOTION_PRESETS[key];
@@ -798,17 +1098,17 @@ function applyMotionPreset(key) {
   motionThreshold = val;
   motionThreshSlider.value = val;
   motionThreshVal.textContent = val;
-  document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === key));
+  document.querySelectorAll('#motionSettings .preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === key));
   addLog(`Hassasiyet ayarı değişti: ${key === 'low' ? 'Az Hassas' : key === 'mid' ? 'Orta' : 'Çok Hassas'} (%${val})`);
 }
-document.querySelectorAll('.preset-btn').forEach(btn => {
+document.querySelectorAll('#motionSettings .preset-btn').forEach(btn => {
   btn.addEventListener('click', () => applyMotionPreset(btn.dataset.preset));
 });
 
 motionThreshSlider.addEventListener('input', () => {
   motionThreshold = parseFloat(motionThreshSlider.value);
   motionThreshVal.textContent = motionThreshold;
-  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#motionSettings .preset-btn').forEach(b => b.classList.remove('active'));
 });
 motionCooldownSlider.addEventListener('input', () => {
   motionCooldown = parseInt(motionCooldownSlider.value);
@@ -821,7 +1121,12 @@ motionCooldownSlider.addEventListener('input', () => {
 // localized motion across a large mostly-static frame.
 function computeMotionLevel() {
   const w = motionCanvas.width, h = motionCanvas.height;
-  motionCtx.drawImage(video, 0, 0, w, h);
+  if (currentVideoRect) {
+    const r = currentVideoRect;
+    motionCtx.drawImage(video, r.sx, r.sy, r.sw, r.sh, 0, 0, w, h);
+  } else {
+    motionCtx.drawImage(video, 0, 0, w, h);
+  }
   const frame = motionCtx.getImageData(0, 0, w, h).data;
   const gray = new Uint8ClampedArray(w * h);
   for (let i = 0, p = 0; i < frame.length; i += 4, p++) {
@@ -1172,13 +1477,109 @@ const syncRetryBtn = document.getElementById('syncRetryBtn');
 const syncBroadcasting = document.getElementById('syncBroadcasting');
 const syncCode = document.getElementById('syncCode');
 const syncCopyBtn = document.getElementById('syncCopyBtn');
+const syncShowQrBtn = document.getElementById('syncShowQrBtn');
+const syncQrWrap = document.getElementById('syncQrWrap');
 const syncStopBtn = document.getElementById('syncStopBtn');
 const syncConnectForm = document.getElementById('syncConnectForm');
 const syncCodeInput = document.getElementById('syncCodeInput');
 const syncConnectBtn = document.getElementById('syncConnectBtn');
+const syncScanQrBtn = document.getElementById('syncScanQrBtn');
 const syncWatching = document.getElementById('syncWatching');
 const syncDisconnectBtn = document.getElementById('syncDisconnectBtn');
 const syncDiag = document.getElementById('syncDiag');
+
+// ---- QR ile kolay eşleştirme: kod sistemi aynen çalışmaya devam eder,
+// QR sadece kodu elle yazmadan aktarmanın bir yolu (kütüphaneler CDN'den
+// yüklenemezse otomatik olarak devre dışı kalır, kod hep elle de girilebilir). ----
+function resetSyncQr() {
+  syncQrWrap.style.display = 'none';
+  syncQrWrap.innerHTML = '';
+  syncShowQrBtn.textContent = '📷 QR Kod Göster';
+}
+
+function renderSyncQr(text) {
+  if (typeof qrcode === 'undefined') {
+    showSyncDiag('⚠️ QR kütüphanesi yüklenemedi (internet gerekli). Kodu elle kopyalayıp diğer cihaza yapıştırabilirsin.');
+    return false;
+  }
+  try {
+    const qr = qrcode(0, 'M');
+    qr.addData(text);
+    qr.make();
+    syncQrWrap.innerHTML = qr.createImgTag(6, 8);
+    return true;
+  } catch (e) {
+    showSyncDiag('⚠️ QR kod oluşturulamadı: ' + e.message);
+    return false;
+  }
+}
+
+syncShowQrBtn.addEventListener('click', () => {
+  if (syncQrWrap.style.display !== 'none') {
+    resetSyncQr();
+    return;
+  }
+  if (renderSyncQr(syncCode.textContent)) {
+    syncQrWrap.style.display = 'block';
+    syncShowQrBtn.textContent = '🙈 QR Kodu Gizle';
+  }
+});
+
+const qrScanModal = document.getElementById('qrScanModal');
+const qrScanVideo = document.getElementById('qrScanVideo');
+const qrScanCancelBtn = document.getElementById('qrScanCancelBtn');
+let qrScanStream = null;
+let qrScanRafId = null;
+const qrScanCanvas = document.createElement('canvas');
+const qrScanCtx = qrScanCanvas.getContext('2d', { willReadFrequently: true });
+
+async function openQrScanner() {
+  if (typeof jsQR === 'undefined') {
+    showSyncDiag('⚠️ QR tarama kütüphanesi yüklenemedi (internet gerekli). Kodu elle yapıştırabilirsin.');
+    return;
+  }
+  try {
+    qrScanStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } },
+      audio: false
+    });
+    qrScanVideo.srcObject = qrScanStream;
+    qrScanModal.classList.add('show');
+    qrScanRafId = requestAnimationFrame(qrScanLoop);
+  } catch (err) {
+    showSyncDiag('📷 QR tarama için kameraya erişilemedi: ' + err.message);
+  }
+}
+
+function closeQrScanner() {
+  if (qrScanRafId) cancelAnimationFrame(qrScanRafId);
+  qrScanRafId = null;
+  if (qrScanStream) { qrScanStream.getTracks().forEach(t => t.stop()); qrScanStream = null; }
+  qrScanVideo.srcObject = null;
+  qrScanModal.classList.remove('show');
+}
+
+function qrScanLoop() {
+  if (!qrScanStream) return;
+  if (qrScanVideo.readyState === qrScanVideo.HAVE_ENOUGH_DATA && qrScanVideo.videoWidth) {
+    qrScanCanvas.width = qrScanVideo.videoWidth;
+    qrScanCanvas.height = qrScanVideo.videoHeight;
+    qrScanCtx.drawImage(qrScanVideo, 0, 0, qrScanCanvas.width, qrScanCanvas.height);
+    const imageData = qrScanCtx.getImageData(0, 0, qrScanCanvas.width, qrScanCanvas.height);
+    const result = jsQR(imageData.data, imageData.width, imageData.height);
+    if (result && result.data) {
+      const code = result.data.trim();
+      closeQrScanner();
+      syncCodeInput.value = code;
+      startWatching(code);
+      return;
+    }
+  }
+  qrScanRafId = requestAnimationFrame(qrScanLoop);
+}
+
+syncScanQrBtn.addEventListener('click', openQrScanner);
+qrScanCancelBtn.addEventListener('click', closeQrScanner);
 
 let syncMode = 'off'; // 'off' | 'broadcast' | 'watch'
 let syncBucketId = null;
@@ -1208,7 +1609,7 @@ function syncShowState() {
 // only displays remote data and shouldn't run its own camera/counting.
 const VIEWER_HIDE_IDS = [
   'statusRow', 'soundToggle', 'cameraBtn',
-  'videoWrap', 'motionToggle', 'motionMeterWrap', 'motionLevelReadout',
+  'videoWrap', 'roiControls', 'motionToggle', 'motionMeterWrap', 'motionLevelReadout',
   'manualRow', 'resetBtn', 'reportBtn', 'wakeStatus',
   'motionSettings', 'hintBox'
 ];
@@ -1276,6 +1677,7 @@ function stopBroadcast() {
   syncBucketId = null;
   syncProviderKey = null;
   if (syncHeartbeatInterval) clearInterval(syncHeartbeatInterval);
+  resetSyncQr();
   syncShowState();
   addLog('Yayın durduruldu');
 }
