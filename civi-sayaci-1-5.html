@@ -75,12 +75,6 @@
     overflow: hidden;
     margin-bottom: 24px;
   }
-  #meter {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, #2ecc71, #f0a500, #e74c3c);
-    transition: width 0.05s linear;
-  }
 
   button {
     border: none;
@@ -317,20 +311,108 @@
     margin-bottom: 14px;
   }
 
+  .tabs {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    max-width: 320px;
+    margin-bottom: 16px;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 10px;
+    font-size: 0.85rem;
+    background: rgba(255,255,255,0.05);
+    color: #9aa5b1;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .tab-btn.active {
+    background: rgba(240,165,0,0.15);
+    color: #f0a500;
+    border-color: #f0a500;
+  }
+  .tab-panel { width: 100%; display: flex; flex-direction: column; align-items: center; }
+
+  .box-guide {
+    position: absolute;
+    left: 14%; right: 14%; top: 10%; bottom: 16%;
+    border: 2px dashed rgba(46,204,113,0.9);
+    border-radius: 12px;
+    pointer-events: none;
+  }
+  .box-guide::after {
+    content: 'Kutu ağzını buraya hizala';
+    position: absolute;
+    bottom: -20px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.62rem;
+    color: #2ecc71;
+    white-space: nowrap;
+    background: rgba(0,0,0,0.55);
+    padding: 2px 7px;
+    border-radius: 6px;
+  }
+
+  .preset-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .preset-btn {
+    flex: 1;
+    padding: 9px 4px;
+    font-size: 0.72rem;
+    background: rgba(255,255,255,0.07);
+    color: #cfd6dd;
+    border-radius: 10px;
+    border: 1px solid transparent;
+  }
+  .preset-btn.active {
+    background: rgba(46,204,113,0.15);
+    color: #2ecc71;
+    border-color: #2ecc71;
+  }
+
+  .notes-log {
+    width: 100%;
+    max-height: 50vh;
+    overflow-y: auto;
+    font-size: 0.78rem;
+    color: #cfd6dd;
+    line-height: 1.7;
+  }
+  .notes-log .day-header {
+    color: #f0a500;
+    font-weight: 700;
+    margin: 10px 0 4px;
+    font-size: 0.75rem;
+  }
+  .notes-log .log-row { display: flex; gap: 8px; }
+  .notes-log .log-time { color: #6b7787; flex-shrink: 0; }
+  .notes-empty { color: #6b7787; font-size: 0.8rem; text-align: center; padding: 12px 0; }
+
 </style>
 </head>
 <body>
 
 <h1>🔩 Çivi Sayacı</h1>
-<div class="subtitle">Kutuya düşen çivilerin sesini dinleyip otomatik sayar</div>
+<div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
+
+<div class="tabs" id="tabNav">
+  <button class="tab-btn active" id="tabBtnCounter" data-tab="counter">🔩 Sayaç</button>
+  <button class="tab-btn" id="tabBtnNotes" data-tab="notes">📝 Notlar</button>
+</div>
 
 <div id="diagBanner" style="display:none; width:100%; max-width:320px; background:rgba(231,76,60,0.15); border:1px solid #e74c3c; color:#ffb3a7; padding:10px 14px; border-radius:12px; font-size:0.8rem; margin-bottom:14px; line-height:1.4;"></div>
+
+<div class="tab-panel" id="tabCounter">
 
 <div class="stats-panel" id="syncPanel">
   <div class="stats-title">🔄 Cihazlar Arası Senkronizasyon</div>
   <div id="syncIdle">
     <button class="camera-toggle" id="syncBroadcastBtn" style="margin-bottom:8px;">📡 Bu Cihazdan Yayınla</button>
     <button class="camera-toggle" id="syncWatchBtn">👀 Başka Cihazı İzle</button>
+    <button class="reset-btn" id="syncRetryBtn" style="display:none; margin-top:8px;">🔁 Tekrar Dene</button>
   </div>
   <div id="syncBroadcasting" style="display:none;">
     <div style="text-align:center; margin-bottom:8px;">
@@ -358,16 +440,14 @@
 
 <div class="status" id="statusRow">
   <div class="dot" id="dot"></div>
-  <span id="statusText">Dinleme kapalı</span>
+  <span id="statusText">Kamera kapalı</span>
 </div>
-
-<div class="meter-wrap" id="audioMeterWrap"><div id="meter"></div></div>
 
 <div class="stats-panel">
   <div class="stats-title">📊 İstatistikler</div>
   <div class="stats-grid">
     <div class="stat-item">
-      <div class="stat-value" id="statElapsed">00:00</div>
+      <div class="stat-value" id="statElapsed">0 sn</div>
       <div class="stat-label">Geçen süre</div>
     </div>
     <div class="stat-item">
@@ -392,18 +472,17 @@
 
 <div class="video-wrap" id="videoWrap">
   <video id="video" autoplay playsinline muted></video>
+  <div class="box-guide" id="boxGuide"></div>
   <div class="flash" id="flash"></div>
   <div class="video-count-badge" id="videoBadge">0</div>
 </div>
 
-<button class="main-btn" id="motionToggle" style="display:none;">▶️ Görüntüden Saymayı Başlat</button>
+<button class="main-btn" id="motionToggle" style="display:none;">⏸ Algılamayı Duraklat</button>
 
 <div class="meter-wrap" id="motionMeterWrap" style="display:none; position:relative;">
   <div id="motionMeter" style="height:100%;width:0%;background:linear-gradient(90deg,#2ecc71,#f0a500,#e74c3c);transition:width 0.05s linear;"></div>
 </div>
 <div id="motionLevelReadout" style="display:none; text-align:center; font-size:0.78rem; color:#9aa5b1; margin-top:-14px; margin-bottom:14px;">Hareket seviyesi: <b id="motionLevelNum">0</b></div>
-
-<button class="main-btn" id="listenBtn">🎤 Sesle Dinlemeyi Başlat</button>
 
 <div class="row" id="manualRow">
   <button id="minusBtn">−1</button>
@@ -416,56 +495,44 @@
 
 <div class="wake-status" id="wakeStatus"></div>
 
-<div class="settings" id="audioSettings">
-  <div class="stats-title">🎤 Ses ile Algılama Ayarları</div>
-  <label>Hassasiyet (eşik) <span id="threshVal">28</span></label>
-  <input type="range" id="threshSlider" min="5" max="80" value="28">
-  <label style="margin-top:10px;">Algılama aralığı (ms) <span id="cooldownVal">250</span></label>
-  <input type="range" id="cooldownSlider" min="100" max="800" value="250" step="10">
-
-  <div class="checkbox-row">
-    <span>🗣️ Konuşmayı sayma (frekans filtresi)</span>
-    <label class="switch">
-      <input type="checkbox" id="voiceFilterToggle" checked>
-      <span class="switch-track"></span>
-    </label>
-  </div>
-  <label style="margin-top:10px;">Filtre sıkılığı <span id="ratioVal">0.42</span></label>
-  <input type="range" id="ratioSlider" min="0.20" max="0.60" value="0.42" step="0.02">
-</div>
-
 <div class="settings" id="motionSettings">
-  <div class="stats-title">📷 Görüntü ile Algılama Ayarları</div>
-  <label>Hareket hassasiyeti (% piksel değişimi) <span id="motionThreshVal">4</span></label>
-  <input type="range" id="motionThreshSlider" min="0.5" max="20" value="4" step="0.5">
-  <label style="margin-top:10px;">Algılama aralığı (ms) <span id="motionCooldownVal">300</span></label>
+  <div class="stats-title">📷 Algılama Ayarları (Manuel)</div>
+  <label>Hareket hassasiyeti (% piksel değişimi) <span id="motionThreshVal">2</span></label>
+  <input type="range" id="motionThreshSlider" min="0.5" max="20" value="2" step="0.5">
+  <div class="preset-row">
+    <button class="preset-btn" id="presetLow" data-preset="low" type="button">Az Hassas</button>
+    <button class="preset-btn" id="presetMid" data-preset="mid" type="button">Orta</button>
+    <button class="preset-btn active" id="presetHigh" data-preset="high" type="button">Çok Hassas</button>
+  </div>
+  <label style="margin-top:14px;">Algılama aralığı (ms) <span id="motionCooldownVal">300</span></label>
   <input type="range" id="motionCooldownSlider" min="100" max="800" value="300" step="10">
 </div>
 
 <div class="hint" id="hintBox">
-  <b>Görüntü ile sayım (önerilen):</b> Kamerayı aç, telefonu kutunun ağzına yakın ve sabit tut, "Görüntüden Saymayı Başlat"a bas. Ekranda "Hareket seviyesi" sayısını izle: birkaç çivi at, hangi değerlere çıktığını gör, sonra "Hareket hassasiyeti" kaydırıcısını o değerin biraz altına ayarla.<br><br>
-  <b>Ses ile sayım:</b> Ortam gürültüsüzse iyi çalışır ama konuşma/nefes gibi sesler bazen yanlış sayabilir.<br><br>
-  Yanlış sayımları her zaman +1 / −1 ile elle düzeltebilirsin.
+  Kamerayı aç, telefonu kutunun ağzına yakın ve sabit tut — noktalı yeşil çerçeveyi kutunun ağzına hizala. Algılama, kamera açılır açılmaz otomatik ve hassas şekilde başlar.<br><br>
+  Ekrandaki "Hareket seviyesi" sayısını izle: birkaç çivi at, hangi değerlere çıktığını gör, sonra "Hareket hassasiyeti" kaydırıcısını veya hazır ayarlardan birini (Az Hassas / Orta / Çok Hassas) seç. Yandan atışlarda kaçırma yaşarsan "Çok Hassas" ayarında kal; çok fazla yanlış sayım olursa "Az Hassas"a geç.<br><br>
+  Yanlış sayımları her zaman +1 / −1 ile elle düzeltebilirsin. Ne yaptığın "Notlar" sekmesine otomatik olarak kaydediliyor.
+</div>
+
+</div>
+
+<div class="tab-panel" id="tabNotes" style="display:none;">
+  <div class="stats-panel">
+    <div class="stats-title">📝 Günlük Kayıtlar</div>
+    <div class="notes-empty" id="notesEmpty">Henüz kayıt yok. Kamerayı açıp saymaya başladığında burada otomatik olarak ayrıntılı bir günlük tutulacak.</div>
+    <div class="notes-log" id="notesLog"></div>
+  </div>
+  <button class="report-btn" id="notesMailBtn">📧 Notları Mail Gönder</button>
+  <button class="reset-btn" id="notesClearBtn">Günlüğü Temizle</button>
 </div>
 
 <script>
 let count = 0;
-let listening = false;
-let audioCtx, analyser, micStream, dataArray, rafId;
-let lastTriggerTime = 0;
-let threshold = 28;
-let cooldown = 250;
 
 const countEl = document.getElementById('count');
 const counterBox = document.getElementById('counterBox');
-const listenBtn = document.getElementById('listenBtn');
 const dot = document.getElementById('dot');
 const statusText = document.getElementById('statusText');
-const meter = document.getElementById('meter');
-const threshSlider = document.getElementById('threshSlider');
-const threshVal = document.getElementById('threshVal');
-const cooldownSlider = document.getElementById('cooldownSlider');
-const cooldownVal = document.getElementById('cooldownVal');
 const cameraBtn = document.getElementById('cameraBtn');
 const videoWrap = document.getElementById('videoWrap');
 const video = document.getElementById('video');
@@ -517,11 +584,10 @@ soundToggle.addEventListener('click', () => {
   if (soundOn) ensureBeepCtx();
 });
 
+// Süreleri saniye olarak gösterir (kullanıcı isteği: dakika:saniye yerine düz saniye).
 function formatDuration(ms) {
-  const totalSec = Math.floor(ms / 1000);
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  const totalSec = Math.max(0, Math.round(ms / 1000));
+  return totalSec + ' sn';
 }
 
 function renderBatchHistory(times) {
@@ -540,7 +606,7 @@ function renderBatchHistory(times) {
 
 function updateStats() {
   if (nailTimestamps.length === 0) {
-    statElapsed.textContent = '00:00';
+    statElapsed.textContent = '0 sn';
     statPace.textContent = '—';
     statPerMin.textContent = '—';
     statEst50.textContent = '—';
@@ -595,16 +661,15 @@ function releaseWakeLock() {
   }
 }
 
-// Re-acquire wake lock if tab becomes visible again while still listening
+// Re-acquire wake lock if tab becomes visible again while still detecting
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && listening && !wakeLock) {
+  if (document.visibilityState === 'visible' && motionListening && !wakeLock) {
     requestWakeLock();
   }
 });
 
 // ---- Daily report via email ----
 const reportBtn = document.getElementById('reportBtn');
-const dayStartTime = Date.now();
 
 reportBtn.addEventListener('click', () => {
   const now = new Date();
@@ -638,6 +703,7 @@ reportBtn.addEventListener('click', () => {
   const subject = encodeURIComponent(`Çivi Sayacı Raporu - ${dateStr}`);
   const encodedBody = encodeURIComponent(body);
   window.location.href = `mailto:?subject=${subject}&body=${encodedBody}`;
+  addLog(`Günlük rapor mail olarak gönderildi (toplam ${count} çivi)`);
 });
 
 
@@ -652,10 +718,11 @@ function clearDiag() {
 // Run an early environment check so failures are never silent
 window.addEventListener('DOMContentLoaded', () => {
   if (!window.isSecureContext) {
-    showDiag('⚠️ Bu sayfa güvenli (https) bağlantı üzerinden açılmamış. Mikrofon/kamera tarayıcı tarafından tamamen engelleniyor. Sayfayı sohbet içindeki önizlemeden "yeni sekmede aç" ile açmayı dene.');
+    showDiag('⚠️ Bu sayfa güvenli (https) bağlantı üzerinden açılmamış. Kamera tarayıcı tarafından tamamen engelleniyor. Sayfayı sohbet içindeki önizlemeden "yeni sekmede aç" ile açmayı dene.');
   } else if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    showDiag('⚠️ Bu ortam mikrofon/kamera API’sini desteklemiyor (muhtemelen kısıtlı bir önizleme penceresi). Sayfayı ayrı bir sekmede/tarayıcıda açmayı dene.');
+    showDiag('⚠️ Bu ortam kamera API’sini desteklemiyor (muhtemelen kısıtlı bir önizleme penceresi). Sayfayı ayrı bir sekmede/tarayıcıda açmayı dene.');
   }
+  renderNotesLog();
 });
 
 let cameraOn = false;
@@ -671,6 +738,9 @@ async function toggleCamera() {
     stopMotionDetection();
     motionToggle.style.display = 'none';
     motionMeterWrap.style.display = 'none';
+    statusText.textContent = 'Kamera kapalı';
+    dot.classList.remove('active');
+    addLog('Kamera kapatıldı');
     return;
   }
   try {
@@ -683,8 +753,12 @@ async function toggleCamera() {
     cameraBtn.textContent = '📷 Kamerayı Kapat';
     cameraOn = true;
     motionToggle.style.display = 'block';
+    addLog('Kamera açıldı, otomatik algılama başlatılıyor');
+    // Kamera açılır açılmaz otomatik ve hassas şekilde algılamayı başlat.
+    startMotionDetection();
   } catch (err) {
     showDiag('📷 Kameraya erişilemedi: ' + err.message + '. İzinleri kontrol et veya sayfayı ayrı sekmede aç.');
+    addLog('Kamera açılamadı: ' + err.message);
   }
 }
 
@@ -700,24 +774,41 @@ const motionCooldownSlider = document.getElementById('motionCooldownSlider');
 const motionCooldownVal = document.getElementById('motionCooldownVal');
 
 let motionListening = false;
+let motionPaused = false;
 let motionRafId = null;
 let motionArmed = true;
 let lastMotionTrigger = 0;
-let motionThreshold = 4; // percent of pixels that changed significantly
+let motionRearmDeadline = 0;
+let motionThreshold = 2; // percent of pixels that changed significantly (düşük = daha hassas)
 let motionCooldown = 300;
 let prevGray = null;
 const motionLevelNum = document.getElementById('motionLevelNum');
 const motionLevelReadout = document.getElementById('motionLevelReadout');
-const PIXEL_DIFF_CUTOFF = 22; // per-pixel brightness change needed to count as "changed"
+const PIXEL_DIFF_CUTOFF = 16; // per-pixel brightness change needed to count as "changed" (yandan/hızlı atışları da yakalamak için düşürüldü)
 
 const motionCanvas = document.createElement('canvas');
 motionCanvas.width = 96;
 motionCanvas.height = 72;
 const motionCtx = motionCanvas.getContext('2d', { willReadFrequently: true });
 
+const MOTION_PRESETS = { low: 8, mid: 4, high: 2 };
+function applyMotionPreset(key) {
+  const val = MOTION_PRESETS[key];
+  if (val === undefined) return;
+  motionThreshold = val;
+  motionThreshSlider.value = val;
+  motionThreshVal.textContent = val;
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === key));
+  addLog(`Hassasiyet ayarı değişti: ${key === 'low' ? 'Az Hassas' : key === 'mid' ? 'Orta' : 'Çok Hassas'} (%${val})`);
+}
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => applyMotionPreset(btn.dataset.preset));
+});
+
 motionThreshSlider.addEventListener('input', () => {
   motionThreshold = parseFloat(motionThreshSlider.value);
   motionThreshVal.textContent = motionThreshold;
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
 });
 motionCooldownSlider.addEventListener('input', () => {
   motionCooldown = parseInt(motionCooldownSlider.value);
@@ -755,15 +846,24 @@ function motionDetectLoop() {
   motionMeter.style.width = displayLevel + '%';
   motionLevelNum.textContent = level.toFixed(1);
 
-  const now = Date.now();
-  if (motionArmed && level > motionThreshold && (now - lastMotionTrigger) > motionCooldown) {
-    lastMotionTrigger = now;
-    motionArmed = false;
-    updateCount(1);
-  }
-  const releaseLevel = motionThreshold * 0.5;
-  if (!motionArmed && level < releaseLevel) {
-    motionArmed = true;
+  if (!motionPaused) {
+    const now = Date.now();
+    if (motionArmed && level > motionThreshold && (now - lastMotionTrigger) > motionCooldown) {
+      lastMotionTrigger = now;
+      motionArmed = false;
+      // En az bir sonraki kareye kadar bekle, ama arka plan gürültüsü seviyeyi
+      // hiç düşürmese bile sonsuza dek "kilitli" kalmasın diye bir zorunlu
+      // yeniden-kurulum süresi de var (aşağıdaki rearm kontrolüne bak).
+      motionRearmDeadline = now + Math.max(motionCooldown * 2, 600);
+      updateCount(1);
+    }
+    const releaseLevel = motionThreshold * 0.5;
+    // Seviye düşmese bile (parlaklık/gölge titremesi vb.) belirli bir süre
+    // sonra otomatik olarak yeniden silahlan — aksi halde çok yüksek hassasiyette
+    // algılayıcı "kilitli" kalıp yandan/art arda gelen çivileri kaçırabiliyordu.
+    if (!motionArmed && (level < releaseLevel || Date.now() >= motionRearmDeadline)) {
+      motionArmed = true;
+    }
   }
 
   motionRafId = requestAnimationFrame(motionDetectLoop);
@@ -772,43 +872,51 @@ function motionDetectLoop() {
 function startMotionDetection() {
   prevGray = null;
   motionArmed = true;
+  motionPaused = false;
   motionListening = true;
   motionMeterWrap.style.display = 'block';
   motionLevelReadout.style.display = 'block';
-  motionToggle.textContent = '⏹ Görüntüden Saymayı Durdur';
-  motionToggle.classList.add('listening');
+  motionToggle.style.display = 'block';
+  motionToggle.textContent = '⏸ Algılamayı Duraklat';
+  motionToggle.classList.remove('listening');
+  statusText.textContent = 'Algılanıyor...';
+  dot.classList.add('active');
   requestWakeLock();
   motionDetectLoop();
 }
 
 function stopMotionDetection() {
   motionListening = false;
+  motionPaused = false;
   if (motionRafId) cancelAnimationFrame(motionRafId);
   motionMeter.style.width = '0%';
   motionLevelReadout.style.display = 'none';
-  motionToggle.textContent = '▶️ Görüntüden Saymayı Başlat';
+  motionToggle.textContent = '⏸ Algılamayı Duraklat';
   motionToggle.classList.remove('listening');
-  if (!listening) releaseWakeLock();
+  dot.classList.remove('active');
+  releaseWakeLock();
 }
 
+// Kamerayı kapatmadan algılamayı geçici olarak duraklat/devam ettir.
 motionToggle.addEventListener('click', () => {
-  if (motionListening) {
-    stopMotionDetection();
+  motionPaused = !motionPaused;
+  if (motionPaused) {
+    motionToggle.textContent = '▶️ Algılamaya Devam Et';
+    motionToggle.classList.add('listening');
+    statusText.textContent = 'Duraklatıldı';
+    dot.classList.remove('active');
+    addLog('Algılama duraklatıldı');
   } else {
-    startMotionDetection();
+    motionArmed = true;
+    motionToggle.textContent = '⏸ Algılamayı Duraklat';
+    motionToggle.classList.remove('listening');
+    statusText.textContent = 'Algılanıyor...';
+    dot.classList.add('active');
+    addLog('Algılamaya devam edildi');
   }
 });
 
-threshSlider.addEventListener('input', () => {
-  threshold = parseInt(threshSlider.value);
-  threshVal.textContent = threshold;
-});
-cooldownSlider.addEventListener('input', () => {
-  cooldown = parseInt(cooldownSlider.value);
-  cooldownVal.textContent = cooldown;
-});
-
-function updateCount(delta) {
+function updateCount(delta, source) {
   count = Math.max(0, count + delta);
   countEl.textContent = count;
   videoBadge.textContent = count;
@@ -823,6 +931,7 @@ function updateCount(delta) {
 
     const now = Date.now();
     nailTimestamps.push(now);
+    addLog(`Çivi #${count} sayıldı (${source || 'kamera'})`);
 
     // check if we just completed a new batch of 50
     if (count % 50 === 0 && count > 0) {
@@ -830,10 +939,12 @@ function updateCount(delta) {
       batchTimes.push(now - batchStart);
       lastBatchMark = now;
       renderBatchHistory();
+      addLog(`${count}. çivi turu tamamlandı — süre: ${formatDuration(now - batchStart)}`);
     }
   } else {
     // undo: remove the most recent timestamp
     nailTimestamps.pop();
+    addLog(`Çivi sayısı ${source || 'manuel'} olarak 1 azaltıldı (yeni değer: ${count})`);
   }
 
   updateStats();
@@ -841,8 +952,8 @@ function updateCount(delta) {
   pushSyncIfBroadcasting();
 }
 
-document.getElementById('plusBtn').addEventListener('click', () => updateCount(1));
-document.getElementById('minusBtn').addEventListener('click', () => updateCount(-1));
+document.getElementById('plusBtn').addEventListener('click', () => updateCount(1, 'manuel +1'));
+document.getElementById('minusBtn').addEventListener('click', () => updateCount(-1, 'manuel -1'));
 document.getElementById('resetBtn').addEventListener('click', () => {
   if (confirm('Sayacı ve istatistikleri sıfırlamak istediğine emin misin?')) {
     count = 0;
@@ -854,154 +965,210 @@ document.getElementById('resetBtn').addEventListener('click', () => {
     renderBatchHistory();
     updateStats();
     pushSyncIfBroadcasting();
+    addLog('Sayaç ve istatistikler sıfırlandı');
   }
 });
 
-let freqData = null;
-let armed = true; // hysteresis gate: must drop below release level before re-triggering
-let voiceFilterOn = true;
-let ratioThreshold = 0.42; // tuned from real recordings: nail hits ~0.05-0.38, voice ~0.43-0.94
+// ---- Günlük Notlar (kalıcı, e-posta ile paylaşılabilir aktivite kaydı) ----
+const NOTES_STORAGE_KEY = 'civiSayaciNotlar';
+const NOTES_MAX_ENTRIES = 1000;
+const notesEmpty = document.getElementById('notesEmpty');
+const notesLogEl = document.getElementById('notesLog');
+let notesEntries = [];
 
-const voiceFilterToggle = document.getElementById('voiceFilterToggle');
-voiceFilterToggle.addEventListener('change', () => {
-  voiceFilterOn = voiceFilterToggle.checked;
-});
-
-const ratioSlider = document.getElementById('ratioSlider');
-const ratioVal = document.getElementById('ratioVal');
-ratioSlider.addEventListener('input', () => {
-  ratioThreshold = parseFloat(ratioSlider.value);
-  ratioVal.textContent = ratioThreshold.toFixed(2);
-});
-
-async function startListening() {
+function loadNotes() {
   try {
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const source = audioCtx.createMediaStreamSource(micStream);
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 1024;
-    analyser.smoothingTimeConstant = 0.15;
-    source.connect(analyser);
-    dataArray = new Uint8Array(analyser.frequencyBinCount);
-    freqData = new Uint8Array(analyser.frequencyBinCount);
-    armed = true;
-
-    listening = true;
-    listenBtn.textContent = '⏹ Dinlemeyi Durdur';
-    listenBtn.classList.add('listening');
-    dot.classList.add('active');
-    statusText.textContent = 'Dinleniyor...';
-
-    requestWakeLock();
-    detectLoop();
-  } catch (err) {
-    showDiag('🎤 Mikrofona erişilemedi: ' + err.message + '. İzinleri kontrol et veya sayfayı ayrı sekmede aç.');
+    const raw = localStorage.getItem(NOTES_STORAGE_KEY);
+    notesEntries = raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    notesEntries = [];
   }
 }
 
-function startListeningSafe() {
-  if (!window.isSecureContext || !navigator.mediaDevices) {
-    showDiag('⚠️ Bu ortamda mikrofon desteklenmiyor (https gerekli). Sayfayı ayrı bir sekmede açmayı dene.');
+function saveNotes() {
+  try {
+    localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notesEntries));
+  } catch (e) {
+    // depolama dolu/erişilemez olabilir, sessizce geç
+  }
+}
+
+function addLog(text) {
+  const ts = Date.now();
+  notesEntries.push({ ts, text });
+  if (notesEntries.length > NOTES_MAX_ENTRIES) {
+    notesEntries = notesEntries.slice(notesEntries.length - NOTES_MAX_ENTRIES);
+  }
+  saveNotes();
+  renderNotesLog();
+}
+
+function renderNotesLog() {
+  if (!notesLogEl) return;
+  if (notesEntries.length === 0) {
+    notesEmpty.style.display = 'block';
+    notesLogEl.innerHTML = '';
     return;
   }
-  clearDiag();
-  startListening();
-}
-
-function stopListening() {
-  listening = false;
-  if (rafId) cancelAnimationFrame(rafId);
-  if (micStream) micStream.getTracks().forEach(t => t.stop());
-  if (audioCtx) audioCtx.close();
-  releaseWakeLock();
-  listenBtn.textContent = '🎤 Dinlemeyi Başlat';
-  listenBtn.classList.remove('listening');
-  dot.classList.remove('active');
-  statusText.textContent = 'Dinleme kapalı';
-  meter.style.width = '0%';
-}
-
-// Returns true if the current sound's frequency profile looks like a sharp
-// metallic impact rather than a sustained human voice.
-// Voice energy concentrates heavily in the low band (~85-1000Hz).
-// A nail/metal clink spreads more energy into higher frequency bins.
-function isImpactLike() {
-  if (!voiceFilterOn || !audioCtx) return true;
-  analyser.getByteFrequencyData(freqData);
-
-  const binHz = audioCtx.sampleRate / analyser.fftSize;
-  const lowCutoffBin = Math.max(1, Math.round(1000 / binHz));
-
-  let lowEnergy = 0;
-  let totalEnergy = 0;
-  for (let i = 0; i < freqData.length; i++) {
-    const v = freqData[i];
-    totalEnergy += v;
-    if (i <= lowCutoffBin) lowEnergy += v;
-  }
-  if (totalEnergy < 5) return false; // basically silence, ignore
-
-  const lowRatio = lowEnergy / totalEnergy;
-  // Voice: lowRatio typically high (>0.43 based on real recordings).
-  // Nail impact: energy spread out, typically <0.38. Use tunable threshold with margin.
-  return lowRatio < ratioThreshold;
-}
-
-function detectLoop() {
-  if (!listening) return;
-  analyser.getByteTimeDomainData(dataArray);
-
-  // calculate volume as deviation from center (128)
-  let sumSquares = 0;
-  let peak = 0;
-  for (let i = 0; i < dataArray.length; i++) {
-    const dev = Math.abs(dataArray[i] - 128);
-    sumSquares += dev * dev;
-    if (dev > peak) peak = dev;
-  }
-  const rms = Math.sqrt(sumSquares / dataArray.length);
-  const level = Math.min(100, (peak / 128) * 100);
-  meter.style.width = level + '%';
-
-  const now = Date.now();
-  const releaseLevel = threshold * 0.55;
-
-  if (armed && peak > threshold && (now - lastTriggerTime) > cooldown) {
-    if (isImpactLike()) {
-      lastTriggerTime = now;
-      armed = false; // must drop below release level before counting again
-      updateCount(1);
+  notesEmpty.style.display = 'none';
+  let html = '';
+  let lastDay = '';
+  notesEntries.forEach(entry => {
+    const d = new Date(entry.ts);
+    const dayStr = d.toLocaleDateString('tr-TR');
+    const timeStr = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    if (dayStr !== lastDay) {
+      html += `<div class="day-header">${dayStr}</div>`;
+      lastDay = dayStr;
     }
-  }
-
-  // re-arm once the signal has settled back down (prevents double counts
-  // from a single decaying clang) regardless of cooldown timer
-  if (!armed && peak < releaseLevel) {
-    armed = true;
-  }
-
-  rafId = requestAnimationFrame(detectLoop);
+    html += `<div class="log-row"><span class="log-time">${timeStr}</span><span>${entry.text}</span></div>`;
+  });
+  notesLogEl.innerHTML = html;
+  notesLogEl.scrollTop = notesLogEl.scrollHeight;
 }
 
-listenBtn.addEventListener('click', () => {
-  if (listening) {
-    stopListening();
-  } else {
-    startListeningSafe();
+loadNotes();
+
+document.getElementById('notesClearBtn').addEventListener('click', () => {
+  if (confirm('Tüm günlük kayıtlarını silmek istediğine emin misin?')) {
+    notesEntries = [];
+    saveNotes();
+    renderNotesLog();
   }
 });
 
-// ---- Cross-device sync via kvdb.io (free, no-signup key-value store) ----
-const KVDB_BASE = 'https://kvdb.io';
+document.getElementById('notesMailBtn').addEventListener('click', () => {
+  if (notesEntries.length === 0) {
+    alert('Henüz gönderilecek bir kayıt yok.');
+    return;
+  }
+  let body = `Çivi Sayacı - Ayrıntılı Günlük\n\n`;
+  let lastDay = '';
+  notesEntries.forEach(entry => {
+    const d = new Date(entry.ts);
+    const dayStr = d.toLocaleDateString('tr-TR');
+    const timeStr = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    if (dayStr !== lastDay) {
+      body += `\n== ${dayStr} ==\n`;
+      lastDay = dayStr;
+    }
+    body += `${timeStr}  ${entry.text}\n`;
+  });
+  const subject = encodeURIComponent('Çivi Sayacı - Günlük Notlar');
+  const encodedBody = encodeURIComponent(body);
+  window.location.href = `mailto:?subject=${subject}&body=${encodedBody}`;
+});
+
+// ---- Tab (Sayaç / Notlar) geçişi ----
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    document.getElementById('tabCounter').style.display = tab === 'counter' ? 'flex' : 'none';
+    document.getElementById('tabNotes').style.display = tab === 'notes' ? 'flex' : 'none';
+    if (tab === 'notes') renderNotesLog();
+  });
+});
+
+// ---- Cihazlar arası senkronizasyon: birden fazla ücretsiz servisi otomatik
+// yedekli (fallback) olarak dener, biri çalışmazsa diğerine geçer, ve geçici
+// hatalarda otomatik olarak tekrar dener. Tek bir servisin (ör. kvdb.io) o an
+// çökmüş/sorunlu olması artık tüm paylaşımı kilitlemesin diye eklendi. ----
 const SYNC_KEY = 'durum';
-const SYNC_PUSH_KEY = 'push';   // heartbeat push (throttled)
 const SYNC_POLL_MS = 2000;
+
+function syncSleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+const SYNC_PROVIDERS = {
+  jsonblob: {
+    label: 'jsonblob.com',
+    async create() {
+      const res = await fetch('https://jsonblob.com/api/jsonBlob', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const loc = res.headers.get('Location') || res.headers.get('location');
+      if (!loc) throw new Error('kimlik alınamadı');
+      return loc.split('/').pop();
+    },
+    async get(id) {
+      const res = await fetch(`https://jsonblob.com/api/jsonBlob/${id}`);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    },
+    async put(id, data) {
+      await fetch(`https://jsonblob.com/api/jsonBlob/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+    }
+  },
+  kvdb: {
+    label: 'kvdb.io',
+    async create() {
+      const res = await fetch('https://kvdb.io/', { method: 'POST' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const id = (await res.text()).trim();
+      if (!id) throw new Error('kimlik alınamadı');
+      return id;
+    },
+    async get(id) {
+      const res = await fetch(`https://kvdb.io/${id}/${SYNC_KEY}`);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    },
+    async put(id, data) {
+      await fetch(`https://kvdb.io/${id}/${SYNC_KEY}`, { method: 'POST', body: JSON.stringify(data) });
+    }
+  }
+};
+const SYNC_PROVIDER_ORDER = ['jsonblob', 'kvdb'];
+const PROVIDER_PREFIX = { jsonblob: 'JB', kvdb: 'KV' };
+const PROVIDER_BY_PREFIX = { JB: 'jsonblob', KV: 'kvdb' };
+
+function makeSyncCode(provider, id) {
+  return `${PROVIDER_PREFIX[provider]}-${id}`;
+}
+function parseSyncCode(codeRaw) {
+  const trimmed = codeRaw.trim();
+  const dashIdx = trimmed.indexOf('-');
+  if (dashIdx > 0) {
+    const prefix = trimmed.slice(0, dashIdx).toUpperCase();
+    if (PROVIDER_BY_PREFIX[prefix]) {
+      return { provider: PROVIDER_BY_PREFIX[prefix], id: trimmed.slice(dashIdx + 1) };
+    }
+  }
+  return { provider: 'kvdb', id: trimmed }; // eski/tanınmayan biçim: kvdb varsay
+}
+
+// Sırayla her sağlayıcıyı, her birini geçici hatalara karşı 2 deneme ile
+// dener; biri tamamen başarısız olursa otomatik olarak diğerine geçer.
+async function createSyncBucketWithFallback() {
+  const errors = [];
+  for (const key of SYNC_PROVIDER_ORDER) {
+    const provider = SYNC_PROVIDERS[key];
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const id = await provider.create();
+        return { provider: key, id };
+      } catch (err) {
+        errors.push(`${provider.label}: ${err.message}`);
+        if (attempt < 2) await syncSleep(1000);
+      }
+    }
+  }
+  throw new Error(errors.join(' | '));
+}
 
 const syncPanel = document.getElementById('syncPanel');
 const syncIdle = document.getElementById('syncIdle');
 const syncBroadcastBtn = document.getElementById('syncBroadcastBtn');
 const syncWatchBtn = document.getElementById('syncWatchBtn');
+const syncRetryBtn = document.getElementById('syncRetryBtn');
 const syncBroadcasting = document.getElementById('syncBroadcasting');
 const syncCode = document.getElementById('syncCode');
 const syncCopyBtn = document.getElementById('syncCopyBtn');
@@ -1015,6 +1182,8 @@ const syncDiag = document.getElementById('syncDiag');
 
 let syncMode = 'off'; // 'off' | 'broadcast' | 'watch'
 let syncBucketId = null;
+let syncProviderKey = null;      // yayın yaparken hangi servis kullanılıyor
+let syncWatchProviderKey = null; // izlerken hangi servis kullanılıyor
 let syncPollInterval = null;
 let syncHeartbeatInterval = null;
 let lastSyncPushAt = 0;
@@ -1036,12 +1205,12 @@ function syncShowState() {
 }
 
 // Elements to hide entirely on the watching (viewer) device, since it
-// only displays remote data and shouldn't run its own mic/camera/counting.
+// only displays remote data and shouldn't run its own camera/counting.
 const VIEWER_HIDE_IDS = [
-  'statusRow', 'audioMeterWrap', 'soundToggle', 'cameraBtn',
+  'statusRow', 'soundToggle', 'cameraBtn',
   'videoWrap', 'motionToggle', 'motionMeterWrap', 'motionLevelReadout',
-  'listenBtn', 'manualRow', 'resetBtn', 'reportBtn', 'wakeStatus',
-  'audioSettings', 'motionSettings', 'hintBox'
+  'manualRow', 'resetBtn', 'reportBtn', 'wakeStatus',
+  'motionSettings', 'hintBox'
 ];
 
 function setViewerModeUI(isViewer) {
@@ -1051,16 +1220,8 @@ function setViewerModeUI(isViewer) {
   });
 }
 
-async function createSyncBucket() {
-  const res = await fetch(KVDB_BASE + '/', { method: 'POST' });
-  if (!res.ok) throw new Error('Bucket oluşturulamadı (HTTP ' + res.status + ')');
-  const id = (await res.text()).trim();
-  if (!id) throw new Error('Geçersiz bucket kimliği döndü');
-  return id;
-}
-
 async function pushSyncData() {
-  if (!syncBucketId) return;
+  if (!syncBucketId || !syncProviderKey) return;
   const payload = {
     count,
     firstTs: nailTimestamps.length ? nailTimestamps[0] : null,
@@ -1070,12 +1231,9 @@ async function pushSyncData() {
     updatedAt: Date.now()
   };
   try {
-    await fetch(`${KVDB_BASE}/${syncBucketId}/${SYNC_KEY}`, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
+    await SYNC_PROVIDERS[syncProviderKey].put(syncBucketId, payload);
   } catch (e) {
-    // silent fail on individual push; heartbeat will retry
+    // tek bir push başarısız olursa sessizce geç; heartbeat tekrar dener
   }
 }
 
@@ -1089,18 +1247,24 @@ function pushSyncIfBroadcasting() {
 
 async function startBroadcast() {
   clearSyncDiag();
+  syncRetryBtn.style.display = 'none';
   syncBroadcastBtn.disabled = true;
   syncBroadcastBtn.textContent = 'Kod oluşturuluyor...';
   try {
-    syncBucketId = await createSyncBucket();
+    const result = await createSyncBucketWithFallback();
+    syncProviderKey = result.provider;
+    syncBucketId = result.id;
     syncMode = 'broadcast';
-    syncCode.textContent = syncBucketId;
+    syncCode.textContent = makeSyncCode(syncProviderKey, syncBucketId);
     syncShowState();
     pushSyncData();
     // heartbeat push every few seconds so elapsed-time keeps advancing on the viewer
     syncHeartbeatInterval = setInterval(() => pushSyncData(), 4000);
+    addLog(`Yayın başlatıldı (kod: ${syncCode.textContent}, servis: ${SYNC_PROVIDERS[syncProviderKey].label})`);
   } catch (err) {
-    showSyncDiag('⚠️ Yayın başlatılamadı: ' + err.message + '. İnterneti kontrol edip tekrar dene.');
+    showSyncDiag('⚠️ Yayın başlatılamadı: ' + err.message + '. Bu genelde ücretsiz senkronizasyon servisinde geçici bir sorun olduğu anlamına gelir — birkaç saniye sonra "Tekrar Dene" ile deneyebilirsin.');
+    syncRetryBtn.style.display = 'block';
+    addLog('Yayın başlatılamadı: ' + err.message);
   } finally {
     syncBroadcastBtn.disabled = false;
     syncBroadcastBtn.textContent = '📡 Bu Cihazdan Yayınla';
@@ -1110,24 +1274,20 @@ async function startBroadcast() {
 function stopBroadcast() {
   syncMode = 'off';
   syncBucketId = null;
+  syncProviderKey = null;
   if (syncHeartbeatInterval) clearInterval(syncHeartbeatInterval);
   syncShowState();
+  addLog('Yayın durduruldu');
 }
 
 async function pollRemoteStats() {
-  if (!syncBucketId) return;
+  if (!syncBucketId || !syncWatchProviderKey) return;
   try {
-    const res = await fetch(`${KVDB_BASE}/${syncBucketId}/${SYNC_KEY}`);
-    if (!res.ok) {
-      showSyncDiag('⚠️ Veri alınamadı (HTTP ' + res.status + '). Koddan emin misin?');
-      return;
-    }
-    const text = await res.text();
-    const data = JSON.parse(text);
+    const data = await SYNC_PROVIDERS[syncWatchProviderKey].get(syncBucketId);
     clearSyncDiag();
     renderRemoteStats(data);
   } catch (err) {
-    showSyncDiag('⚠️ Bağlantı sorunu: ' + err.message);
+    showSyncDiag('⚠️ Bağlantı sorunu: ' + err.message + '. Koddan ve internetten emin ol, otomatik olarak tekrar denenecek.');
   }
 }
 
@@ -1137,7 +1297,7 @@ function renderRemoteStats(data) {
   videoBadge.textContent = count;
 
   if (!data.n || data.n < 1) {
-    statElapsed.textContent = '00:00';
+    statElapsed.textContent = '0 sn';
     statPace.textContent = '—';
     statPerMin.textContent = '—';
     statEst50.textContent = '—';
@@ -1162,29 +1322,36 @@ function renderRemoteStats(data) {
   renderBatchHistory(data.batchTimes || []);
 }
 
-function startWatching(code) {
+function startWatching(codeRaw) {
   clearSyncDiag();
-  syncBucketId = code.trim();
-  if (!syncBucketId) {
+  const codeStr = codeRaw.trim();
+  if (!codeStr) {
     showSyncDiag('⚠️ Lütfen bir kod gir.');
     return;
   }
+  const parsed = parseSyncCode(codeStr);
+  syncWatchProviderKey = parsed.provider;
+  syncBucketId = parsed.id;
   syncMode = 'watch';
   setViewerModeUI(true);
   syncShowState();
   pollRemoteStats();
   syncPollInterval = setInterval(pollRemoteStats, SYNC_POLL_MS);
+  addLog(`Başka cihaz izleniyor (kod: ${codeStr})`);
 }
 
 function stopWatching() {
   syncMode = 'off';
   syncBucketId = null;
+  syncWatchProviderKey = null;
   if (syncPollInterval) clearInterval(syncPollInterval);
   setViewerModeUI(false);
   syncShowState();
+  addLog('İzleme durduruldu');
 }
 
 syncBroadcastBtn.addEventListener('click', startBroadcast);
+syncRetryBtn.addEventListener('click', startBroadcast);
 syncStopBtn.addEventListener('click', stopBroadcast);
 syncWatchBtn.addEventListener('click', () => {
   syncMode = 'off_showing_connect';
@@ -1193,15 +1360,16 @@ syncWatchBtn.addEventListener('click', () => {
 syncConnectBtn.addEventListener('click', () => startWatching(syncCodeInput.value));
 syncDisconnectBtn.addEventListener('click', stopWatching);
 syncCopyBtn.addEventListener('click', () => {
+  const codeText = syncCode.textContent;
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(syncBucketId).then(() => {
+    navigator.clipboard.writeText(codeText).then(() => {
       syncCopyBtn.textContent = '✅ Kopyalandı';
       setTimeout(() => { syncCopyBtn.textContent = '📋 Kodu Kopyala'; }, 1500);
     }).catch(() => {
-      showSyncDiag('Kopyalanamadı, kodu elle seçip kopyalayabilirsin: ' + syncBucketId);
+      showSyncDiag('Kopyalanamadı, kodu elle seçip kopyalayabilirsin: ' + codeText);
     });
   } else {
-    showSyncDiag('Kodu elle seçip kopyalayabilirsin: ' + syncBucketId);
+    showSyncDiag('Kodu elle seçip kopyalayabilirsin: ' + codeText);
   }
 });
 </script>
