@@ -1378,20 +1378,54 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 // ---- Cihazlar arası senkronizasyon: birden fazla ücretsiz servisi otomatik
 // yedekli (fallback) olarak dener, biri çalışmazsa diğerine geçer, ve geçici
-// hatalarda otomatik olarak tekrar dener. Tek bir servisin (ör. kvdb.io) o an
-// çökmüş/sorunlu olması artık tüm paylaşımı kilitlemesin diye eklendi. ----
-const SYNC_KEY = 'durum';
+// hatalarda otomatik olarak tekrar dener. Tek bir servisin çökmüş/engellenmiş
+// olması artık tüm paylaşımı kilitlemesin diye eklendi.
+//
+// kvdb.io kalıcı olarak HTTP 500 verdiği (servisin kendisi bozuk) için
+// listeden tamamen çıkarıldı. ntfy.sh, konu (topic) tabanlı çalıştığından
+// önceden bir "bucket" oluşturmaya gerek duymuyor (bu adım hiç ağ isteği
+// gerektirmediği için başarısız olma ihtimali yok) ve CORS'u web istemcileri
+// için özel olarak destekliyor, bu yüzden birincil sağlayıcı yapıldı.
+// jsonblob.com ikincil yedek olarak kaldı; olası bir CORS ön-uçuş (preflight)
+// hatasını azaltmak için artık Content-Type başlığı zorlanmıyor. ----
 const SYNC_POLL_MS = 2000;
 
 function syncSleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 const SYNC_PROVIDERS = {
+  ntfy: {
+    label: 'ntfy.sh',
+    async create() {
+      // Konu tabanlı: sunucudan bir kimlik istemeye gerek yok, rastgele
+      // üretilen konu adı doğrudan kullanılabilir.
+      return 'civi-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+    },
+    async put(id, data) {
+      const res = await fetch(`https://ntfy.sh/${id}`, {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+    },
+    async get(id) {
+      // Sadece son ~30 saniyedeki mesajları iste: hem yayıncının en güncel
+      // durumunu yakalamaya yeter (heartbeat 4 sn'de bir) hem de uzun süren
+      // oturumlarda cevabın devasa büyümesini engeller.
+      const res = await fetch(`https://ntfy.sh/${id}/json?poll=1&since=30s`);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const text = await res.text();
+      const lines = text.trim().split('\n').filter(Boolean);
+      if (lines.length === 0) throw new Error('henüz veri yok, bekleniyor');
+      const last = JSON.parse(lines[lines.length - 1]);
+      if (!last.message) throw new Error('boş mesaj alındı');
+      return JSON.parse(last.message);
+    }
+  },
   jsonblob: {
     label: 'jsonblob.com',
     async create() {
       const res = await fetch('https://jsonblob.com/api/jsonBlob', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -1407,33 +1441,14 @@ const SYNC_PROVIDERS = {
     async put(id, data) {
       await fetch(`https://jsonblob.com/api/jsonBlob/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
     }
-  },
-  kvdb: {
-    label: 'kvdb.io',
-    async create() {
-      const res = await fetch('https://kvdb.io/', { method: 'POST' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const id = (await res.text()).trim();
-      if (!id) throw new Error('kimlik alınamadı');
-      return id;
-    },
-    async get(id) {
-      const res = await fetch(`https://kvdb.io/${id}/${SYNC_KEY}`);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      return res.json();
-    },
-    async put(id, data) {
-      await fetch(`https://kvdb.io/${id}/${SYNC_KEY}`, { method: 'POST', body: JSON.stringify(data) });
-    }
   }
 };
-const SYNC_PROVIDER_ORDER = ['jsonblob', 'kvdb'];
-const PROVIDER_PREFIX = { jsonblob: 'JB', kvdb: 'KV' };
-const PROVIDER_BY_PREFIX = { JB: 'jsonblob', KV: 'kvdb' };
+const SYNC_PROVIDER_ORDER = ['ntfy', 'jsonblob'];
+const PROVIDER_PREFIX = { ntfy: 'NT', jsonblob: 'JB' };
+const PROVIDER_BY_PREFIX = { NT: 'ntfy', JB: 'jsonblob' };
 
 function makeSyncCode(provider, id) {
   return `${PROVIDER_PREFIX[provider]}-${id}`;
@@ -1447,7 +1462,7 @@ function parseSyncCode(codeRaw) {
       return { provider: PROVIDER_BY_PREFIX[prefix], id: trimmed.slice(dashIdx + 1) };
     }
   }
-  return { provider: 'kvdb', id: trimmed }; // eski/tanınmayan biçim: kvdb varsay
+  return { provider: 'ntfy', id: trimmed }; // eski/tanınmayan biçim: yeni varsayılana düş
 }
 
 // Sırayla her sağlayıcıyı, her birini geçici hatalara karşı 2 deneme ile
@@ -1663,7 +1678,7 @@ async function startBroadcast() {
     syncHeartbeatInterval = setInterval(() => pushSyncData(), 4000);
     addLog(`Yayın başlatıldı (kod: ${syncCode.textContent}, servis: ${SYNC_PROVIDERS[syncProviderKey].label})`);
   } catch (err) {
-    showSyncDiag('⚠️ Yayın başlatılamadı: ' + err.message + '. Bu genelde ücretsiz senkronizasyon servisinde geçici bir sorun olduğu anlamına gelir — birkaç saniye sonra "Tekrar Dene" ile deneyebilirsin.');
+    showSyncDiag('⚠️ Yayın başlatılamadı: ' + err.message + '. Birkaç saniye sonra "Tekrar Dene"yi deneyebilirsin. Israrla devam ederse mobil veri yerine Wi-Fi ile (veya tam tersini) denemeni öneririz — bazı operatörler bu tür paylaşım servislerini engelleyebiliyor.');
     syncRetryBtn.style.display = 'block';
     addLog('Yayın başlatılamadı: ' + err.message);
   } finally {
