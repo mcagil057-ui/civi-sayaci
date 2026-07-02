@@ -504,6 +504,26 @@
 </head>
 <body>
 
+<script>
+// Erken hata yakalayıcı: sayfa herhangi bir nedenle çalışamazsa boş ekran
+// yerine hatayı görünür bir kutuda gösterir (teşhis için hayati).
+window.addEventListener('error', function (e) {
+  try {
+    var box = document.getElementById('earlyErrorBox');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'earlyErrorBox';
+      box.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#7a1f1f;color:#fff;font:12px/1.5 system-ui;padding:8px 12px;z-index:99999;white-space:pre-wrap;';
+      (document.body || document.documentElement).appendChild(box);
+    }
+    var src = e.filename ? (' — ' + String(e.filename).split('/').pop() + ':' + e.lineno) : '';
+    var what = e.message || (e.target && (e.target.src || e.target.href) ? 'Dosya yüklenemedi: ' + String(e.target.src || e.target.href).split('/').pop() : e.type);
+    box.textContent = '⚠️ ' + what + src;
+  } catch (err) { /* hata kutusu bile kurulamazsa sessiz kal */ }
+}, true);
+</script>
+<noscript><div style="background:#7a1f1f;color:#fff;padding:12px;font-family:system-ui;">Bu uygulama için JavaScript gerekli. Tarayıcı ayarlarından JavaScript'i aç.</div></noscript>
+
 <h1>🔩 Çivi Sayacı</h1>
 <div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
 
@@ -703,8 +723,12 @@
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 // ---- PWA: service worker kaydı ve "Uygulamayı Yükle" butonu ----
+// Kayıt, sayfa tamamen yüklendikten sonra yapılır: açılışla yarışıp ilk
+// yüklemeyi yavaşlatmasın / bölmesin diye.
 if ('serviceWorker' in navigator && window.isSecureContext) {
-  navigator.serviceWorker.register('sw.js').catch(() => { /* kayıt olmazsa site normal çalışmaya devam eder */ });
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* kayıt olmazsa site normal çalışmaya devam eder */ });
+  });
 }
 
 let deferredInstallPrompt = null;
