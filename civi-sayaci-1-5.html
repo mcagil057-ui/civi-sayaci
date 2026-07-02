@@ -618,7 +618,7 @@ window.addEventListener('error', function (e) {
 
 <h1>🔩 Çivi Sayacı</h1>
 <div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
-<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-02 · 11b</div>
+<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-03 · 12</div>
 
 <div class="tabs" id="tabNav">
   <button class="tab-btn active" id="tabBtnCounter" data-tab="counter">🔩 Sayaç</button>
@@ -2071,7 +2071,7 @@ async function pushDailyStatsToCloud(useKeepalive) {
 // İstatistik değişimlerinde en fazla dakikada bir buluta yaz (sondan tetiklemeli).
 function scheduleCloudPush() {
   const now = Date.now();
-  if (now - lastCloudPushAt >= 60000) {
+  if (now - lastCloudPushAt >= 180000) {
     lastCloudPushAt = now;
     pushDailyStatsToCloud();
     return;
@@ -2080,7 +2080,7 @@ function scheduleCloudPush() {
     cloudPushTimer = setTimeout(() => {
       cloudPushTimer = null;
       pushDailyStatsToCloud();
-    }, 60000 - (now - lastCloudPushAt));
+    }, 180000 - (now - lastCloudPushAt));
   }
 }
 
@@ -2168,7 +2168,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 // için özel olarak destekliyor, bu yüzden birincil sağlayıcı yapıldı.
 // jsonblob.com ikincil yedek olarak kaldı; olası bir CORS ön-uçuş (preflight)
 // hatasını azaltmak için artık Content-Type başlığı zorlanmıyor. ----
-const SYNC_POLL_MS = 2500; // izleyen cihaz bu aralıkla yoklar (429'a takılmayacak kadar seyrek, yeterince hızlı)
+// İzleyen cihazda ntfy için birincil yol canlı akıştır (SSE: anında teslim,
+// istek bütçesi harcamaz); yoklama sadece emniyet ağıdır ve seyrek çalışır.
+// İki cihaz aynı Wi-Fi'deyken ortak IP'nin ntfy istek bütçesini (~12/dk)
+// aşmamak için tüm hızlar buna göre ayarlandı (429 hatasının çözümü).
+const SYNC_POLL_MS_NTFY = 20000;
+const SYNC_POLL_MS_LEGACY = 3000; // eski JB- kodları için (jsonblob'ta sınır sorunu yok)
 
 function syncSleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
@@ -2389,7 +2394,8 @@ let syncPollInterval = null;
 let syncHeartbeatInterval = null;
 let lastSyncPushAt = 0;
 let syncPushTimeout = null;
-const SYNC_PUSH_MIN_GAP_MS = 400; // avoid hammering the API on rapid nail counts
+const SYNC_PUSH_MIN_GAP_MS = 6000; // ntfy hız sınırı ~5sn/istek; sondan tetiklemeli push son durumu yine garanti eder
+let ntfyBackoffUntil = 0; // 429 (hız sınırı) yenince bu zamana kadar istek atılmaz
 
 function showSyncDiag(msg) {
   syncDiag.textContent = msg;
@@ -2461,13 +2467,23 @@ async function pushSyncData() {
     updatedAt: Date.now()
   };
   const statusEl = document.getElementById('syncPushStatus');
+  if (Date.now() < ntfyBackoffUntil) {
+    if (statusEl) statusEl.textContent = '⏳ hız sınırı — ' + Math.ceil((ntfyBackoffUntil - Date.now()) / 1000) + ' sn sonra devam';
+    return;
+  }
   try {
     await SYNC_PROVIDERS[syncProviderKey].put(syncBucketId, payload);
     if (statusEl) statusEl.textContent = '☁️ son gönderim: ' + new Date().toLocaleTimeString('tr-TR');
   } catch (e) {
     // Başarısızlığı GÖRÜNÜR yap (eskiden sessizdi ve teşhis edilemiyordu);
-    // heartbeat zaten tekrar deneyecek.
-    if (statusEl) statusEl.textContent = '⚠️ gönderilemedi (' + new Date().toLocaleTimeString('tr-TR') + '): ' + e.message;
+    // heartbeat zaten tekrar deneyecek. 429'da (hız sınırı) bir süre hiç
+    // istek atmayarak bütçenin dolmasına izin ver — ısrar çukuru derinleştirir.
+    if (String(e.message).indexOf('429') !== -1) {
+      ntfyBackoffUntil = Date.now() + 90000;
+      if (statusEl) statusEl.textContent = '⏳ hız sınırına takıldı — 90 sn beklenip otomatik devam edilecek';
+    } else if (statusEl) {
+      statusEl.textContent = '⚠️ gönderilemedi (' + new Date().toLocaleTimeString('tr-TR') + '): ' + e.message;
+    }
   }
 }
 
@@ -2568,7 +2584,7 @@ async function startBroadcast() {
   pushSyncData();
   // Anlık güncellemeler zaten her sayımda gönderiliyor (pushSyncIfBroadcasting);
   // heartbeat yeni bağlanan izleyicilere güncel durumu ulaştırmak için.
-  syncHeartbeatInterval = setInterval(() => pushSyncData(), 10000);
+  syncHeartbeatInterval = setInterval(() => pushSyncData(), 30000);
   startCommandListener(syncBucketId);
   addLog(`Yayın başlatıldı (kod: ${syncCode.textContent})`);
 }
@@ -2588,11 +2604,17 @@ function stopBroadcast() {
 
 async function pollRemoteStats() {
   if (!syncBucketId || !syncWatchProviderKey) return;
+  if (Date.now() < ntfyBackoffUntil) return; // hız sınırı bekleniyor; SSE zaten dinlemede
   try {
     const data = await SYNC_PROVIDERS[syncWatchProviderKey].get(syncBucketId);
     clearSyncDiag();
     renderRemoteStats(data);
   } catch (err) {
+    if (String(err.message).indexOf('429') !== -1) {
+      ntfyBackoffUntil = Date.now() + 90000;
+      showSyncDiag('⏳ Hız sınırına takıldı, 90 sn beklenip otomatik devam edilecek. (Canlı akış dinlemede)');
+      return;
+    }
     showSyncDiag('⚠️ Bağlantı sorunu: ' + err.message + '. Koddan ve internetten emin ol, otomatik olarak tekrar denenecek.');
   }
 }
@@ -2742,11 +2764,15 @@ function startWatching(codeRaw) {
   updateGoalAndEarnings();
   renderWeekChart();
   syncShowState();
-  // Düzenli yoklama (kanıtlanmış, güvenilir yöntem). Canlı akış (SSE) bazı
-  // ağlarda/cihazlarda çalışmadığı için kaldırıldı; 2.5 sn'lik yoklama hem
-  // hızlı hem de ntfy istek sınırına takılmayacak kadar seyrek.
+  // ntfy: canlı akış (SSE) birincil — anında teslim eder ve istek bütçesi
+  // harcamaz; seyrek yoklama emniyet ağı olarak yanında çalışır (SSE bir
+  // ağda çalışmazsa bile veri en geç 20 sn'de gelir).
+  if (syncWatchProviderKey === 'ntfy' && typeof EventSource !== 'undefined') {
+    startWatchStream(syncBucketId);
+  }
   pollRemoteStats();
-  syncPollInterval = setInterval(pollRemoteStats, SYNC_POLL_MS);
+  syncPollInterval = setInterval(pollRemoteStats,
+    syncWatchProviderKey === 'ntfy' ? SYNC_POLL_MS_NTFY : SYNC_POLL_MS_LEGACY);
   // Kod hatırlanır: sayfa yenilenince otomatik yeniden bağlanılır.
   try { localStorage.setItem('civiSayaciIzlemeKodu', codeStr); } catch (e) {}
   addLog(`Başka cihaz izleniyor (kod: ${codeStr})`);
