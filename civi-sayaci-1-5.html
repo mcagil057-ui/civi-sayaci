@@ -618,7 +618,7 @@ window.addEventListener('error', function (e) {
 
 <h1>🔩 Çivi Sayacı</h1>
 <div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
-<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-02 · 9</div>
+<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-02 · 10</div>
 
 <div class="tabs" id="tabNav">
   <button class="tab-btn active" id="tabBtnCounter" data-tab="counter">🔩 Sayaç</button>
@@ -654,7 +654,8 @@ window.addEventListener('error', function (e) {
     <button class="camera-toggle" id="syncScanQrBtn">📷 QR Tara ve Bağlan</button>
   </div>
   <div id="syncWatching" style="display:none;">
-    <div style="text-align:center; font-size:0.82rem; color:#2ecc71; margin-bottom:8px;">🟢 Canlı izleniyor</div>
+    <div style="text-align:center; font-size:0.82rem; color:#2ecc71; margin-bottom:4px;">🟢 Canlı izleniyor</div>
+    <div id="syncLastData" style="text-align:center; font-size:0.7rem; color:#98a2b8; margin-bottom:8px;">veri bekleniyor...</div>
     <button class="reset-btn" id="syncDisconnectBtn">Bağlantıyı Kes</button>
   </div>
   <div id="syncDiag" style="display:none; font-size:0.75rem; color:#ffb3a7; margin-top:8px; line-height:1.4;"></div>
@@ -2166,7 +2167,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 // için özel olarak destekliyor, bu yüzden birincil sağlayıcı yapıldı.
 // jsonblob.com ikincil yedek olarak kaldı; olası bir CORS ön-uçuş (preflight)
 // hatasını azaltmak için artık Content-Type başlığı zorlanmıyor. ----
-const SYNC_POLL_MS = 2000; // sadece jsonblob yedeği için; ntfy canlı akış (SSE) kullanır, yoklamaz
+const SYNC_POLL_MS = 2500; // izleyen cihaz bu aralıkla yoklar (429'a takılmayacak kadar seyrek, yeterince hızlı)
 
 function syncSleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
@@ -2186,17 +2187,22 @@ const SYNC_PROVIDERS = {
       if (!res.ok) throw new Error('HTTP ' + res.status);
     },
     async get(id) {
-      // Sadece son ~30 saniyedeki mesajları iste: hem yayıncının en güncel
-      // durumunu yakalamaya yeter (heartbeat 4 sn'de bir) hem de uzun süren
-      // oturumlarda cevabın devasa büyümesini engeller.
-      const res = await fetch(`https://ntfy.sh/${id}/json?poll=1&since=30s`);
+      // Son ~2 dakikadaki mesajları iste (heartbeat 10 sn'de bir). Geniş pencere,
+      // telefon arka plana alınıp heartbeat bir süre gecikse bile en son durumu
+      // yakalamayı garanti eder; yine de yanıt küçük kalır.
+      const res = await fetch(`https://ntfy.sh/${id}/json?poll=1&since=2m`);
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const text = await res.text();
       const lines = text.trim().split('\n').filter(Boolean);
       if (lines.length === 0) throw new Error('henüz veri yok, bekleniyor');
-      const last = JSON.parse(lines[lines.length - 1]);
-      if (!last.message) throw new Error('boş mesaj alındı');
-      return JSON.parse(last.message);
+      // En son geçerli (message alanı olan) satırı bul.
+      for (let i = lines.length - 1; i >= 0; i--) {
+        try {
+          const obj = JSON.parse(lines[i]);
+          if (obj && obj.message) return JSON.parse(obj.message);
+        } catch (e) { /* bu satırı atla */ }
+      }
+      throw new Error('henüz veri yok, bekleniyor');
     }
   },
   jsonblob: {
@@ -2415,8 +2421,10 @@ const VIEWER_HIDE_IDS = [
 ];
 
 // Analiz panelleri: telefonda gizli (varsayılan display:none), sadece
-// izleyen cihazda (iPad) gösterilir.
-const VIEWER_SHOW_IDS = ['statsPanel', 'goalPanel', 'earnPanel', 'weekChartPanel'];
+// izleyen cihazda (iPad) gösterilir. İstatistikler paneli kullanıcı isteğiyle
+// arka planda tutuluyor (ekranda gösterilmiyor); veriler yine hesaplanıp gece
+// Telegram raporunda gönderiliyor. Hedef ve kazanç panelleri iPad'te kalır.
+const VIEWER_SHOW_IDS = ['goalPanel', 'earnPanel', 'weekChartPanel'];
 
 function setViewerModeUI(isViewer) {
   VIEWER_HIDE_IDS.forEach(id => {
@@ -2434,9 +2442,10 @@ function setViewerModeUI(isViewer) {
 
 async function pushSyncData() {
   if (!syncBucketId || !syncProviderKey) return;
-  // Son 10 günün istatistiğini de gönder ki izleyen cihaz grafik, günlük
-  // toplam, hedef ilerlemesi ve haftalık kazancı hesaplayabilsin.
-  const dayKeys = Object.keys(dailyStats).sort().slice(-10);
+  // Son 7 günün istatistiğini de gönder ki izleyen cihaz grafik, günlük
+  // toplam, hedef ilerlemesi ve haftalık kazancı hesaplayabilsin. (Mesajı
+  // küçük tutmak için 7 günle sınırlı.)
+  const dayKeys = Object.keys(dailyStats).sort().slice(-7);
   const trimmedDays = {};
   dayKeys.forEach(k => { trimmedDays[k] = dailyStats[k]; });
   const payload = {
@@ -2583,6 +2592,8 @@ function renderRemoteStats(data) {
   count = data.count || 0;
   countEl.textContent = count;
   videoBadge.textContent = count;
+  const sld = document.getElementById('syncLastData');
+  if (sld) sld.textContent = 'son veri: ' + new Date().toLocaleTimeString('tr-TR');
   updateViewerControls(data);
   // Telefonun gönderdiği günlük istatistikleri izleyende analizler için kullan.
   if (data.days) dailyStats = data.days;
@@ -2719,12 +2730,11 @@ function startWatching(codeRaw) {
   updateGoalAndEarnings();
   renderWeekChart();
   syncShowState();
-  if (syncWatchProviderKey === 'ntfy' && typeof EventSource !== 'undefined') {
-    startWatchStream(syncBucketId);
-  } else {
-    pollRemoteStats();
-    syncPollInterval = setInterval(pollRemoteStats, SYNC_POLL_MS);
-  }
+  // Düzenli yoklama (kanıtlanmış, güvenilir yöntem). Canlı akış (SSE) bazı
+  // ağlarda/cihazlarda çalışmadığı için kaldırıldı; 2.5 sn'lik yoklama hem
+  // hızlı hem de ntfy istek sınırına takılmayacak kadar seyrek.
+  pollRemoteStats();
+  syncPollInterval = setInterval(pollRemoteStats, SYNC_POLL_MS);
   addLog(`Başka cihaz izleniyor (kod: ${codeStr})`);
 }
 

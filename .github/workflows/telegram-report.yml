@@ -80,6 +80,7 @@ jobs:
           BATCHES=$(printf '%s' "$SNAP" | jq -r --arg d "$DAY" '.days[$d].batches // 0')
           RATE=$(printf '%s' "$SNAP" | jq -r '.rate // 0')
           RATEUNIT=$(printf '%s' "$SNAP" | jq -r '.rateUnit // "each"')
+          GOAL=$(printf '%s' "$SNAP" | jq -r '.goal // 0')
 
           MIN=$(( WORKMS / 60000 )); H=$(( MIN / 60 )); M=$(( MIN % 60 ))
           if [ "$H" -gt 0 ]; then WORKSTR="${H} saat ${M} dk"; else WORKSTR="${M} dk"; fi
@@ -110,6 +111,13 @@ jobs:
           MSG="${MSG}"$'\n'"📦 Tamamlanan 50'lik tur: ${BATCHES}"
           if EARN=$(earn_line "$NAILS"); then
             MSG="${MSG}"$'\n'"💰 Kazanç: ₺${EARN}"
+          fi
+          if [ "${GOAL:-0}" -gt 0 ] 2>/dev/null; then
+            if [ "$NAILS" -ge "$GOAL" ]; then
+              MSG="${MSG}"$'\n'"🎯 Hedef: ${GOAL} — ✅ ulaşıldı"
+            else
+              MSG="${MSG}"$'\n'"🎯 Hedef: ${GOAL} — ${NAILS}/${GOAL} (kalan $(( GOAL - NAILS )))"
+            fi
           fi
 
           curl -sf -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
