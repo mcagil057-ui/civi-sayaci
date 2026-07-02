@@ -618,7 +618,7 @@ window.addEventListener('error', function (e) {
 
 <h1>🔩 Çivi Sayacı</h1>
 <div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
-<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-02 · 10</div>
+<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-02 · 11</div>
 
 <div class="tabs" id="tabNav">
   <button class="tab-btn active" id="tabBtnCounter" data-tab="counter">🔩 Sayaç</button>
@@ -642,6 +642,7 @@ window.addEventListener('error', function (e) {
     <div style="text-align:center; margin-bottom:8px;">
       <div style="font-size:0.75rem; color:#9aa5b1;">Paylaşım Kodu — diğer cihaza gir</div>
       <div id="syncCode" style="font-size:1.7rem; font-weight:800; color:#f0a500; letter-spacing:0.04em; word-break:break-all;">------</div>
+      <div id="syncPushStatus" style="font-size:0.7rem; color:#98a2b8; margin-top:4px; min-height:1em;">gönderim bekleniyor...</div>
     </div>
     <button class="camera-toggle" id="syncCopyBtn">📋 Kodu Kopyala</button>
     <button class="camera-toggle" id="syncShowQrBtn">📷 QR Kod Göster</button>
@@ -2459,10 +2460,14 @@ async function pushSyncData() {
     days: trimmedDays,
     updatedAt: Date.now()
   };
+  const statusEl = document.getElementById('syncPushStatus');
   try {
     await SYNC_PROVIDERS[syncProviderKey].put(syncBucketId, payload);
+    if (statusEl) statusEl.textContent = '☁️ son gönderim: ' + new Date().toLocaleTimeString('tr-TR');
   } catch (e) {
-    // tek bir push başarısız olursa sessizce geç; heartbeat tekrar dener
+    // Başarısızlığı GÖRÜNÜR yap (eskiden sessizdi ve teşhis edilemiyordu);
+    // heartbeat zaten tekrar deneyecek.
+    if (statusEl) statusEl.textContent = '⚠️ gönderilemedi (' + new Date().toLocaleTimeString('tr-TR') + '): ' + e.message;
   }
 }
 
@@ -2533,39 +2538,46 @@ function stopCommandListener() {
   if (cmdEventSource) { cmdEventSource.close(); cmdEventSource = null; }
 }
 
+// Yayın kodu artık kalıcı: her "Yayınla"da yeni kod üretmek yerine cihaza
+// özel tek bir kod kullanılır. Böylece iPad'e kod bir kez girilir; sayfa
+// yenilense bile aynı kod geçerli kalır (kod uyuşmazlığı sorununu bitirir).
+const BCAST_TOPIC_KEY = 'civiSayaciYayinKodu';
+const BCAST_ACTIVE_KEY = 'civiSayaciYayinAktif';
+
+function ensureBroadcastTopic() {
+  let t = null;
+  try { t = localStorage.getItem(BCAST_TOPIC_KEY); } catch (e) {}
+  if (!t) {
+    t = 'civi-' + Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 6);
+    try { localStorage.setItem(BCAST_TOPIC_KEY, t); } catch (e) {}
+  }
+  return t;
+}
+
 async function startBroadcast() {
   clearSyncDiag();
   syncRetryBtn.style.display = 'none';
-  syncBroadcastBtn.disabled = true;
-  syncBroadcastBtn.textContent = 'Kod oluşturuluyor...';
-  try {
-    const result = await createSyncBucketWithFallback();
-    syncProviderKey = result.provider;
-    syncBucketId = result.id;
-    syncMode = 'broadcast';
-    syncCode.textContent = makeSyncCode(syncProviderKey, syncBucketId);
-    syncShowState();
-    pushSyncData();
-    // Anlık güncellemeler zaten her sayımda gönderiliyor (pushSyncIfBroadcasting);
-    // heartbeat sadece yeni bağlanan izleyicilere güncel durumu ulaştırmak için.
-    // Sık heartbeat, ntfy'nin istek sınırına (HTTP 429) takılmaya yol açıyordu.
-    syncHeartbeatInterval = setInterval(() => pushSyncData(), 10000);
-    if (syncProviderKey === 'ntfy') startCommandListener(syncBucketId);
-    addLog(`Yayın başlatıldı (kod: ${syncCode.textContent}, servis: ${SYNC_PROVIDERS[syncProviderKey].label})`);
-  } catch (err) {
-    showSyncDiag('⚠️ Yayın başlatılamadı: ' + err.message + '. Birkaç saniye sonra "Tekrar Dene"yi deneyebilirsin. Israrla devam ederse mobil veri yerine Wi-Fi ile (veya tam tersini) denemeni öneririz — bazı operatörler bu tür paylaşım servislerini engelleyebiliyor.');
-    syncRetryBtn.style.display = 'block';
-    addLog('Yayın başlatılamadı: ' + err.message);
-  } finally {
-    syncBroadcastBtn.disabled = false;
-    syncBroadcastBtn.textContent = '📡 Bu Cihazdan Yayınla';
-  }
+  // ntfy konu tabanlı olduğundan kod üretimi yereldir, ağ gerektirmez ve
+  // başarısız olamaz. jsonblob sadece eski JB- kodlarını izlemek için duruyor.
+  syncProviderKey = 'ntfy';
+  syncBucketId = ensureBroadcastTopic();
+  syncMode = 'broadcast';
+  try { localStorage.setItem(BCAST_ACTIVE_KEY, '1'); } catch (e) {}
+  syncCode.textContent = makeSyncCode(syncProviderKey, syncBucketId);
+  syncShowState();
+  pushSyncData();
+  // Anlık güncellemeler zaten her sayımda gönderiliyor (pushSyncIfBroadcasting);
+  // heartbeat yeni bağlanan izleyicilere güncel durumu ulaştırmak için.
+  syncHeartbeatInterval = setInterval(() => pushSyncData(), 10000);
+  startCommandListener(syncBucketId);
+  addLog(`Yayın başlatıldı (kod: ${syncCode.textContent})`);
 }
 
 function stopBroadcast() {
   syncMode = 'off';
   syncBucketId = null;
   syncProviderKey = null;
+  try { localStorage.removeItem(BCAST_ACTIVE_KEY); } catch (e) {}
   if (syncHeartbeatInterval) clearInterval(syncHeartbeatInterval);
   if (syncPushTimeout) { clearTimeout(syncPushTimeout); syncPushTimeout = null; }
   stopCommandListener();
@@ -2735,6 +2747,8 @@ function startWatching(codeRaw) {
   // hızlı hem de ntfy istek sınırına takılmayacak kadar seyrek.
   pollRemoteStats();
   syncPollInterval = setInterval(pollRemoteStats, SYNC_POLL_MS);
+  // Kod hatırlanır: sayfa yenilenince otomatik yeniden bağlanılır.
+  try { localStorage.setItem('civiSayaciIzlemeKodu', codeStr); } catch (e) {}
   addLog(`Başka cihaz izleniyor (kod: ${codeStr})`);
 }
 
@@ -2743,6 +2757,7 @@ function stopWatching() {
   syncBucketId = null;
   syncWatchProviderKey = null;
   lastRemoteState = null;
+  try { localStorage.removeItem('civiSayaciIzlemeKodu'); } catch (e) {}
   if (syncPollInterval) clearInterval(syncPollInterval);
   if (watchEventSource) { watchEventSource.close(); watchEventSource = null; }
   setViewerModeUI(false);
@@ -2772,6 +2787,23 @@ syncCopyBtn.addEventListener('click', () => {
     showSyncDiag('Kodu elle seçip kopyalayabilirsin: ' + codeText);
   }
 });
+
+// ---- Otomatik yeniden bağlanma: sayfa yenilense/kapansa bile rolü hatırla.
+// Telefon yayındaydıysa yayına, iPad izliyorduysa izlemeye kendiliğinden
+// devam eder — her seferinde buton/kod girme derdi biter.
+(function autoResume() {
+  let wasBroadcasting = false, watchCode = null;
+  try {
+    wasBroadcasting = localStorage.getItem(BCAST_ACTIVE_KEY) === '1';
+    watchCode = localStorage.getItem('civiSayaciIzlemeKodu');
+  } catch (e) { return; }
+  if (wasBroadcasting) {
+    startBroadcast();
+  } else if (watchCode) {
+    syncCodeInput.value = watchCode;
+    startWatching(watchCode);
+  }
+})();
 </script>
 </body>
 </html>
