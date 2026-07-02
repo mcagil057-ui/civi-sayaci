@@ -661,6 +661,25 @@
   </div>
   <button class="report-btn" id="notesMailBtn">📧 Notları Mail Gönder</button>
   <button class="reset-btn" id="notesClearBtn">Günlüğü Temizle</button>
+
+  <div class="stats-panel" style="margin-top:16px;">
+    <div class="stats-title">📨 Telegram Günlük Rapor</div>
+    <input type="text" id="tgToken" placeholder="Bot Token (BotFather'dan)" autocomplete="off" style="width:100%; padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); color:#fff; font-size:0.9rem; margin-bottom:8px; box-sizing:border-box;">
+    <input type="text" id="tgChatId" placeholder="Chat ID (örn. 123456789)" autocomplete="off" style="width:100%; padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); color:#fff; font-size:0.9rem; margin-bottom:4px; box-sizing:border-box;">
+    <div class="checkbox-row">
+      <span>🕛 Her gece 00:00'da otomatik gönder</span>
+      <label class="switch">
+        <input type="checkbox" id="tgAutoToggle" checked>
+        <span class="switch-track"></span>
+      </label>
+    </div>
+    <button class="report-btn" id="tgTestBtn" style="margin-top:12px; margin-bottom:0;">📨 Bugünün Raporunu Şimdi Gönder</button>
+    <div id="tgStatus" style="font-size:0.72rem; color:#98a2b8; margin-top:8px; text-align:center; min-height:1em;"></div>
+    <div style="font-size:0.72rem; color:#626d80; margin-top:10px; line-height:1.5;">
+      <b>Kurulum (bir kere):</b> 1) Telegram'da <b>@BotFather</b>'a <b>/newbot</b> yaz, bot adı ver, sana verilen <b>token</b>'ı yukarı yapıştır. 2) Oluşan botunu Telegram'da bulup <b>/start</b> yaz (bot sana mesaj atabilsin diye şart). 3) <b>@userinfobot</b>'a mesaj at, sana söylediği <b>Id</b> numarasını Chat ID kısmına yaz. 4) "Şimdi Gönder" ile test et.<br><br>
+      Sayfa gece 00:00'da açıksa rapor tam o anda gider; kapalıysa sayfayı bir sonraki açışında dünün raporu otomatik gönderilir.
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
@@ -1254,6 +1273,7 @@ function updateCount(delta, source) {
     const now = Date.now();
     nailTimestamps.push(now);
     addLog(`Çivi #${count} sayıldı (${source || 'kamera'})`);
+    recordDailyNail(1, now);
 
     // check if we just completed a new batch of 50
     if (count % 50 === 0 && count > 0) {
@@ -1262,11 +1282,13 @@ function updateCount(delta, source) {
       lastBatchMark = now;
       renderBatchHistory();
       addLog(`${count}. çivi turu tamamlandı — süre: ${formatDuration(now - batchStart)}`);
+      recordDailyBatch();
     }
   } else {
     // undo: remove the most recent timestamp
     nailTimestamps.pop();
     addLog(`Çivi sayısı ${source || 'manuel'} olarak 1 azaltıldı (yeni değer: ${count})`);
+    recordDailyNail(-1, Date.now());
   }
 
   updateStats();
@@ -1380,6 +1402,204 @@ document.getElementById('notesMailBtn').addEventListener('click', () => {
   const encodedBody = encodeURIComponent(body);
   window.location.href = `mailto:?subject=${subject}&body=${encodedBody}`;
 });
+
+// ---- Günlük iş istatistikleri (Telegram raporu için kalıcı takip) ----
+// Sayaç sıfırlansa bile o günün toplamları burada birikmeye devam eder.
+const DAILY_STATS_KEY = 'civiSayaciGunluk';
+let dailyStats = {}; // 'YYYY-MM-DD' -> { nails, workMs, firstTs, lastTs, batches }
+
+function dayKeyOf(d) {
+  const dt = d ? new Date(d) : new Date();
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const g = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${g}`;
+}
+
+function loadDailyStats() {
+  try {
+    const raw = localStorage.getItem(DAILY_STATS_KEY);
+    dailyStats = raw ? JSON.parse(raw) : {};
+  } catch (e) { dailyStats = {}; }
+}
+
+function saveDailyStats() {
+  try {
+    // sadece son 30 günü tut, eski günler şişmesin
+    const keys = Object.keys(dailyStats).sort();
+    while (keys.length > 30) delete dailyStats[keys.shift()];
+    localStorage.setItem(DAILY_STATS_KEY, JSON.stringify(dailyStats));
+  } catch (e) { /* depolama erişilemezse sessizce geç */ }
+}
+
+function ensureDay(key) {
+  const k = key || dayKeyOf();
+  if (!dailyStats[k]) dailyStats[k] = { nails: 0, workMs: 0, firstTs: null, lastTs: null, batches: 0 };
+  return dailyStats[k];
+}
+
+function recordDailyNail(delta, ts) {
+  const ds = ensureDay();
+  if (delta > 0) {
+    ds.nails++;
+    if (!ds.firstTs) ds.firstTs = ts;
+    ds.lastTs = ts;
+  } else {
+    ds.nails = Math.max(0, ds.nails - 1);
+  }
+  saveDailyStats();
+}
+
+function recordDailyBatch() {
+  ensureDay().batches++;
+  saveDailyStats();
+}
+
+// Çalışma süresi: algılama fiilen açıkken (kamera açık ve duraklatılmamış)
+// geçen süre saniye saniye birikir. Kaydetme yazma yükünü azaltmak için
+// 10 saniyede bir yapılır.
+let workSaveTick = 0;
+setInterval(() => {
+  if (motionListening && !motionPaused) {
+    ensureDay().workMs += 1000;
+    if (++workSaveTick >= 10) { workSaveTick = 0; saveDailyStats(); }
+  }
+}, 1000);
+
+loadDailyStats();
+
+// ---- Telegram günlük rapor ----
+const TG_SETTINGS_KEY = 'civiSayaciTelegram';
+const tgToken = document.getElementById('tgToken');
+const tgChatId = document.getElementById('tgChatId');
+const tgAutoToggle = document.getElementById('tgAutoToggle');
+const tgTestBtn = document.getElementById('tgTestBtn');
+const tgStatus = document.getElementById('tgStatus');
+
+let tgSettings = { token: '', chatId: '', auto: true, sentDays: [] };
+let tgLastAttemptAt = 0;
+
+function loadTgSettings() {
+  try {
+    const raw = localStorage.getItem(TG_SETTINGS_KEY);
+    if (raw) tgSettings = Object.assign(tgSettings, JSON.parse(raw));
+  } catch (e) { /* bozuk ayar: varsayılanla devam */ }
+  tgToken.value = tgSettings.token || '';
+  tgChatId.value = tgSettings.chatId || '';
+  tgAutoToggle.checked = tgSettings.auto !== false;
+}
+
+function saveTgSettings() {
+  if (tgSettings.sentDays.length > 60) tgSettings.sentDays = tgSettings.sentDays.slice(-60);
+  try { localStorage.setItem(TG_SETTINGS_KEY, JSON.stringify(tgSettings)); }
+  catch (e) { /* sessizce geç */ }
+}
+
+tgToken.addEventListener('change', () => { tgSettings.token = tgToken.value.trim(); saveTgSettings(); });
+tgChatId.addEventListener('change', () => { tgSettings.chatId = tgChatId.value.trim(); saveTgSettings(); });
+tgAutoToggle.addEventListener('change', () => { tgSettings.auto = tgAutoToggle.checked; saveTgSettings(); });
+
+function formatClock(ts) {
+  return new Date(ts).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatWorkDuration(ms) {
+  const totalMin = Math.round(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h > 0) return `${h} saat ${m} dk`;
+  return `${m} dk`;
+}
+
+function buildDailyReport(dayKey) {
+  const ds = dailyStats[dayKey];
+  const [y, m, g] = dayKey.split('-');
+  const dateStr = `${g}.${m}.${y}`;
+  let text = `🔩 Çivi Sayacı — Günlük Rapor (${dateStr})\n\n`;
+  if (!ds || ds.nails === 0) {
+    text += 'Bu gün hiç çivi sayılmadı.';
+    return text;
+  }
+  text += `✅ Toplam çivi: ${ds.nails}\n`;
+  text += `⏱ Çalışma süresi: ${formatWorkDuration(ds.workMs)} (algılama açık kalma süresi)\n`;
+  if (ds.firstTs && ds.lastTs) {
+    text += `🕐 İlk çivi: ${formatClock(ds.firstTs)} — Son çivi: ${formatClock(ds.lastTs)}\n`;
+    if (ds.nails >= 2 && ds.lastTs > ds.firstTs) {
+      const secPerNail = (ds.lastTs - ds.firstTs) / 1000 / (ds.nails - 1);
+      text += `⚡ Ortalama hız: ${secPerNail.toFixed(1)} sn/çivi (${(60 / secPerNail).toFixed(1)} çivi/dk)\n`;
+    }
+  }
+  text += `📦 Tamamlanan 50'lik tur: ${ds.batches}`;
+  return text;
+}
+
+async function sendTelegram(text) {
+  if (!tgSettings.token || !tgSettings.chatId) throw new Error('Bot token ve Chat ID gerekli');
+  // Form-encoded gövde tarayıcıda CORS ön-uçuş (preflight) gerektirmez.
+  const body = new URLSearchParams({ chat_id: tgSettings.chatId, text });
+  const res = await fetch(`https://api.telegram.org/bot${tgSettings.token}/sendMessage`, {
+    method: 'POST',
+    body
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) {
+    throw new Error(data.description || ('HTTP ' + res.status));
+  }
+}
+
+async function sendDailyReport(dayKey, isManual) {
+  try {
+    await sendTelegram(buildDailyReport(dayKey));
+    if (!tgSettings.sentDays.includes(dayKey)) tgSettings.sentDays.push(dayKey);
+    saveTgSettings();
+    tgStatus.textContent = `✅ ${dayKey} raporu Telegram'a gönderildi`;
+    addLog(`Günlük rapor Telegram'a gönderildi (${dayKey}${isManual ? ', elle' : ', otomatik'})`);
+    return true;
+  } catch (err) {
+    tgStatus.textContent = '⚠️ Telegram gönderimi başarısız: ' + err.message;
+    if (isManual) addLog('Telegram gönderimi başarısız: ' + err.message);
+    return false;
+  }
+}
+
+tgTestBtn.addEventListener('click', async () => {
+  tgSettings.token = tgToken.value.trim();
+  tgSettings.chatId = tgChatId.value.trim();
+  saveTgSettings();
+  tgStatus.textContent = 'Gönderiliyor...';
+  // Elle gönderim "bugünün" o ana kadarki raporunu yollar; gün 'gönderildi'
+  // olarak işaretlenmez ki gece yarısı tam rapor yine otomatik gitsin.
+  try {
+    await sendTelegram(buildDailyReport(dayKeyOf()));
+    tgStatus.textContent = '✅ Bugünün raporu gönderildi (gece 00:00 raporu ayrıca gidecek)';
+    addLog('Bugünün ara raporu Telegram\'a elle gönderildi');
+  } catch (err) {
+    tgStatus.textContent = '⚠️ Gönderilemedi: ' + err.message;
+  }
+});
+
+// Otomatik gönderim denetleyicisi: her 30 saniyede bir, bugünden önceki ve
+// henüz gönderilmemiş, verisi olan günleri Telegram'a yollar. Sayfa gece
+// 00:00'da açıksa rapor ilk 30 saniye içinde gider; kapalıysa sayfanın bir
+// sonraki açılışında dünün (ve varsa önceki günlerin) raporu gönderilir.
+// Başarısız denemeler 5 dakika arayla otomatik tekrarlanır.
+setInterval(async () => {
+  if (!tgSettings.auto || !tgSettings.token || !tgSettings.chatId) return;
+  const today = dayKeyOf();
+  const pending = Object.keys(dailyStats).sort().filter(day =>
+    day < today && !tgSettings.sentDays.includes(day) && dailyStats[day].nails > 0
+  );
+  if (pending.length === 0) return;
+  const now = Date.now();
+  if (now - tgLastAttemptAt < 5 * 60 * 1000 && tgLastAttemptAt !== 0) return;
+  tgLastAttemptAt = now;
+  for (const day of pending) {
+    const ok = await sendDailyReport(day, false);
+    if (!ok) break; // ağ sorunu varsa kalanları sonraki turda dene
+  }
+}, 30000);
+
+loadTgSettings();
 
 // ---- Tab (Sayaç / Notlar) geçişi ----
 document.querySelectorAll('.tab-btn').forEach(btn => {
