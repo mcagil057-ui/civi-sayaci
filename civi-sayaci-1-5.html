@@ -479,6 +479,74 @@
   .notes-log .log-time { color: var(--text-faint); flex-shrink: 0; }
   .notes-empty { color: var(--text-faint); font-size: 0.8rem; text-align: center; padding: 12px 0; }
 
+  .goal-bar-wrap {
+    width: 100%;
+    height: 14px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 6px 0 10px;
+  }
+  .goal-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent-2), var(--accent));
+    border-radius: 999px;
+    transition: width 0.4s ease;
+  }
+  .goal-bar.done { background: linear-gradient(90deg, #34d399, #10b981); }
+  .mini-input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.05);
+    color: #fff;
+    font-size: 0.95rem;
+    box-sizing: border-box;
+  }
+  .field-row { display: flex; gap: 8px; align-items: center; }
+  .field-row .mini-input { flex: 1; }
+  .seg {
+    display: flex; gap: 4px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 10px; padding: 3px;
+  }
+  .seg button {
+    flex: 1; padding: 8px 6px; font-size: 0.72rem;
+    background: transparent; color: var(--text-dim);
+    border-radius: 8px; border: none;
+  }
+  .seg button.active { background: rgba(255,176,32,0.2); color: var(--accent); }
+
+  .chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 110px;
+    padding-top: 8px;
+  }
+  .chart .bar-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    height: 100%;
+    justify-content: flex-end;
+  }
+  .chart .bar {
+    width: 100%;
+    max-width: 30px;
+    background: linear-gradient(180deg, var(--accent), #c97f06);
+    border-radius: 6px 6px 0 0;
+    min-height: 2px;
+    transition: height 0.4s ease;
+  }
+  .chart .bar-col.best .bar { background: linear-gradient(180deg, var(--accent-2), #10b981); }
+  .chart .bar-val { font-size: 0.62rem; color: var(--text-dim); }
+  .chart .bar-day { font-size: 0.6rem; color: var(--text-faint); }
+
   .qr-modal {
     display: none;
     position: fixed;
@@ -529,6 +597,10 @@ if (location.search.indexOf('reset=1') !== -1) {
 // yerine hatayı görünür bir kutuda gösterir (teşhis için hayati).
 window.addEventListener('error', function (e) {
   try {
+    // Sadece gerçek çalışma/JS hatalarını göster. İsteğe bağlı dış kaynakların
+    // (ör. QR kütüphaneleri) yüklenememesi kritik değildir ve gereksiz uyarı
+    // vermemeli — bunların message alanı olmaz, sadece target olur.
+    if (!e.message && e.target && e.target !== window) return;
     var box = document.getElementById('earlyErrorBox');
     if (!box) {
       box = document.createElement('div');
@@ -636,7 +708,63 @@ window.addEventListener('error', function (e) {
   <div class="batch-history" id="batchHistory"></div>
 </div>
 
+<div class="stats-panel" id="goalPanel">
+  <div class="stats-title">🎯 Günlük Hedef</div>
+  <div class="field-row" style="margin-bottom:10px;">
+    <input type="number" inputmode="numeric" id="goalInput" class="mini-input" placeholder="Günlük hedef (örn. 500)" min="0">
+  </div>
+  <div id="goalProgressWrap" style="display:none;">
+    <div class="goal-bar-wrap"><div class="goal-bar" id="goalBar"></div></div>
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-value" id="goalDone">0</div>
+        <div class="stat-label">bugün yapılan</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="goalLeft">—</div>
+        <div class="stat-label">kalan</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="goalPct">0%</div>
+        <div class="stat-label">tamamlanan</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="goalEta">—</div>
+        <div class="stat-label">tahmini bitiş</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="stats-panel" id="earnPanel">
+  <div class="stats-title">💰 Kazanç</div>
+  <div class="field-row" style="margin-bottom:8px;">
+    <input type="number" inputmode="decimal" id="rateInput" class="mini-input" placeholder="Ücret (₺)" min="0" step="0.01">
+    <div class="seg" id="rateUnitSeg" style="flex:1.2;">
+      <button type="button" data-unit="each" class="active">adet başı</button>
+      <button type="button" data-unit="per50">50'lik başı</button>
+    </div>
+  </div>
+  <div class="stats-grid" id="earnGrid" style="display:none;">
+    <div class="stat-item">
+      <div class="stat-value" id="earnToday">₺0</div>
+      <div class="stat-label">bugün</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="earnWeek">₺0</div>
+      <div class="stat-label">bu hafta</div>
+    </div>
+  </div>
+</div>
+
+<div class="stats-panel" id="weekChartPanel">
+  <div class="stats-title">📈 Son 7 Gün</div>
+  <div class="chart" id="weekChart"></div>
+</div>
+
 <button class="sound-toggle on" id="soundToggle">🔊 Onay sesi açık</button>
+<button class="sound-toggle" id="voiceToggle">🗣️ Sesli anons kapalı</button>
+<button class="camera-toggle" id="speakCountBtn">🔊 Sayıyı Sesli Söyle</button>
 
 <button class="camera-toggle" id="cameraBtn">📷 Kamerayı Aç</button>
 
@@ -883,7 +1011,10 @@ function updateStats() {
   }
 }
 
-setInterval(updateStats, 1000);
+setInterval(() => {
+  updateStats();
+  if (typeof updateGoalAndEarnings === 'function') updateGoalAndEarnings();
+}, 1000);
 
 // ---- Wake Lock: keep screen on while listening ----
 const wakeStatus = document.getElementById('wakeStatus');
@@ -1377,6 +1508,15 @@ function updateCount(delta, source) {
       renderBatchHistory();
       addLog(`${count}. çivi turu tamamlandı — süre: ${formatDuration(now - batchStart)}`);
       recordDailyBatch();
+      // Eller meşgulken ekrana bakmadan takip: her 50'de sesli anons.
+      if (prefs.voice) speak(count + ' oldu');
+    }
+
+    // Günlük hedefe tam ulaşıldığı an: kutlama sesi + anons (bir kez).
+    if (prefs.goal > 0 && todayNails() === prefs.goal) {
+      playBeep(); setTimeout(playBeep, 140); setTimeout(playBeep, 280);
+      if (prefs.voice) speak('Hedefe ulaştın, ' + prefs.goal + ' çivi');
+      addLog(`🎯 Günlük hedefe ulaşıldı (${prefs.goal})`);
     }
   } else {
     // undo: remove the most recent timestamp
@@ -1386,6 +1526,8 @@ function updateCount(delta, source) {
   }
 
   updateStats();
+  updateGoalAndEarnings();
+  renderWeekChart();
   if (navigator.vibrate) navigator.vibrate(40);
   pushSyncIfBroadcasting();
 }
@@ -1564,6 +1706,182 @@ setInterval(() => {
 
 loadDailyStats();
 
+// ---- Hedef, Kazanç, Grafik, Sesli anons ----
+const PREFS_KEY = 'civiSayaciTercihler';
+let prefs = { goal: 0, rate: 0, rateUnit: 'each', voice: false };
+
+function loadPrefs() {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (raw) prefs = Object.assign(prefs, JSON.parse(raw));
+  } catch (e) { /* bozuk tercih: varsayılan */ }
+}
+function savePrefs() {
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (e) {}
+}
+
+const goalInput = document.getElementById('goalInput');
+const goalProgressWrap = document.getElementById('goalProgressWrap');
+const goalBar = document.getElementById('goalBar');
+const goalDone = document.getElementById('goalDone');
+const goalLeft = document.getElementById('goalLeft');
+const goalPct = document.getElementById('goalPct');
+const goalEta = document.getElementById('goalEta');
+const rateInput = document.getElementById('rateInput');
+const rateUnitSeg = document.getElementById('rateUnitSeg');
+const earnGrid = document.getElementById('earnGrid');
+const earnToday = document.getElementById('earnToday');
+const earnWeek = document.getElementById('earnWeek');
+const weekChart = document.getElementById('weekChart');
+const voiceToggle = document.getElementById('voiceToggle');
+const speakCountBtn = document.getElementById('speakCountBtn');
+
+function todayNails() {
+  const t = dailyStats[dayKeyOf()];
+  return t ? t.nails : 0;
+}
+
+function formatMoney(v) {
+  return '₺' + (Math.round(v * 100) / 100).toLocaleString('tr-TR');
+}
+
+// Mevcut hıza göre bir sonraki hedefe kalan süreyi tahmin eder.
+function currentSecPerNail() {
+  if (nailTimestamps.length >= 2) {
+    const elapsed = nailTimestamps[nailTimestamps.length - 1] - nailTimestamps[0];
+    return elapsed / 1000 / (nailTimestamps.length - 1);
+  }
+  const t = dailyStats[dayKeyOf()];
+  if (t && t.nails >= 2 && t.firstTs && t.lastTs && t.lastTs > t.firstTs) {
+    return (t.lastTs - t.firstTs) / 1000 / (t.nails - 1);
+  }
+  return 0;
+}
+
+function weekTotalNails() {
+  // Bu haftanın (Pazartesi başlangıçlı) toplamı
+  const now = new Date();
+  const dow = (now.getDay() + 6) % 7; // Pazartesi=0
+  let total = 0;
+  for (let i = 0; i <= dow; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    const ds = dailyStats[dayKeyOf(d)];
+    if (ds) total += ds.nails;
+  }
+  return total;
+}
+
+function earningsFor(nails) {
+  if (!prefs.rate) return 0;
+  return prefs.rateUnit === 'per50' ? (nails / 50) * prefs.rate : nails * prefs.rate;
+}
+
+function updateGoalAndEarnings() {
+  const done = todayNails();
+  // Hedef
+  if (prefs.goal > 0) {
+    goalProgressWrap.style.display = 'block';
+    const pct = Math.min(100, (done / prefs.goal) * 100);
+    goalBar.style.width = pct + '%';
+    goalBar.classList.toggle('done', done >= prefs.goal);
+    goalDone.textContent = done;
+    const left = Math.max(0, prefs.goal - done);
+    goalLeft.textContent = left;
+    goalPct.textContent = Math.round(pct) + '%';
+    if (done >= prefs.goal) {
+      goalEta.textContent = '✅ tamam';
+    } else {
+      const spn = currentSecPerNail();
+      if (spn > 0) {
+        const eta = new Date(Date.now() + left * spn * 1000);
+        goalEta.textContent = eta.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+      } else {
+        goalEta.textContent = '—';
+      }
+    }
+  } else {
+    goalProgressWrap.style.display = 'none';
+  }
+  // Kazanç
+  if (prefs.rate > 0) {
+    earnGrid.style.display = 'grid';
+    earnToday.textContent = formatMoney(earningsFor(done));
+    earnWeek.textContent = formatMoney(earningsFor(weekTotalNails()));
+  } else {
+    earnGrid.style.display = 'none';
+  }
+}
+
+const TR_DAYS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+function renderWeekChart() {
+  const now = new Date();
+  const days = [];
+  let max = 1;
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    const ds = dailyStats[dayKeyOf(d)];
+    const n = ds ? ds.nails : 0;
+    const dow = (d.getDay() + 6) % 7;
+    days.push({ n: n, label: TR_DAYS[dow] });
+    if (n > max) max = n;
+  }
+  const best = Math.max.apply(null, days.map(d => d.n));
+  let html = '';
+  days.forEach(d => {
+    const h = Math.round((d.n / max) * 100);
+    const isBest = d.n === best && d.n > 0;
+    html += `<div class="bar-col${isBest ? ' best' : ''}"><div class="bar-val">${d.n || ''}</div><div class="bar" style="height:${h}%"></div><div class="bar-day">${d.label}</div></div>`;
+  });
+  weekChart.innerHTML = html;
+}
+
+// Ayarlar
+loadPrefs();
+goalInput.value = prefs.goal || '';
+rateInput.value = prefs.rate || '';
+rateUnitSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.unit === prefs.rateUnit));
+voiceToggle.textContent = prefs.voice ? '🗣️ Sesli anons açık' : '🗣️ Sesli anons kapalı';
+voiceToggle.classList.toggle('on', prefs.voice);
+
+goalInput.addEventListener('change', () => {
+  prefs.goal = Math.max(0, parseInt(goalInput.value) || 0);
+  savePrefs(); updateGoalAndEarnings(); scheduleCloudPush();
+});
+rateInput.addEventListener('change', () => {
+  prefs.rate = Math.max(0, parseFloat(rateInput.value) || 0);
+  savePrefs(); updateGoalAndEarnings(); scheduleCloudPush();
+});
+rateUnitSeg.querySelectorAll('button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    prefs.rateUnit = btn.dataset.unit;
+    rateUnitSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+    savePrefs(); updateGoalAndEarnings(); scheduleCloudPush();
+  });
+});
+
+// Sesli anons (Türkçe konuşma sentezi)
+function speak(text) {
+  if (!('speechSynthesis' in window)) return;
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'tr-TR';
+    u.rate = 1.0;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  } catch (e) { /* konuşma desteklenmiyorsa sessiz geç */ }
+}
+voiceToggle.addEventListener('click', () => {
+  prefs.voice = !prefs.voice;
+  voiceToggle.textContent = prefs.voice ? '🗣️ Sesli anons açık' : '🗣️ Sesli anons kapalı';
+  voiceToggle.classList.toggle('on', prefs.voice);
+  savePrefs();
+  if (prefs.voice) speak('Sesli anons açık');
+});
+speakCountBtn.addEventListener('click', () => speak(count + ' çivi'));
+
+updateGoalAndEarnings();
+renderWeekChart();
+
 // ---- Telegram günlük rapor ----
 const TG_SETTINGS_KEY = 'civiSayaciTelegram';
 const tgToken = document.getElementById('tgToken');
@@ -1713,7 +2031,7 @@ reportTopicCopyBtn.addEventListener('click', () => {
 
 async function pushDailyStatsToCloud(useKeepalive) {
   const topic = ensureReportTopic();
-  const payload = { days: dailyStats, sent: tgSettings.sentDays, updatedAt: Date.now() };
+  const payload = { days: dailyStats, sent: tgSettings.sentDays, rate: prefs.rate, rateUnit: prefs.rateUnit, goal: prefs.goal, updatedAt: Date.now() };
   try {
     await fetch(`https://ntfy.sh/${topic}`, {
       method: 'POST',
@@ -2063,7 +2381,8 @@ function syncShowState() {
 // Elements to hide entirely on the watching (viewer) device, since it
 // only displays remote data and shouldn't run its own camera/counting.
 const VIEWER_HIDE_IDS = [
-  'statusRow', 'statsPanel', 'soundToggle', 'cameraBtn',
+  'statusRow', 'statsPanel', 'goalPanel', 'earnPanel', 'weekChartPanel',
+  'soundToggle', 'voiceToggle', 'speakCountBtn', 'cameraBtn',
   'videoWrap', 'roiControls', 'motionToggle', 'motionMeterWrap', 'motionLevelReadout',
   'manualRow', 'resetBtn', 'reportBtn', 'wakeStatus',
   'motionSettings', 'hintBox'

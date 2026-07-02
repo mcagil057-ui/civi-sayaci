@@ -78,10 +78,21 @@ jobs:
           FIRST=$(printf '%s' "$SNAP" | jq -r --arg d "$DAY" '.days[$d].firstTs // empty')
           LAST=$(printf '%s' "$SNAP" | jq -r --arg d "$DAY" '.days[$d].lastTs // empty')
           BATCHES=$(printf '%s' "$SNAP" | jq -r --arg d "$DAY" '.days[$d].batches // 0')
+          RATE=$(printf '%s' "$SNAP" | jq -r '.rate // 0')
+          RATEUNIT=$(printf '%s' "$SNAP" | jq -r '.rateUnit // "each"')
 
           MIN=$(( WORKMS / 60000 )); H=$(( MIN / 60 )); M=$(( MIN % 60 ))
           if [ "$H" -gt 0 ]; then WORKSTR="${H} saat ${M} dk"; else WORKSTR="${M} dk"; fi
           DATESTR=$(TZ=Europe/Istanbul date -d "$DAY" +%d.%m.%Y)
+
+          # Kazanc hesabi (ucret tanimliysa)
+          earn_line() { # $1=nails
+            awk -v n="$1" -v r="$RATE" -v u="$RATEUNIT" 'BEGIN{
+              if (r+0<=0) exit 1;
+              e = (u=="per50") ? (n/50)*r : n*r;
+              printf "%.2f", e;
+            }'
+          }
 
           MSG="🔩 Çivi Sayacı — Günlük Rapor (${DATESTR})"$'\n\n'
           MSG="${MSG}✅ Toplam çivi: ${NAILS}"$'\n'
@@ -97,6 +108,9 @@ jobs:
             fi
           fi
           MSG="${MSG}"$'\n'"📦 Tamamlanan 50'lik tur: ${BATCHES}"
+          if EARN=$(earn_line "$NAILS"); then
+            MSG="${MSG}"$'\n'"💰 Kazanç: ₺${EARN}"
+          fi
 
           curl -sf -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${TG_CHAT}" \
@@ -105,3 +119,35 @@ jobs:
 
           # Telefonun ayni raporu tekrar gondermemesi icin isaret birak.
           curl -s -d "{\"reportSent\":\"${DAY}\"}" "https://ntfy.sh/${TOPIC}" > /dev/null || true
+
+          # ---- Haftalik ozet: raporlanan gun Pazar ise (hafta bitti) gonder ----
+          # Anlik snapshot son 30 gunu icerdiginden, hafta gunlerini oradan toplariz.
+          DOW=$(TZ=Europe/Istanbul date -d "$DAY" +%u) # 1=Pzt ... 7=Paz
+          WEEKID="$(TZ=Europe/Istanbul date -d "$DAY" +%G-W%V)"
+          WEEKMARKED=$(printf '%s\n' "$RAW" | jq -r 'select(.message != null) | (.message | fromjson?) | .weekSent // empty' 2>/dev/null || true)
+          if [ "$DOW" = "7" ] && ! printf '%s\n' "$WEEKMARKED" | grep -qx "$WEEKID"; then
+            WT=0; WORKW=0
+            WLINES=""
+            for i in 6 5 4 3 2 1 0; do
+              WD=$(TZ=Europe/Istanbul date -d "$DAY - $i day" +%F)
+              WN=$(printf '%s' "$SNAP" | jq -r --arg d "$WD" '.days[$d].nails // 0')
+              WWM=$(printf '%s' "$SNAP" | jq -r --arg d "$WD" '.days[$d].workMs // 0')
+              WT=$(( WT + WN )); WORKW=$(( WORKW + WWM ))
+              DLABEL=$(TZ=Europe/Istanbul date -d "$WD" +%d.%m)
+              WDOW=$(TZ=Europe/Istanbul date -d "$WD" +%u)
+              case "$WDOW" in 1) DN=Pzt;; 2) DN=Sal;; 3) DN=Çar;; 4) DN=Per;; 5) DN=Cum;; 6) DN=Cmt;; 7) DN=Paz;; esac
+              WLINES="${WLINES}"$'\n'"  ${DN} ${DLABEL}: ${WN}"
+            done
+            WMIN=$(( WORKW / 60000 )); WH=$(( WMIN / 60 )); WM=$(( WMIN % 60 ))
+            WMSG="📊 Çivi Sayacı — Haftalık Özet (${WEEKID})"$'\n\n'
+            WMSG="${WMSG}✅ Haftalık toplam: ${WT} çivi"$'\n'
+            WMSG="${WMSG}⏱ Toplam çalışma: ${WH} saat ${WM} dk"
+            if WEARN=$(earn_line "$WT"); then
+              WMSG="${WMSG}"$'\n'"💰 Haftalık kazanç: ₺${WEARN}"
+            fi
+            WMSG="${WMSG}"$'\n\n'"Günlük dağılım:${WLINES}"
+            curl -sf -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+              --data-urlencode "chat_id=${TG_CHAT}" \
+              --data-urlencode "text=${WMSG}" > /dev/null && echo "Haftalik ozet gonderildi."
+            curl -s -d "{\"weekSent\":\"${WEEKID}\"}" "https://ntfy.sh/${TOPIC}" > /dev/null || true
+          fi
