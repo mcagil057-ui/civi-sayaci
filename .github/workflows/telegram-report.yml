@@ -1,0 +1,95 @@
+# Çivi Sayacı — gece yarısı Telegram raporu
+#
+# Her gece Türkiye saatiyle 00:00'da (21:00 UTC) çalışır: telefonun gün boyu
+# buluta yazdığı istatistikleri okur, dünün raporunu Telegram'a gönderir ve
+# telefonun aynı raporu tekrar göndermemesi için buluta "gönderildi" işareti
+# bırakır. Telefon kapalı olsa bile çalışır.
+#
+# Gerekli gizli anahtarlar (repo Settings → Secrets and variables → Actions):
+#   TELEGRAM_TOKEN   → BotFather'ın verdiği bot token
+#   TELEGRAM_CHAT_ID → @userinfobot'un söylediği Id
+#   RAPOR_KODU       → Sitedeki "Notlar" sekmesinde görünen Rapor Kodu
+name: Telegram Gunluk Rapor
+
+on:
+  schedule:
+    - cron: '0 21 * * *' # 21:00 UTC = 00:00 Türkiye
+  workflow_dispatch: {}
+
+jobs:
+  rapor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Raporu olustur ve gonder
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TOPIC: ${{ secrets.RAPOR_KODU }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TG_TOKEN:-}" ] || [ -z "${TG_CHAT:-}" ] || [ -z "${TOPIC:-}" ]; then
+            echo "Eksik secret: TELEGRAM_TOKEN, TELEGRAM_CHAT_ID ve RAPOR_KODU tanimlanmali."
+            exit 1
+          fi
+
+          DAY=$(TZ=Europe/Istanbul date -d 'yesterday' +%F)
+          echo "Rapor gunu: $DAY"
+
+          # Telefonun gun boyu yazdigi son durum anligini (snapshot) al.
+          # ntfy mesajlari ~12 saat saklanir; telefon her acilista ve calisirken
+          # dakikada bir yazdigi icin gunun son durumu burada bulunur.
+          RAW=$(curl -s "https://ntfy.sh/${TOPIC}/json?poll=1&since=12h" || true)
+          SNAP=$(printf '%s\n' "$RAW" | jq -c 'select(.message != null) | (.message | fromjson?) | select(.days != null)' 2>/dev/null | tail -n 1 || true)
+          if [ -z "$SNAP" ]; then
+            echo "Son 12 saatte veri yok — bugun calisilmamis ya da telefon buluta yazamamis. Rapor atlaniyor."
+            exit 0
+          fi
+
+          # Ayni gun daha once gonderilmis mi? (sunucu isareti veya telefonun kaydi)
+          MARKED=$(printf '%s\n' "$RAW" | jq -r 'select(.message != null) | (.message | fromjson?) | .reportSent // empty' 2>/dev/null || true)
+          if printf '%s\n' "$MARKED" | grep -qx "$DAY"; then
+            echo "Bu gunun raporu zaten gonderilmis (sunucu isareti). Atlaniyor."
+            exit 0
+          fi
+          ALREADY=$(printf '%s' "$SNAP" | jq -r --arg d "$DAY" '(.sent // []) | index($d)')
+          if [ "$ALREADY" != "null" ]; then
+            echo "Bu gunun raporu zaten gonderilmis (telefon kaydi). Atlaniyor."
+            exit 0
+          fi
+
+          NAILS=$(printf '%s' "$SNAP" | jq -r --arg d "$DAY" '.days[$d].nails // 0')
+          if [ "$NAILS" -eq 0 ]; then
+            echo "O gun hic civi sayilmamis. Rapor atlaniyor."
+            exit 0
+          fi
+          WORKMS=$(printf '%s' "$SNAP" | jq -r --arg d "$DAY" '.days[$d].workMs // 0')
+          FIRST=$(printf '%s' "$SNAP" | jq -r --arg d "$DAY" '.days[$d].firstTs // empty')
+          LAST=$(printf '%s' "$SNAP" | jq -r --arg d "$DAY" '.days[$d].lastTs // empty')
+          BATCHES=$(printf '%s' "$SNAP" | jq -r --arg d "$DAY" '.days[$d].batches // 0')
+
+          MIN=$(( WORKMS / 60000 )); H=$(( MIN / 60 )); M=$(( MIN % 60 ))
+          if [ "$H" -gt 0 ]; then WORKSTR="${H} saat ${M} dk"; else WORKSTR="${M} dk"; fi
+          DATESTR=$(TZ=Europe/Istanbul date -d "$DAY" +%d.%m.%Y)
+
+          MSG="🔩 Çivi Sayacı — Günlük Rapor (${DATESTR})"$'\n\n'
+          MSG="${MSG}✅ Toplam çivi: ${NAILS}"$'\n'
+          MSG="${MSG}⏱ Çalışma süresi: ${WORKSTR}"
+          if [ -n "$FIRST" ] && [ -n "$LAST" ]; then
+            FT=$(TZ=Europe/Istanbul date -d "@$(( FIRST / 1000 ))" +%H:%M)
+            LT=$(TZ=Europe/Istanbul date -d "@$(( LAST / 1000 ))" +%H:%M)
+            MSG="${MSG}"$'\n'"🕐 İlk çivi: ${FT} — Son çivi: ${LT}"
+            if [ "$NAILS" -ge 2 ] && [ "$LAST" -gt "$FIRST" ]; then
+              SPN=$(awk -v f="$FIRST" -v l="$LAST" -v n="$NAILS" 'BEGIN{printf "%.1f", (l-f)/1000/(n-1)}')
+              PERMIN=$(awk -v f="$FIRST" -v l="$LAST" -v n="$NAILS" 'BEGIN{s=(l-f)/1000/(n-1); if (s>0) printf "%.1f", 60/s; else print "-"}')
+              MSG="${MSG}"$'\n'"⚡ Ortalama hız: ${SPN} sn/çivi (${PERMIN} çivi/dk)"
+            fi
+          fi
+          MSG="${MSG}"$'\n'"📦 Tamamlanan 50'lik tur: ${BATCHES}"
+
+          curl -sf -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=${MSG}" > /dev/null
+          echo "Rapor Telegram'a gonderildi."
+
+          # Telefonun ayni raporu tekrar gondermemesi icin isaret birak.
+          curl -s -d "{\"reportSent\":\"${DAY}\"}" "https://ntfy.sh/${TOPIC}" > /dev/null || true

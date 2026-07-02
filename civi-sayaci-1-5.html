@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Çivi Sayacı</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#171b32">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Çivi Sayacı">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   :root {
@@ -505,6 +512,8 @@
   <button class="tab-btn" id="tabBtnNotes" data-tab="notes">📝 Notlar</button>
 </div>
 
+<button class="camera-toggle" id="installBtn" style="display:none; background:rgba(52,211,153,0.12); border-color:rgba(52,211,153,0.4); color:#34d399;">📲 Uygulamayı Telefona Yükle</button>
+
 <div id="diagBanner" style="display:none; width:100%; max-width:320px; background:rgba(231,76,60,0.15); border:1px solid #e74c3c; color:#ffb3a7; padding:10px 14px; border-radius:12px; font-size:0.8rem; margin-bottom:14px; line-height:1.4;"></div>
 
 <div class="tab-panel" id="tabCounter">
@@ -676,8 +685,16 @@
     <button class="report-btn" id="tgTestBtn" style="margin-top:12px; margin-bottom:0;">📨 Bugünün Raporunu Şimdi Gönder</button>
     <div id="tgStatus" style="font-size:0.72rem; color:#98a2b8; margin-top:8px; text-align:center; min-height:1em;"></div>
     <div style="font-size:0.72rem; color:#626d80; margin-top:10px; line-height:1.5;">
-      <b>Kurulum (bir kere):</b> 1) Telegram'da <b>@BotFather</b>'a <b>/newbot</b> yaz, bot adı ver, sana verilen <b>token</b>'ı yukarı yapıştır. 2) Oluşan botunu Telegram'da bulup <b>/start</b> yaz (bot sana mesaj atabilsin diye şart). 3) <b>@userinfobot</b>'a mesaj at, sana söylediği <b>Id</b> numarasını Chat ID kısmına yaz. 4) "Şimdi Gönder" ile test et.<br><br>
-      Sayfa gece 00:00'da açıksa rapor tam o anda gider; kapalıysa sayfayı bir sonraki açışında dünün raporu otomatik gönderilir.
+      <b>Kurulum (bir kere):</b> 1) Telegram'da <b>@BotFather</b>'a <b>/newbot</b> yaz, bot adı ver, sana verilen <b>token</b>'ı yukarı yapıştır. 2) Oluşan botunu Telegram'da bulup <b>/start</b> yaz (bot sana mesaj atabilsin diye şart). 3) <b>@userinfobot</b>'a mesaj at, sana söylediği <b>Id</b> numarasını Chat ID kısmına yaz. 4) "Şimdi Gönder" ile test et.
+    </div>
+    <div style="border-top:1px solid rgba(255,255,255,0.08); margin-top:12px; padding-top:12px;">
+      <div style="font-size:0.78rem; color:#98a2b8; font-weight:700; margin-bottom:6px;">☁️ Sunucudan tam 00:00'da gönderim</div>
+      <div style="font-size:0.72rem; color:#626d80; line-height:1.5; margin-bottom:8px;">
+        Telefon kapalı olsa bile rapor her gece GitHub sunucusundan gönderilir. Kurulum: aşağıdaki <b>Rapor Kodu</b>'nu kopyala, GitHub deposunda <b>Settings → Secrets and variables → Actions → New repository secret</b> yolunu izleyip üç gizli anahtar ekle: <b>RAPOR_KODU</b> (bu kod), <b>TELEGRAM_TOKEN</b> (bot token) ve <b>TELEGRAM_CHAT_ID</b> (chat id).
+      </div>
+      <div id="reportTopicText" style="font-size:0.85rem; font-weight:700; color:#ffb020; word-break:break-all; text-align:center; margin-bottom:8px;">—</div>
+      <button class="camera-toggle" id="reportTopicCopyBtn" style="margin-bottom:0;">📋 Rapor Kodunu Kopyala</button>
+      <div id="cloudStatus" style="font-size:0.7rem; color:#98a2b8; margin-top:8px; text-align:center; min-height:1em;"></div>
     </div>
   </div>
 </div>
@@ -685,6 +702,35 @@
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
+// ---- PWA: service worker kaydı ve "Uygulamayı Yükle" butonu ----
+if ('serviceWorker' in navigator && window.isSecureContext) {
+  navigator.serviceWorker.register('sw.js').catch(() => { /* kayıt olmazsa site normal çalışmaya devam eder */ });
+}
+
+let deferredInstallPrompt = null;
+const installBtn = document.getElementById('installBtn');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  installBtn.style.display = 'block';
+});
+
+installBtn.addEventListener('click', async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  const choice = await deferredInstallPrompt.userChoice;
+  if (choice.outcome === 'accepted') {
+    installBtn.style.display = 'none';
+    addLog('Uygulama telefona yüklendi');
+  }
+  deferredInstallPrompt = null;
+});
+
+window.addEventListener('appinstalled', () => {
+  installBtn.style.display = 'none';
+});
+
 let count = 0;
 
 const countEl = document.getElementById('count');
@@ -1448,11 +1494,13 @@ function recordDailyNail(delta, ts) {
     ds.nails = Math.max(0, ds.nails - 1);
   }
   saveDailyStats();
+  scheduleCloudPush();
 }
 
 function recordDailyBatch() {
   ensureDay().batches++;
   saveDailyStats();
+  scheduleCloudPush();
 }
 
 // Çalışma süresi: algılama fiilen açıkken (kamera açık ve duraklatılmamış)
@@ -1462,7 +1510,7 @@ let workSaveTick = 0;
 setInterval(() => {
   if (motionListening && !motionPaused) {
     ensureDay().workMs += 1000;
-    if (++workSaveTick >= 10) { workSaveTick = 0; saveDailyStats(); }
+    if (++workSaveTick >= 10) { workSaveTick = 0; saveDailyStats(); scheduleCloudPush(); }
   }
 }, 1000);
 
@@ -1578,28 +1626,134 @@ tgTestBtn.addEventListener('click', async () => {
   }
 });
 
+// ---- Sunucu (GitHub Actions) gece raporu için bulut deposu ----
+// Sayfa, gün içi istatistikleri bir ntfy konusuna düzenli olarak yazar;
+// GitHub'da her gece 00:00'da (TR) çalışan görev bu konudan son durumu
+// okuyup raporu Telegram'a gönderir — telefon kapalı olsa bile.
+const REPORT_TOPIC_KEY = 'civiSayaciRaporKonu';
+const reportTopicText = document.getElementById('reportTopicText');
+const reportTopicCopyBtn = document.getElementById('reportTopicCopyBtn');
+const cloudStatusEl = document.getElementById('cloudStatus');
+let reportTopic = null;
+let lastCloudPushAt = 0;
+let cloudPushTimer = null;
+
+function cloudStatus(msg) { cloudStatusEl.textContent = msg; }
+
+function ensureReportTopic() {
+  if (reportTopic) return reportTopic;
+  try { reportTopic = localStorage.getItem(REPORT_TOPIC_KEY); } catch (e) { reportTopic = null; }
+  if (!reportTopic) {
+    reportTopic = 'civi-rapor-' + Math.random().toString(36).slice(2, 10);
+    try { localStorage.setItem(REPORT_TOPIC_KEY, reportTopic); } catch (e) { /* saklanamazsa her açılışta yenisi üretilir */ }
+  }
+  reportTopicText.textContent = reportTopic;
+  return reportTopic;
+}
+
+reportTopicCopyBtn.addEventListener('click', () => {
+  const t = ensureReportTopic();
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(t).then(() => {
+      reportTopicCopyBtn.textContent = '✅ Kopyalandı';
+      setTimeout(() => { reportTopicCopyBtn.textContent = '📋 Rapor Kodunu Kopyala'; }, 1500);
+    }).catch(() => cloudStatus('Kopyalanamadı, kodu elle seçip kopyala: ' + t));
+  } else {
+    cloudStatus('Kodu elle seçip kopyala: ' + t);
+  }
+});
+
+async function pushDailyStatsToCloud(useKeepalive) {
+  const topic = ensureReportTopic();
+  const payload = { days: dailyStats, sent: tgSettings.sentDays, updatedAt: Date.now() };
+  try {
+    await fetch(`https://ntfy.sh/${topic}`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      keepalive: !!useKeepalive
+    });
+    lastCloudPushAt = Date.now();
+    cloudStatus('☁️ Buluta son kayıt: ' + new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }));
+  } catch (e) {
+    cloudStatus('⚠️ Buluta yazılamadı — gece raporu gerekirse sayfa açılınca telefon üzerinden gönderilir');
+  }
+}
+
+// İstatistik değişimlerinde en fazla dakikada bir buluta yaz (sondan tetiklemeli).
+function scheduleCloudPush() {
+  const now = Date.now();
+  if (now - lastCloudPushAt >= 60000) {
+    lastCloudPushAt = now;
+    pushDailyStatsToCloud();
+    return;
+  }
+  if (!cloudPushTimer) {
+    cloudPushTimer = setTimeout(() => {
+      cloudPushTimer = null;
+      pushDailyStatsToCloud();
+    }, 60000 - (now - lastCloudPushAt));
+  }
+}
+
+// Sayfa kapanırken/arka plana alınırken son durumu kaçırmamak için yaz.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && Date.now() - lastCloudPushAt > 15000) {
+    pushDailyStatsToCloud(true);
+  }
+});
+
+// Sunucunun gönderdiği "rapor gönderildi" işaretlerini oku ve yerelle
+// birleştir — böylece sunucu gece göndermişse telefon aynı raporu bir
+// daha göndermez.
+async function mergeCloudSentMarkers() {
+  if (!reportTopic) return;
+  try {
+    const res = await fetch(`https://ntfy.sh/${reportTopic}/json?poll=1&since=12h`);
+    if (!res.ok) return;
+    const text = await res.text();
+    let changed = false;
+    text.trim().split('\n').filter(Boolean).forEach(line => {
+      try {
+        const m = JSON.parse(line);
+        if (!m.message) return;
+        const obj = JSON.parse(m.message);
+        if (obj.reportSent && !tgSettings.sentDays.includes(obj.reportSent)) {
+          tgSettings.sentDays.push(obj.reportSent);
+          changed = true;
+        }
+      } catch (e) { /* rapor dışı mesaj: yoksay */ }
+    });
+    if (changed) saveTgSettings();
+  } catch (e) { /* ağ yoksa sorun değil, telefon yöntemi zaten tekrar dener */ }
+}
+
 // Otomatik gönderim denetleyicisi: her 30 saniyede bir, bugünden önceki ve
 // henüz gönderilmemiş, verisi olan günleri Telegram'a yollar. Sayfa gece
 // 00:00'da açıksa rapor ilk 30 saniye içinde gider; kapalıysa sayfanın bir
 // sonraki açılışında dünün (ve varsa önceki günlerin) raporu gönderilir.
+// Göndermeden önce sunucunun gece zaten gönderip göndermediği kontrol edilir.
 // Başarısız denemeler 5 dakika arayla otomatik tekrarlanır.
 setInterval(async () => {
   if (!tgSettings.auto || !tgSettings.token || !tgSettings.chatId) return;
   const today = dayKeyOf();
-  const pending = Object.keys(dailyStats).sort().filter(day =>
+  const findPending = () => Object.keys(dailyStats).sort().filter(day =>
     day < today && !tgSettings.sentDays.includes(day) && dailyStats[day].nails > 0
   );
-  if (pending.length === 0) return;
+  if (findPending().length === 0) return;
   const now = Date.now();
   if (now - tgLastAttemptAt < 5 * 60 * 1000 && tgLastAttemptAt !== 0) return;
   tgLastAttemptAt = now;
-  for (const day of pending) {
+  await mergeCloudSentMarkers(); // sunucu göndermişse tekrar gönderme
+  for (const day of findPending()) {
     const ok = await sendDailyReport(day, false);
     if (!ok) break; // ağ sorunu varsa kalanları sonraki turda dene
   }
 }, 30000);
 
 loadTgSettings();
+ensureReportTopic();
+mergeCloudSentMarkers();
+pushDailyStatsToCloud();
 
 // ---- Tab (Sayaç / Notlar) geçişi ----
 document.querySelectorAll('.tab-btn').forEach(btn => {
