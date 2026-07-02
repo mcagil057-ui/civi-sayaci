@@ -549,12 +549,22 @@
   <div class="label">çivi</div>
 </div>
 
+<div class="stats-panel" id="viewerControls" style="display:none;">
+  <div class="stats-title">🎮 Uzaktan Kontrol</div>
+  <button class="main-btn" id="viewerPauseBtn" style="margin-bottom:10px;">⏸ Algılamayı Duraklat</button>
+  <div class="row" style="margin-bottom:0;">
+    <button id="viewerMinusBtn">−1</button>
+    <button id="viewerPlusBtn">+1</button>
+  </div>
+  <div id="viewerCmdDiag" style="font-size:0.72rem; color:#98a2b8; margin-top:8px; text-align:center; min-height:1em;"></div>
+</div>
+
 <div class="status" id="statusRow">
   <div class="dot" id="dot"></div>
   <span id="statusText">Kamera kapalı</span>
 </div>
 
-<div class="stats-panel">
+<div class="stats-panel" id="statsPanel">
   <div class="stats-title">📊 İstatistikler</div>
   <div class="stats-grid">
     <div class="stat-item">
@@ -873,6 +883,7 @@ async function toggleCamera() {
     statusText.textContent = 'Kamera kapalı';
     dot.classList.remove('active');
     addLog('Kamera kapatıldı');
+    pushSyncIfBroadcasting();
     return;
   }
   try {
@@ -893,6 +904,7 @@ async function toggleCamera() {
       applyRoiToGuide();
       recomputeVideoRect();
       startMotionDetection();
+      pushSyncIfBroadcasting();
     };
     if (video.readyState >= 1 && video.videoWidth) {
       beginDetection();
@@ -1203,23 +1215,28 @@ function stopMotionDetection() {
 }
 
 // Kamerayı kapatmadan algılamayı geçici olarak duraklat/devam ettir.
-motionToggle.addEventListener('click', () => {
-  motionPaused = !motionPaused;
+// Hem yereldeki butondan hem de izleyen cihazdan gelen uzaktan komutlardan çağrılır.
+function setMotionPaused(paused, source) {
+  if (!motionListening || motionPaused === paused) return;
+  motionPaused = paused;
   if (motionPaused) {
     motionToggle.textContent = '▶️ Algılamaya Devam Et';
     motionToggle.classList.add('listening');
     statusText.textContent = 'Duraklatıldı';
     dot.classList.remove('active');
-    addLog('Algılama duraklatıldı');
+    addLog('Algılama duraklatıldı' + (source ? ` (${source})` : ''));
   } else {
     motionArmed = true;
     motionToggle.textContent = '⏸ Algılamayı Duraklat';
     motionToggle.classList.remove('listening');
     statusText.textContent = 'Algılanıyor...';
     dot.classList.add('active');
-    addLog('Algılamaya devam edildi');
+    addLog('Algılamaya devam edildi' + (source ? ` (${source})` : ''));
   }
-});
+  pushSyncIfBroadcasting();
+}
+
+motionToggle.addEventListener('click', () => setMotionPaused(!motionPaused));
 
 function updateCount(delta, source) {
   count = Math.max(0, count + delta);
@@ -1388,7 +1405,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 // için özel olarak destekliyor, bu yüzden birincil sağlayıcı yapıldı.
 // jsonblob.com ikincil yedek olarak kaldı; olası bir CORS ön-uçuş (preflight)
 // hatasını azaltmak için artık Content-Type başlığı zorlanmıyor. ----
-const SYNC_POLL_MS = 1000; // izleyen cihazın veriyi hızlı görmesi için sık sık yoklanıyor
+const SYNC_POLL_MS = 2000; // sadece jsonblob yedeği için; ntfy canlı akış (SSE) kullanır, yoklamaz
 
 function syncSleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
@@ -1624,7 +1641,7 @@ function syncShowState() {
 // Elements to hide entirely on the watching (viewer) device, since it
 // only displays remote data and shouldn't run its own camera/counting.
 const VIEWER_HIDE_IDS = [
-  'statusRow', 'soundToggle', 'cameraBtn',
+  'statusRow', 'statsPanel', 'soundToggle', 'cameraBtn',
   'videoWrap', 'roiControls', 'motionToggle', 'motionMeterWrap', 'motionLevelReadout',
   'manualRow', 'resetBtn', 'reportBtn', 'wakeStatus',
   'motionSettings', 'hintBox'
@@ -1635,6 +1652,9 @@ function setViewerModeUI(isViewer) {
     const el = document.getElementById(id);
     if (el) el.style.display = isViewer ? 'none' : '';
   });
+  // Uzaktan kontrol paneli sadece izleme modunda ve komut kanalını
+  // destekleyen ntfy sağlayıcısında gösterilir.
+  viewerControls.style.display = (isViewer && syncWatchProviderKey === 'ntfy') ? 'block' : 'none';
 }
 
 async function pushSyncData() {
@@ -1645,6 +1665,8 @@ async function pushSyncData() {
     lastTs: nailTimestamps.length ? nailTimestamps[nailTimestamps.length - 1] : null,
     n: nailTimestamps.length,
     batchTimes: batchTimes,
+    cameraOn: cameraOn,
+    detecting: motionListening && !motionPaused,
     updatedAt: Date.now()
   };
   try {
@@ -1676,6 +1698,40 @@ function pushSyncIfBroadcasting() {
   }
 }
 
+// ---- Uzaktan komut kanalı (sadece ntfy): izleyen cihaz "<konu>-cmd"
+// konusuna komut yollar, yayıncı bu konuyu canlı akışla (SSE) dinleyip
+// uygular. Böylece izleyen ekrandan algılamayı duraklat/başlat ve
+// +1 / −1 düzeltmesi yapılabiliyor. ----
+let cmdEventSource = null;
+
+function handleRemoteCommand(cmd) {
+  if (!cmd || !cmd.action) return;
+  if (cmd.action === 'pause') setMotionPaused(true, 'uzaktan');
+  else if (cmd.action === 'resume') setMotionPaused(false, 'uzaktan');
+  else if (cmd.action === 'inc') updateCount(1, 'uzaktan +1');
+  else if (cmd.action === 'dec') updateCount(-1, 'uzaktan -1');
+}
+
+function startCommandListener(topicId) {
+  stopCommandListener();
+  try {
+    cmdEventSource = new EventSource(`https://ntfy.sh/${topicId}-cmd/sse`);
+    cmdEventSource.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.message) handleRemoteCommand(JSON.parse(msg.message));
+      } catch (err) { /* bozuk komut: yoksay */ }
+    };
+    // onerror: EventSource kendi kendine yeniden bağlanır, ek bir şey gerekmez
+  } catch (e) {
+    cmdEventSource = null; // EventSource desteklenmiyorsa uzaktan kontrol devre dışı kalır
+  }
+}
+
+function stopCommandListener() {
+  if (cmdEventSource) { cmdEventSource.close(); cmdEventSource = null; }
+}
+
 async function startBroadcast() {
   clearSyncDiag();
   syncRetryBtn.style.display = 'none';
@@ -1689,9 +1745,11 @@ async function startBroadcast() {
     syncCode.textContent = makeSyncCode(syncProviderKey, syncBucketId);
     syncShowState();
     pushSyncData();
-    // heartbeat push every couple seconds so elapsed-time keeps advancing on the viewer
-    // and any missed push gets caught up quickly
-    syncHeartbeatInterval = setInterval(() => pushSyncData(), 2000);
+    // Anlık güncellemeler zaten her sayımda gönderiliyor (pushSyncIfBroadcasting);
+    // heartbeat sadece yeni bağlanan izleyicilere güncel durumu ulaştırmak için.
+    // Sık heartbeat, ntfy'nin istek sınırına (HTTP 429) takılmaya yol açıyordu.
+    syncHeartbeatInterval = setInterval(() => pushSyncData(), 10000);
+    if (syncProviderKey === 'ntfy') startCommandListener(syncBucketId);
     addLog(`Yayın başlatıldı (kod: ${syncCode.textContent}, servis: ${SYNC_PROVIDERS[syncProviderKey].label})`);
   } catch (err) {
     showSyncDiag('⚠️ Yayın başlatılamadı: ' + err.message + '. Birkaç saniye sonra "Tekrar Dene"yi deneyebilirsin. Israrla devam ederse mobil veri yerine Wi-Fi ile (veya tam tersini) denemeni öneririz — bazı operatörler bu tür paylaşım servislerini engelleyebiliyor.');
@@ -1709,6 +1767,7 @@ function stopBroadcast() {
   syncProviderKey = null;
   if (syncHeartbeatInterval) clearInterval(syncHeartbeatInterval);
   if (syncPushTimeout) { clearTimeout(syncPushTimeout); syncPushTimeout = null; }
+  stopCommandListener();
   resetSyncQr();
   syncShowState();
   addLog('Yayın durduruldu');
@@ -1725,35 +1784,91 @@ async function pollRemoteStats() {
   }
 }
 
+let lastRemoteState = null;
+
 function renderRemoteStats(data) {
+  lastRemoteState = data;
   count = data.count || 0;
   countEl.textContent = count;
   videoBadge.textContent = count;
+  updateViewerControls(data);
+}
 
-  if (!data.n || data.n < 1) {
-    statElapsed.textContent = '0 sn';
-    statPace.textContent = '—';
-    statPerMin.textContent = '—';
-    statEst50.textContent = '—';
-    renderBatchHistory([]);
+// ---- İzleyen cihazdaki uzaktan kontrol paneli ----
+const viewerControls = document.getElementById('viewerControls');
+const viewerPauseBtn = document.getElementById('viewerPauseBtn');
+const viewerPlusBtn = document.getElementById('viewerPlusBtn');
+const viewerMinusBtn = document.getElementById('viewerMinusBtn');
+const viewerCmdDiag = document.getElementById('viewerCmdDiag');
+
+function updateViewerControls(data) {
+  if (syncMode !== 'watch') return;
+  if (!data || data.cameraOn === undefined) {
+    viewerPauseBtn.disabled = true;
+    viewerPauseBtn.textContent = '⏳ Durum bekleniyor...';
     return;
   }
-
-  const elapsed = (data.lastTs || data.firstTs) - data.firstTs;
-  statElapsed.textContent = formatDuration(Date.now() - data.firstTs);
-
-  if (data.n >= 2) {
-    const secPerNail = elapsed / data.n;
-    statPace.textContent = secPerNail > 0 ? (secPerNail / 1000).toFixed(1) : '—';
-    statPerMin.textContent = secPerNail > 0 ? (60000 / secPerNail).toFixed(1) : '—';
-    statEst50.textContent = secPerNail > 0 ? formatDuration(secPerNail * 50) : '—';
+  if (!data.cameraOn) {
+    viewerPauseBtn.disabled = true;
+    viewerPauseBtn.textContent = '📷 Karşı cihazda kamera kapalı';
+    viewerPauseBtn.classList.remove('listening');
+  } else if (data.detecting) {
+    viewerPauseBtn.disabled = false;
+    viewerPauseBtn.textContent = '⏸ Algılamayı Duraklat';
+    viewerPauseBtn.classList.remove('listening');
   } else {
-    statPace.textContent = '—';
-    statPerMin.textContent = '—';
-    statEst50.textContent = '—';
+    viewerPauseBtn.disabled = false;
+    viewerPauseBtn.textContent = '▶️ Algılamayı Başlat';
+    viewerPauseBtn.classList.add('listening');
   }
+}
 
-  renderBatchHistory(data.batchTimes || []);
+async function sendRemoteCommand(action) {
+  if (!syncBucketId || syncWatchProviderKey !== 'ntfy') return;
+  viewerCmdDiag.textContent = 'Komut gönderiliyor...';
+  try {
+    const res = await fetch(`https://ntfy.sh/${syncBucketId}-cmd`, {
+      method: 'POST',
+      body: JSON.stringify({ action, ts: Date.now() })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    viewerCmdDiag.textContent = '✅ Gönderildi';
+    setTimeout(() => { if (viewerCmdDiag.textContent === '✅ Gönderildi') viewerCmdDiag.textContent = ''; }, 1500);
+  } catch (err) {
+    viewerCmdDiag.textContent = '⚠️ Komut gönderilemedi: ' + err.message;
+  }
+}
+
+viewerPauseBtn.addEventListener('click', () => {
+  if (!lastRemoteState) return;
+  sendRemoteCommand(lastRemoteState.detecting ? 'pause' : 'resume');
+});
+viewerPlusBtn.addEventListener('click', () => sendRemoteCommand('inc'));
+viewerMinusBtn.addEventListener('click', () => sendRemoteCommand('dec'));
+
+// ---- İzleme: ntfy için canlı akış (SSE), jsonblob için yoklama.
+// Saniyede bir yoklama ntfy'nin istek sınırına takılıp HTTP 429 hatası
+// veriyordu; SSE tek bir kalıcı bağlantı kurar, veriyi anında iletir ve
+// sınırlara takılmaz. ----
+let watchEventSource = null;
+
+function startWatchStream(topicId) {
+  // since=15m: bağlanır bağlanmaz yayıncının son bilinen durumunu da getirir
+  watchEventSource = new EventSource(`https://ntfy.sh/${topicId}/sse?since=15m`);
+  watchEventSource.onopen = () => clearSyncDiag();
+  watchEventSource.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.message) {
+        clearSyncDiag();
+        renderRemoteStats(JSON.parse(msg.message));
+      }
+    } catch (err) { /* bozuk mesaj: yoksay */ }
+  };
+  watchEventSource.onerror = () => {
+    // EventSource kendi kendine yeniden bağlanır; sadece bilgi ver
+    showSyncDiag('⚠️ Bağlantı koptu, otomatik olarak yeniden bağlanılıyor...');
+  };
 }
 
 function startWatching(codeRaw) {
@@ -1767,10 +1882,16 @@ function startWatching(codeRaw) {
   syncWatchProviderKey = parsed.provider;
   syncBucketId = parsed.id;
   syncMode = 'watch';
+  lastRemoteState = null;
   setViewerModeUI(true);
+  updateViewerControls(null);
   syncShowState();
-  pollRemoteStats();
-  syncPollInterval = setInterval(pollRemoteStats, SYNC_POLL_MS);
+  if (syncWatchProviderKey === 'ntfy' && typeof EventSource !== 'undefined') {
+    startWatchStream(syncBucketId);
+  } else {
+    pollRemoteStats();
+    syncPollInterval = setInterval(pollRemoteStats, SYNC_POLL_MS);
+  }
   addLog(`Başka cihaz izleniyor (kod: ${codeStr})`);
 }
 
@@ -1778,7 +1899,9 @@ function stopWatching() {
   syncMode = 'off';
   syncBucketId = null;
   syncWatchProviderKey = null;
+  lastRemoteState = null;
   if (syncPollInterval) clearInterval(syncPollInterval);
+  if (watchEventSource) { watchEventSource.close(); watchEventSource = null; }
   setViewerModeUI(false);
   syncShowState();
   addLog('İzleme durduruldu');
