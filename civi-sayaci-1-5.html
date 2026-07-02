@@ -505,6 +505,26 @@
 <body>
 
 <script>
+// Sıfırlama kaçış yolu: adres sonuna ?reset=1 eklenirse tüm service worker
+// kayıtları ve önbellekler silinir, temiz adrese dönülür. Bozuk/eski önbellek
+// yüzünden uygulama açılmıyorsa (boş ekran / açılır açılmaz kapanma) bu adres
+// sorunu kesin çözer. En başta, her şeyden önce çalışır.
+if (location.search.indexOf('reset=1') !== -1) {
+  (async function () {
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(function (r) { return r.unregister(); }));
+      }
+      if (window.caches) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(function (k) { return caches.delete(k); }));
+      }
+    } catch (e) { /* yine de temiz adrese dön */ }
+    location.replace(location.pathname);
+  })();
+}
+
 // Erken hata yakalayıcı: sayfa herhangi bir nedenle çalışamazsa boş ekran
 // yerine hatayı görünür bir kutuda gösterir (teşhis için hayati).
 window.addEventListener('error', function (e) {
@@ -725,9 +745,13 @@ window.addEventListener('error', function (e) {
 // ---- PWA: service worker kaydı ve "Uygulamayı Yükle" butonu ----
 // Kayıt, sayfa tamamen yüklendikten sonra yapılır: açılışla yarışıp ilk
 // yüklemeyi yavaşlatmasın / bölmesin diye.
-if ('serviceWorker' in navigator && window.isSecureContext) {
+if ('serviceWorker' in navigator && window.isSecureContext && location.search.indexOf('reset=1') === -1) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => { /* kayıt olmazsa site normal çalışmaya devam eder */ });
+    // updateViaCache:'none' → sw.js her zaman ağdan taze kontrol edilir, böylece
+    // eski/bozuk bir service worker cihazda kalıcı olarak takılı kalamaz.
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+      .then((reg) => { reg.update().catch(() => {}); })
+      .catch(() => { /* kayıt olmazsa site normal çalışmaya devam eder */ });
   });
 }
 
