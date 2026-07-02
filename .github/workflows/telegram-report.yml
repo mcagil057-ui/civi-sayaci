@@ -14,7 +14,13 @@ name: Telegram Gunluk Rapor
 on:
   schedule:
     - cron: '0 21 * * *' # 21:00 UTC = 00:00 Türkiye
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      hedef_gun:
+        description: "Hangi gunun raporu? (test icin 'bugun' sec)"
+        type: choice
+        default: dun
+        options: [dun, bugun]
 
 jobs:
   rapor:
@@ -25,6 +31,7 @@ jobs:
           TG_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
           TOPIC: ${{ secrets.RAPOR_KODU }}
+          HEDEF_GUN: ${{ github.event.inputs.hedef_gun }}
         run: |
           set -euo pipefail
           if [ -z "${TG_TOKEN:-}" ] || [ -z "${TG_CHAT:-}" ] || [ -z "${TOPIC:-}" ]; then
@@ -32,7 +39,12 @@ jobs:
             exit 1
           fi
 
-          DAY=$(TZ=Europe/Istanbul date -d 'yesterday' +%F)
+          # Zamanlanmis calismada her zaman 'dun'; elle calistirmada secime gore.
+          if [ "${HEDEF_GUN:-dun}" = "bugun" ]; then
+            DAY=$(TZ=Europe/Istanbul date +%F)
+          else
+            DAY=$(TZ=Europe/Istanbul date -d 'yesterday' +%F)
+          fi
           echo "Rapor gunu: $DAY"
 
           # Telefonun gun boyu yazdigi son durum anligini (snapshot) al.
