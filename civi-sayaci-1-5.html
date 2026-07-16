@@ -618,7 +618,7 @@ window.addEventListener('error', function (e) {
 
 <h1>🔩 Çivi Sayacı</h1>
 <div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
-<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-16 · 14</div>
+<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-16 · 15</div>
 
 <div class="tabs" id="tabNav">
   <button class="tab-btn active" id="tabBtnCounter" data-tab="counter">🔩 Sayaç</button>
@@ -874,6 +874,7 @@ window.addEventListener('error', function (e) {
 
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 // ---- PWA: service worker kaydı ve "Uygulamayı Yükle" butonu ----
 // Kayıt, sayfa tamamen yüklendikten sonra yapılır: açılışla yarışıp ilk
@@ -2452,15 +2453,14 @@ function setViewerModeUI(isViewer) {
   viewerControls.style.display = (isViewer && syncWatchProviderKey === 'ntfy') ? 'block' : 'none';
 }
 
-async function pushSyncData() {
-  if (!syncBucketId || !syncProviderKey) return;
+function buildSyncPayload() {
   // Son 7 günün istatistiğini de gönder ki izleyen cihaz grafik, günlük
   // toplam, hedef ilerlemesi ve haftalık kazancı hesaplayabilsin. (Mesajı
   // küçük tutmak için 7 günle sınırlı.)
   const dayKeys = Object.keys(dailyStats).sort().slice(-7);
   const trimmedDays = {};
   dayKeys.forEach(k => { trimmedDays[k] = dailyStats[k]; });
-  const payload = {
+  return {
     count,
     firstTs: nailTimestamps.length ? nailTimestamps[0] : null,
     lastTs: nailTimestamps.length ? nailTimestamps[nailTimestamps.length - 1] : null,
@@ -2471,6 +2471,11 @@ async function pushSyncData() {
     days: trimmedDays,
     updatedAt: Date.now()
   };
+}
+
+async function pushSyncData() {
+  if (!syncBucketId || !syncProviderKey) return;
+  const payload = buildSyncPayload();
   const statusEl = document.getElementById('syncPushStatus');
   if (Date.now() < ntfyBackoffUntil) {
     if (statusEl) statusEl.textContent = '⏳ hız sınırı — ' + Math.ceil((ntfyBackoffUntil - Date.now()) / 1000) + ' sn sonra devam';
@@ -2492,8 +2497,106 @@ async function pushSyncData() {
   }
 }
 
+// ---- Doğrudan cihazdan-cihaza bağlantı (WebRTC / PeerJS) ----
+// İki cihaz aynı ortamdayken birbirine DOĞRUDAN bağlanır: hız sınırı yok,
+// gecikme yok. ntfy yolu yedek olarak aynen çalışmaya devam eder (ve gece
+// raporu için zaten gerekli). Kütüphane yüklenemezse sessizce devre dışı
+// kalır — her şey ntfy üzerinden yürür.
+let p2pPeer = null;          // yayıncının peer nesnesi
+let p2pConns = [];           // yayıncıya bağlı izleyici kanalları
+let p2pWatchConn = null;     // izleyicinin yayıncıya kanalı
+let p2pRetryTimer = null;
+
+function p2pPeerId(topic) { return 'cs-' + topic; }
+
+function p2pStatusNote() {
+  const statusEl = document.getElementById('syncPushStatus');
+  if (statusEl && p2pConns.length > 0) {
+    statusEl.textContent = '⚡ doğrudan bağlantı: ' + p2pConns.length + ' cihaz — anında iletim aktif';
+  }
+}
+
+function p2pSendToWatchers(payload) {
+  if (p2pConns.length === 0) return;
+  p2pConns.forEach(c => { try { c.send(payload); } catch (e) { /* kopuk kanal, temizlik aşağıda */ } });
+}
+
+function startP2PBroadcast(topic) {
+  if (typeof Peer === 'undefined' || p2pPeer) return;
+  try {
+    p2pPeer = new Peer(p2pPeerId(topic));
+    p2pPeer.on('connection', (conn) => {
+      conn.on('open', () => {
+        p2pConns.push(conn);
+        addLog('İzleyici doğrudan bağlandı (anında iletim aktif)');
+        p2pStatusNote();
+        try { conn.send(buildSyncPayload()); } catch (e) {}
+      });
+      conn.on('data', (d) => { try { handleRemoteCommand(d); } catch (e) {} });
+      const drop = () => { p2pConns = p2pConns.filter(c => c !== conn); };
+      conn.on('close', drop);
+      conn.on('error', drop);
+    });
+    p2pPeer.on('error', (err) => {
+      // 'unavailable-id': eski bir sekme kimliği bırakmamış olabilir; biraz
+      // sonra tekrar dene. Diğer hatalarda sessizce ntfy'ye güven.
+      if (err && err.type === 'unavailable-id' && !p2pRetryTimer) {
+        try { p2pPeer.destroy(); } catch (e) {}
+        p2pPeer = null;
+        p2pRetryTimer = setTimeout(() => { p2pRetryTimer = null; if (syncMode === 'broadcast') startP2PBroadcast(topic); }, 20000);
+      }
+    });
+  } catch (e) { p2pPeer = null; }
+}
+
+function startP2PWatch(topic) {
+  if (typeof Peer === 'undefined') return;
+  try {
+    const me = new Peer(); // rastgele kimlik
+    me.on('open', () => {
+      const conn = me.connect(p2pPeerId(topic));
+      conn.on('open', () => {
+        p2pWatchConn = conn;
+        addLog('Yayıncıya doğrudan bağlanıldı (anında iletim)');
+      });
+      conn.on('data', (payload) => {
+        try {
+          clearSyncDiag();
+          renderRemoteStats(payload);
+          const sld = document.getElementById('syncLastData');
+          if (sld) sld.textContent = 'son veri: ' + new Date().toLocaleTimeString('tr-TR') + ' ⚡doğrudan';
+        } catch (e) {}
+      });
+      const retry = () => {
+        p2pWatchConn = null;
+        if (syncMode === 'watch' && !p2pRetryTimer) {
+          p2pRetryTimer = setTimeout(() => {
+            p2pRetryTimer = null;
+            try { me.destroy(); } catch (e) {}
+            if (syncMode === 'watch') startP2PWatch(topic);
+          }, 10000);
+        }
+      };
+      conn.on('close', retry);
+      conn.on('error', retry);
+    });
+    me.on('error', () => { /* sessiz: ntfy yolu devrede */ });
+  } catch (e) { /* sessiz */ }
+}
+
+function stopP2P() {
+  if (p2pRetryTimer) { clearTimeout(p2pRetryTimer); p2pRetryTimer = null; }
+  p2pConns.forEach(c => { try { c.close(); } catch (e) {} });
+  p2pConns = [];
+  if (p2pWatchConn) { try { p2pWatchConn.close(); } catch (e) {} p2pWatchConn = null; }
+  if (p2pPeer) { try { p2pPeer.destroy(); } catch (e) {} p2pPeer = null; }
+}
+
 function pushSyncIfBroadcasting() {
   if (syncMode !== 'broadcast') return;
+  // Doğrudan bağlı izleyicilere HER değişikliği anında ilet (sınırsız);
+  // ntfy'ye ise aşağıdaki hız sınırıyla gönder.
+  p2pSendToWatchers(buildSyncPayload());
   const now = Date.now();
   const elapsed = now - lastSyncPushAt;
   if (elapsed >= SYNC_PUSH_MIN_GAP_MS) {
@@ -2616,6 +2719,7 @@ async function startBroadcast() {
   // heartbeat yeni bağlanan izleyicilere güncel durumu ulaştırmak için.
   syncHeartbeatInterval = setInterval(() => pushSyncData(), 60000);
   startCommandListener(syncBucketId);
+  startP2PBroadcast(syncBucketId);
   addLog(`Yayın başlatıldı (kod: ${syncCode.textContent})`);
 }
 
@@ -2628,6 +2732,7 @@ function stopBroadcast() {
   if (syncHeartbeatInterval) clearInterval(syncHeartbeatInterval);
   if (syncPushTimeout) { clearTimeout(syncPushTimeout); syncPushTimeout = null; }
   stopCommandListener();
+  stopP2P();
   resetSyncQr();
   syncShowState();
   addLog('Yayın durduruldu');
@@ -2740,6 +2845,15 @@ function updateViewerControls(data) {
 
 async function sendRemoteCommand(action) {
   if (!syncBucketId || syncWatchProviderKey !== 'ntfy') return;
+  // Doğrudan bağlantı varsa komut oradan gider: anında ve hız sınırsız.
+  if (p2pWatchConn && p2pWatchConn.open) {
+    try {
+      p2pWatchConn.send({ action, ts: Date.now() });
+      viewerCmdDiag.textContent = '✅ Gönderildi ⚡';
+      setTimeout(() => { if (viewerCmdDiag.textContent === '✅ Gönderildi ⚡') viewerCmdDiag.textContent = ''; }, 1500);
+      return;
+    } catch (e) { /* kanal kopmuş olabilir; ntfy yoluna düş */ }
+  }
   viewerCmdDiag.textContent = 'Komut gönderiliyor...';
   try {
     const res = await fetch(`https://ntfy.sh/${syncBucketId}-cmd`, {
@@ -2757,9 +2871,13 @@ async function sendRemoteCommand(action) {
 // İzleyen cihazda girilen hedef/ücret ayarını telefona (yayıncıya) ilet.
 function sendPrefsToBroadcaster() {
   if (!syncBucketId || syncWatchProviderKey !== 'ntfy') return;
+  const msg = { action: 'setPrefs', goal: prefs.goal, rate: prefs.rate, rateUnit: prefs.rateUnit, ts: Date.now() };
+  if (p2pWatchConn && p2pWatchConn.open) {
+    try { p2pWatchConn.send(msg); return; } catch (e) { /* ntfy yoluna düş */ }
+  }
   fetch(`https://ntfy.sh/${syncBucketId}-cmd`, {
     method: 'POST',
-    body: JSON.stringify({ action: 'setPrefs', goal: prefs.goal, rate: prefs.rate, rateUnit: prefs.rateUnit, ts: Date.now() })
+    body: JSON.stringify(msg)
   }).catch(() => { /* ulaşmazsa sorun değil, izleyendeki gösterim yereldir */ });
 }
 
@@ -2819,6 +2937,7 @@ function startWatching(codeRaw) {
   if (syncWatchProviderKey === 'ntfy' && typeof EventSource !== 'undefined') {
     startWatchStream(syncBucketId);
   }
+  if (syncWatchProviderKey === 'ntfy') startP2PWatch(syncBucketId);
   pollRemoteStats(true);
   syncPollInterval = setInterval(() => pollRemoteStats(false),
     syncWatchProviderKey === 'ntfy' ? SYNC_POLL_MS_NTFY : SYNC_POLL_MS_LEGACY);
@@ -2837,6 +2956,7 @@ function stopWatching() {
   try { localStorage.removeItem('civiSayaciIzlemeKodu'); } catch (e) {}
   if (syncPollInterval) clearInterval(syncPollInterval);
   if (watchEventSource) { watchEventSource.close(); watchEventSource = null; }
+  stopP2P();
   setViewerModeUI(false);
   syncShowState();
   addLog('İzleme durduruldu');
