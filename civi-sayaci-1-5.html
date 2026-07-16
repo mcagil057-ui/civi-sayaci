@@ -618,7 +618,7 @@ window.addEventListener('error', function (e) {
 
 <h1>🔩 Çivi Sayacı</h1>
 <div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
-<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-15 · 13</div>
+<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-16 · 14</div>
 
 <div class="tabs" id="tabNav">
   <button class="tab-btn active" id="tabBtnCounter" data-tab="counter">🔩 Sayaç</button>
@@ -645,6 +645,7 @@ window.addEventListener('error', function (e) {
       <div id="syncPushStatus" style="font-size:0.7rem; color:#98a2b8; margin-top:4px; min-height:1em;">gönderim bekleniyor...</div>
     </div>
     <button class="camera-toggle" id="syncCopyBtn">📋 Kodu Kopyala</button>
+    <button class="camera-toggle" id="syncTestBtn">🔍 Bağlantı Testi</button>
     <button class="camera-toggle" id="syncShowQrBtn">📷 QR Kod Göster</button>
     <div id="syncQrWrap" style="display:none; text-align:center; margin-bottom:10px; background:#fff; padding:12px; border-radius:14px;"></div>
     <button class="reset-btn" id="syncStopBtn" style="margin-top:8px;">Yayını Durdur</button>
@@ -656,6 +657,7 @@ window.addEventListener('error', function (e) {
   </div>
   <div id="syncWatching" style="display:none;">
     <div style="text-align:center; font-size:0.82rem; color:#2ecc71; margin-bottom:4px;">🟢 Canlı izleniyor</div>
+    <div id="syncWatchCode" style="text-align:center; font-size:0.72rem; color:#ffb020; word-break:break-all; margin-bottom:2px;"></div>
     <div id="syncLastData" style="text-align:center; font-size:0.7rem; color:#98a2b8; margin-bottom:8px;">veri bekleniyor...</div>
     <button class="reset-btn" id="syncDisconnectBtn">Bağlantıyı Kes</button>
   </div>
@@ -2655,6 +2657,12 @@ async function pollRemoteStats(force) {
       showSyncDiag('⏳ Hız sınırına takıldı, 90 sn beklenip otomatik devam edilecek. (Canlı akış dinlemede)');
       return;
     }
+    if (String(err.message).indexOf('henüz veri yok') !== -1) {
+      // Bağlantı ÇALIŞIYOR (servise ulaşıldı) ama izlenen kodda veri yok:
+      // ya telefon şu an yayın göndermiyor ya da kodlar farklı.
+      showSyncDiag('ℹ️ Bağlantı tamam ama telefondan henüz veri gelmedi. Telefonda "son gönderim" saatinin ilerlediğini ve telefondaki kodun aşağıdaki "izlenen kod" ile AYNI olduğunu kontrol et.');
+      return;
+    }
     showSyncDiag('⚠️ Bağlantı sorunu: ' + err.message + '. Koddan ve internetten emin ol, otomatik olarak tekrar denenecek.');
   }
 }
@@ -2816,6 +2824,8 @@ function startWatching(codeRaw) {
     syncWatchProviderKey === 'ntfy' ? SYNC_POLL_MS_NTFY : SYNC_POLL_MS_LEGACY);
   // Kod hatırlanır: sayfa yenilenince otomatik yeniden bağlanılır.
   try { localStorage.setItem('civiSayaciIzlemeKodu', codeStr); } catch (e) {}
+  const wcEl = document.getElementById('syncWatchCode');
+  if (wcEl) wcEl.textContent = 'izlenen kod: ' + codeStr;
   addLog(`Başka cihaz izleniyor (kod: ${codeStr})`);
 }
 
@@ -2831,6 +2841,27 @@ function stopWatching() {
   syncShowState();
   addLog('İzleme durduruldu');
 }
+
+// Uçtan uca bağlantı testi: kendi koduna bir test verisi gönderir, geri
+// okur ve sonucu adıyla söyler — "çalışmıyor ama neden bilmiyorum" bitsin.
+document.getElementById('syncTestBtn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('syncPushStatus');
+  if (!syncBucketId) { statusEl.textContent = '⚠️ Önce yayını başlat.'; return; }
+  statusEl.textContent = '🔍 Test ediliyor (gönder + geri oku)...';
+  try {
+    const res1 = await fetch(`https://ntfy.sh/${syncBucketId}`, { method: 'POST', body: JSON.stringify({ test: Date.now() }) });
+    if (!res1.ok) throw new Error('gönderme HTTP ' + res1.status);
+    await new Promise(r => setTimeout(r, 1200));
+    const res2 = await fetch(`https://ntfy.sh/${syncBucketId}/json?poll=1&since=1m`);
+    if (!res2.ok) throw new Error('okuma HTTP ' + res2.status);
+    const ok = (await res2.text()).indexOf('"message"') !== -1;
+    if (!ok) throw new Error('gönderilen veri geri okunamadı');
+    await pushSyncData(); // güncel durumu da hemen gönder (durum yazısını test sonucu ezmesin diye önce)
+    statusEl.textContent = '✅ Bağlantı sağlam: gönderme ve okuma çalışıyor. iPad\'te "izlenen kod" bununla AYNI olmalı: ' + makeSyncCode('ntfy', syncBucketId);
+  } catch (err) {
+    statusEl.textContent = '❌ Test başarısız: ' + err.message + (String(err.message).indexOf('429') !== -1 ? ' (hız sınırı — 2 dk bekleyip tekrar dene)' : '');
+  }
+});
 
 syncBroadcastBtn.addEventListener('click', startBroadcast);
 syncRetryBtn.addEventListener('click', startBroadcast);
@@ -2865,18 +2896,34 @@ syncCopyBtn.addEventListener('click', () => {
     watchCode = localStorage.getItem('civiSayaciIzlemeKodu');
   } catch (e) { return; }
   if (wasBroadcasting) {
-    if (foreignLeaseFresh()) {
-      // Başka bir sekme zaten yayında: bu sekme yayına katılmasın, yoksa
-      // gönderim hızı katlanıp hız sınırına (429) takılıyor.
-      showSyncDiag('ℹ️ Yayın başka bir sekmede zaten açık. Bu sekmeyi kapatabilirsin — yayın oradan sürüyor.');
-    } else {
-      startBroadcast();
-    }
+    // Başka bir sekme yayındaysa bekle; o sekme kapanır/uyursa (kilit 15sn
+    // içinde eskir) bu sekme yayını OTOMATİK devralır. (Önceki sürümde
+    // devralma yoktu ve yayın sahipsiz kalabiliyordu.)
+    const tryTakeover = () => {
+      if (syncMode === 'broadcast') return;
+      if (foreignLeaseFresh()) {
+        showSyncDiag('ℹ️ Yayın şu an başka bir sekmede açık; o sekme kapanırsa bu sekme otomatik devralacak.');
+        setTimeout(tryTakeover, 10000);
+      } else {
+        clearSyncDiag();
+        startBroadcast();
+      }
+    };
+    tryTakeover();
   } else if (watchCode) {
     syncCodeInput.value = watchCode;
     startWatching(watchCode);
   }
 })();
+
+// Yayıncı sekme öne gelince kilidi tazele ve son durumu hemen gönder —
+// arka planda dondurulmuş sekme uyandığında gecikmeden toparlanır.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && syncMode === 'broadcast') {
+    renewLease();
+    pushSyncData();
+  }
+});
 </script>
 </body>
 </html>
