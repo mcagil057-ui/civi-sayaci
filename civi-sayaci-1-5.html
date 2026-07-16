@@ -618,7 +618,7 @@ window.addEventListener('error', function (e) {
 
 <h1>🔩 Çivi Sayacı</h1>
 <div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
-<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-16 · 15</div>
+<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-16 · 16</div>
 
 <div class="tabs" id="tabNav">
   <button class="tab-btn active" id="tabBtnCounter" data-tab="counter">🔩 Sayaç</button>
@@ -829,7 +829,8 @@ window.addEventListener('error', function (e) {
 <div class="hint" id="hintBox">
   Kamerayı aç, telefonu kutunun ağzına yakın ve sabit tut. Yeşil köşeli çerçeve algılanan alanı gösterir; algılama, kamera açılır açılmaz bu alanda otomatik ve hassas şekilde başlar.<br><br>
   Alan otomatik konumu tam uymuyorsa video üzerindeki "✏️ Elle Çiz" ile kutunun ağzını parmağınla çizip kendi alanını tanımlayabilirsin — çizdiğin alan hatırlanır, "🎯 Otomatik Alan"a basarak istediğin zaman geri dönebilirsin.<br><br>
-  Ekrandaki "Hareket seviyesi" sayısını izle: birkaç çivi at, hangi değerlere çıktığını gör, sonra "Hareket hassasiyeti" kaydırıcısını veya hazır ayarlardan birini (Az Hassas / Orta / Çok Hassas) seç. Yandan atışlarda kaçırma yaşarsan "Çok Hassas" ayarında kal; çok fazla yanlış sayım olursa "Az Hassas"a geç.<br><br>
+  Ekrandaki "Hareket seviyesi" sayısını izle: birkaç çivi at, hangi değerlere çıktığını gör, sonra "Hareket hassasiyeti" kaydırıcısını veya hazır ayarlardan birini (Az Hassas / Orta / Çok Hassas) seç.<br><br>
+  <b>Yandan atışlar için:</b> "Çok Hassas"ı seç (algılayıcı artık hızlı/bulanık geçişleri de görüyor) ve "✏️ Elle Çiz" ile alanı kutunun ağzından biraz DAHA GENİŞ çiz — çivinin uçuş yolu da alana girsin ki kamera onu daha uzun süre görsün.<br><br>
   Yanlış sayımları her zaman +1 / −1 ile elle düzeltebilirsin. Ne yaptığın "Notlar" sekmesine otomatik olarak kaydediliyor.
 </div>
 
@@ -1202,8 +1203,8 @@ const motionLevelReadout = document.getElementById('motionLevelReadout');
 const PIXEL_DIFF_CUTOFF = 16; // per-pixel brightness change needed to count as "changed" (yandan/hızlı atışları da yakalamak için düşürüldü)
 
 const motionCanvas = document.createElement('canvas');
-motionCanvas.width = 96;
-motionCanvas.height = 72;
+motionCanvas.width = 128;
+motionCanvas.height = 96;
 const motionCtx = motionCanvas.getContext('2d', { willReadFrequently: true });
 
 // ---- Algılama Alanı (ROI): otomatik ortalanmış kutu veya kullanıcının elle
@@ -1362,7 +1363,7 @@ window.addEventListener('pointerup', () => {
 loadRoi();
 applyRoiToGuide();
 
-const MOTION_PRESETS = { low: 8, mid: 4, high: 2 };
+const MOTION_PRESETS = { low: 6, mid: 3, high: 1 };
 function applyMotionPreset(key) {
   const val = MOTION_PRESETS[key];
   if (val === undefined) return;
@@ -1405,11 +1406,21 @@ function computeMotionLevel() {
   }
   let level = 0;
   if (prevGray) {
-    let changedCount = 0;
+    // İki ölçü birden:
+    // 1) "Keskin" piksel sayısı — yavaş/net düşen çiviler için (eskisi gibi).
+    // 2) "Soluk toplam" — YANDAN atılan çivi karede çok hızlı geçtiğinden
+    //    bulanıklaşır: çok pikselde KÜÇÜK değişim bırakır. Keskin sayaç bunu
+    //    göremezken soluk toplam yakalar. Gürültü tabanı (6) sensör
+    //    parazitini dışarıda tutar.
+    let changedCount = 0, softSum = 0;
     for (let p = 0; p < gray.length; p++) {
-      if (Math.abs(gray[p] - prevGray[p]) > PIXEL_DIFF_CUTOFF) changedCount++;
+      const d = Math.abs(gray[p] - prevGray[p]);
+      if (d > PIXEL_DIFF_CUTOFF) changedCount++;
+      if (d > 6) softSum += d;
     }
-    level = (changedCount / gray.length) * 100;
+    const hardPct = (changedCount / gray.length) * 100;
+    const softPct = (softSum / (gray.length * 32)) * 100;
+    level = Math.max(hardPct, softPct);
   }
   prevGray = gray;
   return level;
