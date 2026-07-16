@@ -618,7 +618,7 @@ window.addEventListener('error', function (e) {
 
 <h1>🔩 Çivi Sayacı</h1>
 <div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
-<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-03 · 12</div>
+<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-15 · 13</div>
 
 <div class="tabs" id="tabNav">
   <button class="tab-btn active" id="tabBtnCounter" data-tab="counter">🔩 Sayaç</button>
@@ -2172,7 +2172,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 // istek bütçesi harcamaz); yoklama sadece emniyet ağıdır ve seyrek çalışır.
 // İki cihaz aynı Wi-Fi'deyken ortak IP'nin ntfy istek bütçesini (~12/dk)
 // aşmamak için tüm hızlar buna göre ayarlandı (429 hatasının çözümü).
-const SYNC_POLL_MS_NTFY = 20000;
+// ntfy izleme: 15 sn'de bir kontrol edilir ama canlı akış (SSE) veri
+// taşıdığı sürece gerçek istek atılmaz (aşağıdaki tazelik kapısı) —
+// akış koparsa yoklama kendiliğinden devreye girer.
+const SYNC_POLL_MS_NTFY = 15000;
 const SYNC_POLL_MS_LEGACY = 3000; // eski JB- kodları için (jsonblob'ta sınır sorunu yok)
 
 function syncSleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
@@ -2394,7 +2397,7 @@ let syncPollInterval = null;
 let syncHeartbeatInterval = null;
 let lastSyncPushAt = 0;
 let syncPushTimeout = null;
-const SYNC_PUSH_MIN_GAP_MS = 6000; // ntfy hız sınırı ~5sn/istek; sondan tetiklemeli push son durumu yine garanti eder
+const SYNC_PUSH_MIN_GAP_MS = 10000; // sürekli sayımda bile bütçenin güvenli altında kalır; sondan tetiklemeli push son durumu garanti eder
 let ntfyBackoffUntil = 0; // 429 (hız sınırı) yenince bu zamana kadar istek atılmaz
 
 function showSyncDiag(msg) {
@@ -2560,6 +2563,29 @@ function stopCommandListener() {
 const BCAST_TOPIC_KEY = 'civiSayaciYayinKodu';
 const BCAST_ACTIVE_KEY = 'civiSayaciYayinAktif';
 
+// Sekme kilidi: uygulama birden fazla sekmede açıksa yalnızca BİRİ yayın
+// yapar — yoksa gönderim hızı katlanıp servis sınırına (429) takılıyordu.
+const BCAST_LEASE_KEY = 'civiSayaciYayinKilidi';
+const TAB_ID = Math.random().toString(36).slice(2);
+let leaseInterval = null;
+
+function foreignLeaseFresh() {
+  try {
+    const l = JSON.parse(localStorage.getItem(BCAST_LEASE_KEY) || 'null');
+    return !!(l && l.id !== TAB_ID && (Date.now() - l.ts) < 15000);
+  } catch (e) { return false; }
+}
+function renewLease() {
+  try { localStorage.setItem(BCAST_LEASE_KEY, JSON.stringify({ id: TAB_ID, ts: Date.now() })); } catch (e) {}
+}
+function releaseLease() {
+  if (leaseInterval) { clearInterval(leaseInterval); leaseInterval = null; }
+  try {
+    const l = JSON.parse(localStorage.getItem(BCAST_LEASE_KEY) || 'null');
+    if (l && l.id === TAB_ID) localStorage.removeItem(BCAST_LEASE_KEY);
+  } catch (e) {}
+}
+
 function ensureBroadcastTopic() {
   let t = null;
   try { t = localStorage.getItem(BCAST_TOPIC_KEY); } catch (e) {}
@@ -2578,13 +2604,15 @@ async function startBroadcast() {
   syncProviderKey = 'ntfy';
   syncBucketId = ensureBroadcastTopic();
   syncMode = 'broadcast';
+  renewLease();
+  if (!leaseInterval) leaseInterval = setInterval(renewLease, 5000);
   try { localStorage.setItem(BCAST_ACTIVE_KEY, '1'); } catch (e) {}
   syncCode.textContent = makeSyncCode(syncProviderKey, syncBucketId);
   syncShowState();
   pushSyncData();
   // Anlık güncellemeler zaten her sayımda gönderiliyor (pushSyncIfBroadcasting);
   // heartbeat yeni bağlanan izleyicilere güncel durumu ulaştırmak için.
-  syncHeartbeatInterval = setInterval(() => pushSyncData(), 30000);
+  syncHeartbeatInterval = setInterval(() => pushSyncData(), 60000);
   startCommandListener(syncBucketId);
   addLog(`Yayın başlatıldı (kod: ${syncCode.textContent})`);
 }
@@ -2593,6 +2621,7 @@ function stopBroadcast() {
   syncMode = 'off';
   syncBucketId = null;
   syncProviderKey = null;
+  releaseLease();
   try { localStorage.removeItem(BCAST_ACTIVE_KEY); } catch (e) {}
   if (syncHeartbeatInterval) clearInterval(syncHeartbeatInterval);
   if (syncPushTimeout) { clearTimeout(syncPushTimeout); syncPushTimeout = null; }
@@ -2602,9 +2631,20 @@ function stopBroadcast() {
   addLog('Yayın durduruldu');
 }
 
-async function pollRemoteStats() {
+let lastRemoteDataAt = 0; // en son ne zaman veri geldi (SSE veya yoklama)
+let lastPollAt = 0;
+
+async function pollRemoteStats(force) {
   if (!syncBucketId || !syncWatchProviderKey) return;
   if (Date.now() < ntfyBackoffUntil) return; // hız sınırı bekleniyor; SSE zaten dinlemede
+  // Tazelik kapısı (sadece ntfy): canlı akış veri taşıyorsa yoklama isteği
+  // atma — istek bütçesini koru. Akış susarsa (30 sn'den eski veri) yokla.
+  const now = Date.now();
+  if (!force && syncWatchProviderKey === 'ntfy') {
+    if (now - lastRemoteDataAt < 30000) return;
+    if (now - lastPollAt < 30000) return;
+  }
+  lastPollAt = now;
   try {
     const data = await SYNC_PROVIDERS[syncWatchProviderKey].get(syncBucketId);
     clearSyncDiag();
@@ -2623,6 +2663,7 @@ let lastRemoteState = null;
 
 function renderRemoteStats(data) {
   lastRemoteState = data;
+  lastRemoteDataAt = Date.now();
   count = data.count || 0;
   countEl.textContent = count;
   videoBadge.textContent = count;
@@ -2770,8 +2811,8 @@ function startWatching(codeRaw) {
   if (syncWatchProviderKey === 'ntfy' && typeof EventSource !== 'undefined') {
     startWatchStream(syncBucketId);
   }
-  pollRemoteStats();
-  syncPollInterval = setInterval(pollRemoteStats,
+  pollRemoteStats(true);
+  syncPollInterval = setInterval(() => pollRemoteStats(false),
     syncWatchProviderKey === 'ntfy' ? SYNC_POLL_MS_NTFY : SYNC_POLL_MS_LEGACY);
   // Kod hatırlanır: sayfa yenilenince otomatik yeniden bağlanılır.
   try { localStorage.setItem('civiSayaciIzlemeKodu', codeStr); } catch (e) {}
@@ -2824,7 +2865,13 @@ syncCopyBtn.addEventListener('click', () => {
     watchCode = localStorage.getItem('civiSayaciIzlemeKodu');
   } catch (e) { return; }
   if (wasBroadcasting) {
-    startBroadcast();
+    if (foreignLeaseFresh()) {
+      // Başka bir sekme zaten yayında: bu sekme yayına katılmasın, yoksa
+      // gönderim hızı katlanıp hız sınırına (429) takılıyor.
+      showSyncDiag('ℹ️ Yayın başka bir sekmede zaten açık. Bu sekmeyi kapatabilirsin — yayın oradan sürüyor.');
+    } else {
+      startBroadcast();
+    }
   } else if (watchCode) {
     syncCodeInput.value = watchCode;
     startWatching(watchCode);
