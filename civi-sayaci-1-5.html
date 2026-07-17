@@ -618,7 +618,7 @@ window.addEventListener('error', function (e) {
 
 <h1>🔩 Çivi Sayacı</h1>
 <div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
-<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-16 · 17</div>
+<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-16 · 18</div>
 
 <div class="tabs" id="tabNav">
   <button class="tab-btn active" id="tabBtnCounter" data-tab="counter">🔩 Sayaç</button>
@@ -683,6 +683,7 @@ window.addEventListener('error', function (e) {
     <button id="viewerPlusBtn">+1</button>
   </div>
   <div id="viewerCmdDiag" style="font-size:0.72rem; color:#98a2b8; margin-top:8px; text-align:center; min-height:1em;"></div>
+  <div id="viewerAiNote" style="display:none; font-size:0.75rem; color:#ffb020; margin-top:8px; text-align:center; line-height:1.4;"></div>
 </div>
 
 <div class="status" id="statusRow">
@@ -801,6 +802,7 @@ window.addEventListener('error', function (e) {
   <div id="motionMeter" style="height:100%;width:0%;background:linear-gradient(90deg,#2ecc71,#f0a500,#e74c3c);transition:width 0.05s linear;"></div>
 </div>
 <div id="motionLevelReadout" style="display:none; text-align:center; font-size:0.78rem; color:#9aa5b1; margin-top:-14px; margin-bottom:14px;">Hareket seviyesi: <b id="motionLevelNum">0</b></div>
+<div id="gozcuLine" style="display:none; width:100%; max-width:320px; text-align:center; font-size:0.75rem; color:#98a2b8; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:8px 12px; margin-bottom:14px; line-height:1.4;">🤖 Gözcü: izliyor</div>
 
 <div class="row" id="manualRow">
   <button id="minusBtn">−1</button>
@@ -1409,9 +1411,12 @@ function computeMotionLevel() {
   }
   const frame = motionCtx.getImageData(0, 0, w, h).data;
   const gray = new Uint8ClampedArray(w * h);
+  let brightSum = 0;
   for (let i = 0, p = 0; i < frame.length; i += 4, p++) {
     gray[p] = (frame[i] * 0.299 + frame[i + 1] * 0.587 + frame[i + 2] * 0.114);
+    brightSum += gray[p];
   }
+  gozcuBrightness = brightSum / gray.length; // Gözcü için ortam parlaklığı
   let level = 0;
   if (prevGray) {
     // İki ölçü birden:
@@ -1431,8 +1436,65 @@ function computeMotionLevel() {
     level = Math.max(hardPct, softPct);
   }
   prevGray = gray;
+  // Gözcü: tetikleme dışı "taban hareket" ortalaması (kamera titreşimi tespiti).
+  // Tetiklemeye yakın yüksek seviyeleri karıştırmamak için sınırlı örnek alır.
+  if (level < motionThreshold * 3) {
+    gozcuBaseline = gozcuBaseline * 0.95 + level * 0.05;
+  }
   return level;
 }
+
+// ---- 🤖 Akıllı Gözcü: kamerayı sürekli izleyip ortam ve sayım sağlığını
+// denetler. Telefonda çalışır, dışarıya veri göndermez, ek işlem yükü yok
+// denecek kadar azdır (zaten hesaplanan değerleri okur). Uyarıları ekrana,
+// Notlar'a, (açıksa) sesli anonsa ve iPad'e iletir. ----
+let gozcuBrightness = 128;
+let gozcuBaseline = 0;
+let gozcuCountTimes = [];   // son sayımların zamanları (seri sayım tespiti)
+let gozcuLastAlerts = {};   // uyarı tipi -> son gösterim zamanı (tekrar önleme)
+let gozcuNote = null;       // iPad'e iletilecek son gözlem {text, ts}
+const gozcuLine = document.getElementById('gozcuLine');
+
+function gozcuAlert(type, text, sesli) {
+  const now = Date.now();
+  if (gozcuLastAlerts[type] && now - gozcuLastAlerts[type] < 5 * 60 * 1000) return; // 5 dk'da bir
+  gozcuLastAlerts[type] = now;
+  if (gozcuLine) gozcuLine.textContent = '🤖 Gözcü: ' + text;
+  gozcuNote = { text, ts: now };
+  addLog('🤖 Gözcü: ' + text);
+  if (sesli && prefs.voice) speak(text);
+  pushSyncIfBroadcasting();
+}
+
+setInterval(() => {
+  if (!motionListening || motionPaused) return;
+  // 1) Karanlık / kapalı lens
+  if (gozcuBrightness < 12) {
+    gozcuAlert('kapkara', 'Görüntü kapkaranlık — lens kapalı ya da kamera engellenmiş olabilir.', true);
+  } else if (gozcuBrightness < 40) {
+    gozcuAlert('karanlik', 'Ortam kararıyor — algılama zayıflayabilir, ışığı artırmanı öneririm.', true);
+  }
+  // 2) Sürekli titreşim / kamera oynaması (pervane telefonu titretiyor olabilir)
+  if (gozcuBaseline > Math.max(0.4, motionThreshold * 0.7)) {
+    gozcuAlert('titresim', 'Sürekli hareket görüyorum — telefon titriyor (pervane?) ya da alanda sürekli kıpırtı var. Sehpayı ve algılama alanını kontrol et.', true);
+  }
+  // 3) Şüpheli seri sayım (olası yanlış sayım)
+  const now = Date.now();
+  gozcuCountTimes = gozcuCountTimes.filter(t => now - t < 10000);
+  if (gozcuCountTimes.length >= 6) {
+    gozcuAlert('seri', '10 saniyede ' + gozcuCountTimes.length + ' sayım oldu — yanlış sayım olabilir, sayacı kontrol et.', true);
+    gozcuCountTimes = [];
+  }
+  // 4) Uzun sessizlik (bilgi amaçlı, sessiz)
+  const t = dailyStats[dayKeyOf()];
+  if (t && t.lastTs && now - t.lastTs > 15 * 60 * 1000 && t.nails > 0) {
+    gozcuAlert('sessiz', '15 dakikadır sayım yok — mola verildiyse kamerayı kapatman ısınmayı azaltır.', false);
+  }
+  // Sorun yoksa durumu tazele (uyarı yazısı 60 sn sonra normale döner)
+  if (gozcuLine && gozcuNote && now - gozcuNote.ts > 60000) {
+    gozcuLine.textContent = '🤖 Gözcü: izliyor — her şey yolunda';
+  }
+}, 5000);
 
 function motionDetectLoop() {
   if (!motionListening) return;
@@ -1480,6 +1542,7 @@ function startMotionDetection() {
   motionListening = true;
   motionMeterWrap.style.display = 'block';
   motionLevelReadout.style.display = 'block';
+  if (gozcuLine) { gozcuLine.style.display = 'block'; gozcuLine.textContent = '🤖 Gözcü: izliyor'; }
   motionToggle.style.display = 'block';
   motionToggle.textContent = '⏸ Algılamayı Duraklat';
   motionToggle.classList.remove('listening');
@@ -1495,6 +1558,7 @@ function stopMotionDetection() {
   if (motionRafId) cancelAnimationFrame(motionRafId);
   motionMeter.style.width = '0%';
   motionLevelReadout.style.display = 'none';
+  if (gozcuLine) gozcuLine.style.display = 'none';
   motionToggle.textContent = '⏸ Algılamayı Duraklat';
   motionToggle.classList.remove('listening');
   dot.classList.remove('active');
@@ -1540,6 +1604,7 @@ function updateCount(delta, source) {
 
     const now = Date.now();
     nailTimestamps.push(now);
+    gozcuCountTimes.push(now); // Gözcü: seri sayım denetimi için
     addLog(`Çivi #${count} sayıldı (${source || 'kamera'})`);
     recordDailyNail(1, now);
 
@@ -2455,7 +2520,7 @@ function syncShowState() {
 // arayüzü. (İstatistik/hedef/kazanç/grafik panelleri VIEWER_SHOW_IDS'te,
 // izleyende gösterilir.)
 const VIEWER_HIDE_IDS = [
-  'statusRow', 'soundToggle', 'voiceToggle', 'speakCountBtn', 'cameraBtn',
+  'statusRow', 'gozcuLine', 'soundToggle', 'voiceToggle', 'speakCountBtn', 'cameraBtn',
   'videoWrap', 'roiControls', 'motionToggle', 'motionMeterWrap', 'motionLevelReadout',
   'manualRow', 'resetBtn', 'reportBtn', 'wakeStatus',
   'motionSettings', 'hintBox'
@@ -2497,6 +2562,7 @@ function buildSyncPayload() {
     cameraOn: cameraOn,
     detecting: motionListening && !motionPaused,
     days: trimmedDays,
+    aiNote: (gozcuNote && Date.now() - gozcuNote.ts < 10 * 60 * 1000) ? gozcuNote : null,
     updatedAt: Date.now()
   };
 }
@@ -2811,6 +2877,16 @@ function renderRemoteStats(data) {
   const sld = document.getElementById('syncLastData');
   if (sld) sld.textContent = 'son veri: ' + new Date().toLocaleTimeString('tr-TR');
   updateViewerControls(data);
+  // Telefonun Akıllı Gözcü uyarısını izleyende de göster.
+  const ain = document.getElementById('viewerAiNote');
+  if (ain) {
+    if (data.aiNote && data.aiNote.text) {
+      ain.textContent = '🤖 ' + data.aiNote.text;
+      ain.style.display = 'block';
+    } else {
+      ain.style.display = 'none';
+    }
+  }
   // Telefonun gönderdiği günlük istatistikleri izleyende analizler için kullan.
   if (data.days) dailyStats = data.days;
   renderViewerStats(data);
