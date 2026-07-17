@@ -618,7 +618,7 @@ window.addEventListener('error', function (e) {
 
 <h1>🔩 Çivi Sayacı</h1>
 <div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
-<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-16 · 18</div>
+<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-16 · 19</div>
 
 <div class="tabs" id="tabNav">
   <button class="tab-btn active" id="tabBtnCounter" data-tab="counter">🔩 Sayaç</button>
@@ -801,7 +801,7 @@ window.addEventListener('error', function (e) {
 <div class="meter-wrap" id="motionMeterWrap" style="display:none; position:relative;">
   <div id="motionMeter" style="height:100%;width:0%;background:linear-gradient(90deg,#2ecc71,#f0a500,#e74c3c);transition:width 0.05s linear;"></div>
 </div>
-<div id="motionLevelReadout" style="display:none; text-align:center; font-size:0.78rem; color:#9aa5b1; margin-top:-14px; margin-bottom:14px;">Hareket seviyesi: <b id="motionLevelNum">0</b></div>
+<div id="motionLevelReadout" style="display:none; text-align:center; font-size:0.78rem; color:#9aa5b1; margin-top:-14px; margin-bottom:14px;">Hareket seviyesi: <b id="motionLevelNum">0</b> · zirve (5sn): <b id="motionPeakNum" style="color:#ffb020;">0</b></div>
 <div id="gozcuLine" style="display:none; width:100%; max-width:320px; text-align:center; font-size:0.75rem; color:#98a2b8; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:8px 12px; margin-bottom:14px; line-height:1.4;">🤖 Gözcü: izliyor</div>
 
 <div class="row" id="manualRow">
@@ -817,8 +817,10 @@ window.addEventListener('error', function (e) {
 
 <div class="settings" id="motionSettings">
   <div class="stats-title">📷 Algılama Ayarları (Manuel)</div>
+  <button class="camera-toggle" id="calibBtn" style="margin-bottom:6px;">🎯 Yandan Atış Kalibrasyonu</button>
+  <div id="calibStatus" style="font-size:0.75rem; color:#98a2b8; text-align:center; margin-bottom:10px; min-height:1em; line-height:1.4;"></div>
   <label>Hareket hassasiyeti (% piksel değişimi) <span id="motionThreshVal">2</span></label>
-  <input type="range" id="motionThreshSlider" min="0.5" max="20" value="2" step="0.5">
+  <input type="range" id="motionThreshSlider" min="0.1" max="20" value="2" step="0.1">
   <div class="preset-row">
     <button class="preset-btn" id="presetLow" data-preset="low" type="button">Az Hassas</button>
     <button class="preset-btn" id="presetMid" data-preset="mid" type="button">Orta</button>
@@ -1496,6 +1498,65 @@ setInterval(() => {
   }
 }, 5000);
 
+// ---- 🎯 Yandan atış kalibrasyonu: kullanıcı 12 sn boyunca atış yapar,
+// algılayıcının her atışta ürettiği zirveler ölçülür ve hassasiyet en zayıf
+// atışın bile yakalanacağı değere OTOMATİK ayarlanır. Hiç zirve görülmezse
+// kameranın o atışları fiziksel olarak göremediği anlaşılır ve kullanıcı
+// net şekilde yönlendirilir. ----
+let calibActive = false;
+let calibUntil = 0;
+let calibSamples = [];
+let motionPeakVal = 0, motionPeakAt = 0;
+const motionPeakNum = document.getElementById('motionPeakNum');
+const calibStatusEl = document.getElementById('calibStatus');
+
+function finishCalibration() {
+  calibActive = false;
+  // Zirve çıkarımı: 0.12 üstü bitişik bölgelerin her birinin en yüksek değeri
+  // bir "atış zirvesi" sayılır; bölgeler 250ms+ sessizlikle ayrılır.
+  const peaks = [];
+  let cur = 0, lastAbove = -1e9;
+  calibSamples.forEach(s => {
+    if (s.v > 0.12) {
+      if (s.t - lastAbove > 250 && cur > 0) { peaks.push(cur); cur = 0; }
+      cur = Math.max(cur, s.v);
+      lastAbove = s.t;
+    }
+  });
+  if (cur > 0) peaks.push(cur);
+  calibSamples = [];
+
+  if (peaks.length === 0) {
+    calibStatusEl.textContent = '❌ Hiç atış göremedim. Kamera o bölgeyi fiziksel olarak görmüyor olabilir: kamerayı kutuya yaklaştır/açıyı değiştir ve "✏️ Elle Çiz" ile alanı atış yolunu da kapsayacak şekilde GENİŞ çiz, sonra tekrar dene.';
+    addLog('🎯 Kalibrasyon: hiç atış algılanamadı (kamera açısı/alan sorunu olabilir)');
+    if (prefs.voice) speak('Hiç atış göremedim. Kamerayı yaklaştırıp alanı genişletmeyi dene.');
+    return;
+  }
+  const minPeak = Math.min.apply(null, peaks);
+  const newThr = Math.max(0.1, Math.round(minPeak * 0.6 * 10) / 10);
+  motionThreshold = newThr;
+  motionThreshSlider.value = newThr;
+  motionThreshVal.textContent = newThr;
+  document.querySelectorAll('#motionSettings .preset-btn').forEach(b => b.classList.remove('active'));
+  calibStatusEl.textContent = '✅ ' + peaks.length + ' atış gördüm (zirveler: ' + peaks.map(p => p.toFixed(2)).join(', ') + '). Hassasiyet otomatik olarak ' + newThr + ' yapıldı — en zayıf atışın bile yakalanır.';
+  addLog('🎯 Kalibrasyon: ' + peaks.length + ' atış ölçüldü, hassasiyet ' + newThr + ' yapıldı');
+  if (prefs.voice) speak(peaks.length + ' atış gördüm. Hassasiyeti ayarladım.');
+}
+
+document.getElementById('calibBtn').addEventListener('click', () => {
+  if (!motionListening) {
+    calibStatusEl.textContent = '⚠️ Önce kamerayı aç (algılama çalışıyor olmalı).';
+    return;
+  }
+  if (calibActive) return;
+  calibSamples = [];
+  calibActive = true;
+  calibUntil = performance.now() + 12000;
+  calibStatusEl.textContent = '🎯 Başladı! 12 saniye içinde birkaç YANDAN atış yap...';
+  if (prefs.voice) speak('Kalibrasyon başladı. Yandan atışlarını yap.');
+  addLog('🎯 Yandan atış kalibrasyonu başlatıldı');
+});
+
 function motionDetectLoop() {
   if (!motionListening) return;
   // Isınma önlemi: analiz en fazla ~25 kare/sn (ekran 60fps yenilense bile).
@@ -1511,6 +1572,25 @@ function motionDetectLoop() {
   const displayLevel = Math.min(100, (level / 25) * 100);
   motionMeter.style.width = displayLevel + '%';
   motionLevelNum.textContent = level.toFixed(1);
+
+  // Zirve göstergesi: son 5 saniyenin en yüksek değeri sabit kalır — tek
+  // karelik sıçramalar (yandan atışlar) gözle okunabilir hale gelir.
+  if (level > motionPeakVal) {
+    motionPeakVal = level; motionPeakAt = nowMs;
+  } else if (nowMs - motionPeakAt > 5000) {
+    motionPeakVal = level; motionPeakAt = nowMs;
+  }
+  if (motionPeakNum) motionPeakNum.textContent = motionPeakVal.toFixed(2);
+
+  // Kalibrasyon: seviyeleri kaydet, sayımı bastır.
+  if (calibActive) {
+    calibSamples.push({ t: nowMs, v: level });
+    const kalan = Math.max(0, Math.ceil((calibUntil - nowMs) / 1000));
+    calibStatusEl.textContent = '🎯 ATIŞ YAP! Kalan süre: ' + kalan + ' sn (atışlar şimdilik sayılmaz)';
+    if (nowMs >= calibUntil) finishCalibration();
+    motionRafId = requestAnimationFrame(motionDetectLoop);
+    return;
+  }
 
   if (!motionPaused) {
     const now = Date.now();

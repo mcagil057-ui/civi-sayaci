@@ -1,6 +1,6 @@
 // Çivi Sayacı service worker: uygulamanın çevrimdışı da açılabilmesini sağlar.
 // Sürüm adını değiştirmek eski önbelleği temizletir.
-const CACHE_NAME = 'civi-sayaci-v15';
+const CACHE_NAME = 'civi-sayaci-v16';
 const APP_SHELL = './civi-sayaci-1-5.html';
 const PRECACHE = [APP_SHELL, './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 
