@@ -618,7 +618,7 @@ window.addEventListener('error', function (e) {
 
 <h1>🔩 Çivi Sayacı</h1>
 <div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
-<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-16 · 16</div>
+<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-16 · 17</div>
 
 <div class="tabs" id="tabNav">
   <button class="tab-btn active" id="tabBtnCounter" data-tab="counter">🔩 Sayaç</button>
@@ -1147,8 +1147,15 @@ async function toggleCamera() {
     return;
   }
   try {
+    // Düşük çözünürlük + 30fps sınırı: algılama için fazlasıyla yeterli,
+    // kamera donanımının ve işlemcinin ısınmasını belirgin azaltır.
     camStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' } },
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        frameRate: { ideal: 24, max: 30 }
+      },
       audio: false
     });
     video.srcObject = camStream;
@@ -1195,6 +1202,7 @@ let motionRafId = null;
 let motionArmed = true;
 let lastMotionTrigger = 0;
 let motionRearmDeadline = 0;
+let lastAnalysisAt = 0; // analiz hız sınırı (~25fps) için
 let motionThreshold = 2; // percent of pixels that changed significantly (düşük = daha hassas)
 let motionCooldown = 300;
 let prevGray = null;
@@ -1428,6 +1436,15 @@ function computeMotionLevel() {
 
 function motionDetectLoop() {
   if (!motionListening) return;
+  // Isınma önlemi: analiz en fazla ~25 kare/sn (ekran 60fps yenilense bile).
+  // Yandan atışlar bundan etkilenmez — kareler seyreldikçe bulanıklık izi
+  // kare başına daha da belirginleşir ve soluk-toplam ölçüsü onu yakalar.
+  const nowMs = performance.now();
+  if (nowMs - lastAnalysisAt < 40) {
+    motionRafId = requestAnimationFrame(motionDetectLoop);
+    return;
+  }
+  lastAnalysisAt = nowMs;
   const level = computeMotionLevel();
   const displayLevel = Math.min(100, (level / 25) * 100);
   motionMeter.style.width = displayLevel + '%';
