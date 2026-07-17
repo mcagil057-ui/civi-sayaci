@@ -29,11 +29,11 @@
       "batches": 22
     },
     "2026-07-17": {
-      "nails": 132,
-      "workMs": 1760000,
+      "nails": 174,
+      "workMs": 2842000,
       "firstTs": 1784281368555,
-      "lastTs": 1784290674259,
-      "batches": 1
+      "lastTs": 1784291721245,
+      "batches": 2
     }
   },
   "sent": [
