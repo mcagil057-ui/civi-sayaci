@@ -618,7 +618,7 @@ window.addEventListener('error', function (e) {
 
 <h1>🔩 Çivi Sayacı</h1>
 <div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
-<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-16 · 21</div>
+<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-17 · 22</div>
 
 <div class="tabs" id="tabNav">
   <button class="tab-btn active" id="tabBtnCounter" data-tab="counter">🔩 Sayaç</button>
@@ -2391,15 +2391,15 @@ fotoInput.addEventListener('change', () => {
     fotoCtx.drawImage(img, 0, 0, w, h);
     const px = fotoCtx.getImageData(0, 0, w, h).data;
     const gray = new Uint8ClampedArray(w * h);
-    // Gri (renksiz) maskesi: çiviler GRİ metal olduğundan, belirgin renkli
-    // pikseller (tahta reni lekeler, renkli çöpler) aday bile olamaz — bu
-    // sayede kontrast eşiği güvenle çok daha hassas yapılabiliyor.
-    const satMask = new Uint8Array(w * h);
+    // Piksel başına renklilik (doygunluk) değeri saklanır; eleme piksel
+    // bazında DEĞİL, bulunan parçanın ortalamasına göre yapılır — gerçek
+    // ışıkta (sarımsı ampul vb.) hafif renkli görünen gri çiviler böylece
+    // parçalanmaz, ama gerçekten renkli cisimler (tahta, çöp) yine elenir.
+    const satVal = new Uint8Array(w * h);
     for (let i = 0, p = 0; i < px.length; i += 4, p++) {
       const r = px[i], g = px[i + 1], b = px[i + 2];
       gray[p] = (r * 0.299 + g * 0.587 + b * 0.114);
-      const sat = Math.max(Math.abs(r - g), Math.abs(g - b), Math.abs(r - b));
-      satMask[p] = sat < 48 ? 1 : 0;
+      satVal[p] = Math.max(Math.abs(r - g), Math.abs(g - b), Math.abs(r - b));
     }
     // Integral görüntü (yerel ortalama için)
     const integral = new Float64Array((w + 1) * (h + 1));
@@ -2423,7 +2423,7 @@ fotoInput.addEventListener('change', () => {
         meanMap[y * w + x] = sum / ((x1 - x0) * (y1 - y0));
       }
     }
-    fotoData = { gray, w, h, integral, meanMap, satMask, img };
+    fotoData = { gray, w, h, integral, meanMap, satVal, img };
     URL.revokeObjectURL(img.src);
     fotoCanvas.style.display = 'block';
     fotoTuneWrap.style.display = 'block';
@@ -2444,7 +2444,7 @@ function fotoLocalMean(x, y, win) {
   return sum / ((x1 - x0) * (y1 - y0));
 }
 
-function fotoComponents(mask, w, h) {
+function fotoComponents(mask, w, h, satVal) {
   const labels = new Int32Array(w * h);
   const comps = [];
   const stack = [];
@@ -2452,12 +2452,13 @@ function fotoComponents(mask, w, h) {
   for (let p = 0; p < mask.length; p++) {
     if (!mask[p] || labels[p]) continue;
     next++;
-    let area = 0, minx = w, miny = h, maxx = 0, maxy = 0;
+    let area = 0, minx = w, miny = h, maxx = 0, maxy = 0, satSum = 0;
     stack.length = 0; stack.push(p); labels[p] = next;
     while (stack.length) {
       const q = stack.pop();
       const qx = q % w, qy = (q / w) | 0;
       area++;
+      if (satVal) satSum += satVal[q];
       if (qx < minx) minx = qx; if (qx > maxx) maxx = qx;
       if (qy < miny) miny = qy; if (qy > maxy) maxy = qy;
       // 8 komşu
@@ -2469,7 +2470,7 @@ function fotoComponents(mask, w, h) {
         if (mask[n] && !labels[n]) { labels[n] = next; stack.push(n); }
       }
     }
-    comps.push({ area, minx, miny, maxx, maxy });
+    comps.push({ area, minx, miny, maxx, maxy, satSum });
   }
   return comps;
 }
@@ -2481,11 +2482,12 @@ function fotoMedian(arr) {
 }
 
 // Verilen eşikte tespit yapar; çizim yapmaz, sonucu döndürür.
-// Çivi bilgisi kullanılır: GRİ metal (renkli pikseller elenir) ve hepsi
-// AYNI boyda uzun-ince (10cm) — yuvarlak/kısa cisimler (taş, leke, kırıntı)
-// şekil ve boy süzgeçlerinden geçemez.
+// Çivi bilgisi kullanılır ama YUMUŞAK biçimde: renk kontrolü piksel piksel
+// değil parçanın ORTALAMASINA bakar (sarı ampul ışığında hafif renkli
+// görünen gri çivi parçalanmaz), şekil kontrolü de iki ölçütlüdür — gölgesi
+// bitişik çıkan çivi geçer, yuvarlak taş/leke yine elenir.
 function fotoDetect(C) {
-  const { gray, w, h, meanMap, satMask } = fotoData;
+  const { gray, w, h, meanMap, satVal } = fotoData;
   const MIN_AREA = 25;
 
   // İnce-uzunluk ölçüsü (dönmeden bağımsız): köşegen² / alan.
@@ -2494,32 +2496,40 @@ function fotoDetect(C) {
     const bw = c.maxx - c.minx + 1, bh = c.maxy - c.miny + 1;
     return (bw * bw + bh * bh) / Math.max(1, c.area);
   };
+  const aspect = (c) => {
+    const bw = c.maxx - c.minx + 1, bh = c.maxy - c.miny + 1;
+    return Math.max(bw, bh) / Math.min(bw, bh);
+  };
   const diagOf = (c) => {
     const bw = c.maxx - c.minx + 1, bh = c.maxy - c.miny + 1;
     return Math.sqrt(bw * bw + bh * bh);
   };
+  // Parça ortalaması gerçekten renkliyse (tahta, çöp, renkli cisim) ele;
+  // hafif renk tonu (sıcak ışık yansıması) affedilir.
+  const tooColorful = (c) => (c.satSum / Math.max(1, c.area)) > 60;
+  // Çivi-benzeri şekil: uzun-ince (en/boy oranı) VEYA ince-doluluk yüksek.
+  // Yuvarlak cisimler ikisinden de geçemez (aspect≈1, thinness≈2.5).
+  const nailLike = (c) => aspect(c) >= 3 || thinness(c) >= 4;
 
   // İki kutupluluk: çiviler zeminden koyu da olabilir parlak da — ikisini de
-  // dene, "çivi-benzeri bileşen" sayısı yüksek olanı seç. Gri maskesi her
-  // iki kutupta da uygulanır.
+  // dene, "çivi-benzeri bileşen" sayısı yüksek olanı seç.
   const build = (dark) => {
     const m = new Uint8Array(w * h);
     for (let p = 0; p < m.length; p++) {
-      if (!satMask[p]) continue;
       m[p] = dark ? (gray[p] < meanMap[p] - C ? 1 : 0) : (gray[p] > meanMap[p] + C ? 1 : 0);
     }
-    const comps = fotoComponents(m, w, h);
+    const comps = fotoComponents(m, w, h, satVal);
     let score = 0;
     comps.forEach(c => {
-      if (c.area >= MIN_AREA && thinness(c) >= 5) score++;
+      if (c.area >= MIN_AREA && nailLike(c) && !tooColorful(c)) score++;
     });
     return { comps, score };
   };
   const dark = build(true), light = build(false);
   const pick = dark.score >= light.score ? dark : light;
 
-  // Tek çivi birimi: çivi-benzeri (ince-uzun) bileşenlerin medyan alanı ve boyu
-  const singles = pick.comps.filter(c => c.area >= MIN_AREA && thinness(c) >= 5);
+  // Tek çivi birimi: çivi-benzeri bileşenlerin medyan alanı ve boyu
+  const singles = pick.comps.filter(c => c.area >= MIN_AREA && nailLike(c) && !tooColorful(c));
   const unit = fotoMedian(singles.map(c => c.area)) ||
                fotoMedian(pick.comps.filter(c => c.area >= MIN_AREA).map(c => c.area)) || MIN_AREA * 6;
   const medDiag = fotoMedian(singles.map(diagOf));
@@ -2528,12 +2538,13 @@ function fotoDetect(C) {
   const boxes = [];
   pick.comps.forEach(c => {
     if (c.area < MIN_AREA) return;
+    if (tooColorful(c)) { boxes.push({ c, skip: true }); return; } // renkli cisim
     if (c.area > unit * 25) { boxes.push({ c, skip: true }); return; } // gölge/dev leke
     if (c.area < unit * 1.6) {
-      // Tek çivi adayı: ince-uzun olmalı ve boyu diğer çivilere uymalı
-      // (hepsi 10cm — çok kısa parçalar kırıntı/taştır, elenir).
-      if (thinness(c) < 4) { boxes.push({ c, skip: true }); return; }
-      if (medDiag && singles.length >= 3 && diagOf(c) < medDiag * 0.45) { boxes.push({ c, skip: true }); return; }
+      // Tek çivi adayı: şekli çiviye benzemeli, boyu diğer çivilere uymalı
+      // (yeterince örnek varsa — çok kısa parçalar kırıntı/taştır, elenir).
+      if (!nailLike(c)) { boxes.push({ c, skip: true }); return; }
+      if (medDiag && singles.length >= 4 && diagOf(c) < medDiag * 0.45) { boxes.push({ c, skip: true }); return; }
       total += 1; parca++;
       boxes.push({ c, k: 1 });
     } else {
@@ -2581,9 +2592,7 @@ function fotoAnalyze() {
 // kalmadan doğru sayıya oturur.
 function fotoAutoTune() {
   if (!fotoData) return;
-  // Gri + şekil süzgeçleri gürültüyü elediği için artık çok daha hassas
-  // eşiklere inilebiliyor (soluk/ince çiviler de yakalanır).
-  const Cs = [5, 7, 9, 12, 16, 20];
+  const Cs = [7, 9, 12, 16, 20];
   const dets = Cs.map(c => fotoDetect(c));
   const counts = dets.map(d => d.total);
   let bestCount = counts[0], bestFreq = 0;
