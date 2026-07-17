@@ -618,10 +618,11 @@ window.addEventListener('error', function (e) {
 
 <h1>🔩 Çivi Sayacı</h1>
 <div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
-<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-16 · 19</div>
+<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-16 · 20</div>
 
 <div class="tabs" id="tabNav">
   <button class="tab-btn active" id="tabBtnCounter" data-tab="counter">🔩 Sayaç</button>
+  <button class="tab-btn" id="tabBtnFoto" data-tab="foto">📸 Say</button>
   <button class="tab-btn" id="tabBtnNotes" data-tab="notes">📝 Notlar</button>
 </div>
 
@@ -838,6 +839,28 @@ window.addEventListener('error', function (e) {
   Yanlış sayımları her zaman +1 / −1 ile elle düzeltebilirsin. Ne yaptığın "Notlar" sekmesine otomatik olarak kaydediliyor.
 </div>
 
+</div>
+
+<div class="tab-panel" id="tabFoto" style="display:none;">
+  <div class="stats-panel">
+    <div class="stats-title">📸 Fotoğrafla Hızlı Sayım</div>
+    <div style="font-size:0.75rem; color:#98a2b8; line-height:1.5; margin-bottom:10px;">
+      Yere serili, <b>ipsiz</b> çivilerin fotoğrafını çek. En iyi sonuç için: çivileri üst üste yığmadan aralıklı ser, düz zemin kullan (beton/karton), fotoğrafı tepeden çek.
+    </div>
+    <input type="file" id="fotoInput" accept="image/*" capture="environment" style="display:none">
+    <button class="main-btn" id="fotoBtn">📸 Fotoğraf Çek / Seç</button>
+    <canvas id="fotoCanvas" style="width:100%; border-radius:12px; display:none; margin-bottom:10px;"></canvas>
+    <div id="fotoResult" style="text-align:center; font-size:1.05rem; font-weight:700; color:#ffb020; min-height:1.3em; margin-bottom:8px;"></div>
+    <div class="row" id="fotoAdjRow" style="display:none; margin-bottom:10px;">
+      <button id="fotoMinus" type="button">−1</button>
+      <button id="fotoPlus" type="button">+1</button>
+    </div>
+    <div id="fotoTuneWrap" style="display:none;">
+      <label style="font-size:0.8rem; color:#98a2b8; display:flex; justify-content:space-between;">İnce ayar (kontrast eşiği) <span id="fotoThreshVal">10</span></label>
+      <input type="range" id="fotoThresh" min="4" max="30" value="10" step="1" style="width:100%;">
+      <button class="report-btn" id="fotoLogBtn" style="margin-top:10px;">📝 Sonucu Notlara Kaydet</button>
+    </div>
+  </div>
 </div>
 
 <div class="tab-panel" id="tabNotes" style="display:none;">
@@ -2320,16 +2343,247 @@ ensureReportTopic();
 mergeCloudSentMarkers();
 pushDailyStatsToCloud();
 
-// ---- Tab (Sayaç / Notlar) geçişi ----
+// ---- Tab (Sayaç / Fotoğrafla Say / Notlar) geçişi ----
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const tab = btn.dataset.tab;
     document.getElementById('tabCounter').style.display = tab === 'counter' ? 'flex' : 'none';
+    document.getElementById('tabFoto').style.display = tab === 'foto' ? 'flex' : 'none';
     document.getElementById('tabNotes').style.display = tab === 'notes' ? 'flex' : 'none';
     if (tab === 'notes') renderNotesLog();
   });
+});
+
+// ---- 📸 Fotoğrafla hızlı sayım: durağan fotoğraftaki İPSİZ çivileri
+// klasik görüntü işlemeyle sayar (cihazda çalışır, internet gerekmez).
+// Yöntem: yerel-uyarlamalı eşikleme (integral görüntü) → bağlı bileşen
+// analizi → uzun-ince bileşenlerden "tek çivi alanı" tahmini → her kümenin
+// alanı bu birime bölünerek toplam bulunur. Değen/üst üste çiviler bu
+// bölme sayesinde yaklaşık doğru sayılır; sonuç işaretli görselle birlikte
+// TAHMİN olarak sunulur ve +/− ile düzeltilebilir. ----
+const fotoInput = document.getElementById('fotoInput');
+const fotoBtn = document.getElementById('fotoBtn');
+const fotoCanvas = document.getElementById('fotoCanvas');
+const fotoCtx = fotoCanvas.getContext('2d', { willReadFrequently: true });
+const fotoResult = document.getElementById('fotoResult');
+const fotoAdjRow = document.getElementById('fotoAdjRow');
+const fotoTuneWrap = document.getElementById('fotoTuneWrap');
+const fotoThresh = document.getElementById('fotoThresh');
+const fotoThreshVal = document.getElementById('fotoThreshVal');
+let fotoData = null;   // { gray, w, h, integral, img }
+let fotoCount = 0;
+
+fotoBtn.addEventListener('click', () => fotoInput.click());
+
+fotoInput.addEventListener('change', () => {
+  const file = fotoInput.files && fotoInput.files[0];
+  if (!file) return;
+  fotoResult.textContent = '⏳ İşleniyor...';
+  const img = new Image();
+  img.onload = () => {
+    // En uzun kenar ~1000px olacak şekilde küçült (hız + gürültü azaltma)
+    const scale = Math.min(1, 1000 / Math.max(img.width, img.height));
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+    fotoCanvas.width = w; fotoCanvas.height = h;
+    fotoCtx.drawImage(img, 0, 0, w, h);
+    const px = fotoCtx.getImageData(0, 0, w, h).data;
+    const gray = new Uint8ClampedArray(w * h);
+    for (let i = 0, p = 0; i < px.length; i += 4, p++) {
+      gray[p] = (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114);
+    }
+    // Integral görüntü (yerel ortalama için)
+    const integral = new Float64Array((w + 1) * (h + 1));
+    for (let y = 0; y < h; y++) {
+      let row = 0;
+      for (let x = 0; x < w; x++) {
+        row += gray[y * w + x];
+        integral[(y + 1) * (w + 1) + (x + 1)] = integral[y * (w + 1) + (x + 1)] + row;
+      }
+    }
+    // Yerel ortalama haritası bir kez hesaplanır (eşikten bağımsız) —
+    // otomatik eşik denemesi bu sayede hızlıdır.
+    const win = Math.max(12, Math.round(Math.min(w, h) / 24));
+    const meanMap = new Float32Array(w * h);
+    const W1 = w + 1;
+    for (let y = 0; y < h; y++) {
+      const y0 = Math.max(0, y - win), y1 = Math.min(h, y + win + 1);
+      for (let x = 0; x < w; x++) {
+        const x0 = Math.max(0, x - win), x1 = Math.min(w, x + win + 1);
+        const sum = integral[y1 * W1 + x1] - integral[y0 * W1 + x1] - integral[y1 * W1 + x0] + integral[y0 * W1 + x0];
+        meanMap[y * w + x] = sum / ((x1 - x0) * (y1 - y0));
+      }
+    }
+    fotoData = { gray, w, h, integral, meanMap, img };
+    URL.revokeObjectURL(img.src);
+    fotoCanvas.style.display = 'block';
+    fotoTuneWrap.style.display = 'block';
+    fotoAdjRow.style.display = 'flex';
+    fotoAutoTune();
+  };
+  img.onerror = () => { fotoResult.textContent = '⚠️ Fotoğraf açılamadı, tekrar dene.'; };
+  img.src = URL.createObjectURL(file);
+  fotoInput.value = '';
+});
+
+function fotoLocalMean(x, y, win) {
+  const { integral, w, h } = fotoData;
+  const x0 = Math.max(0, x - win), y0 = Math.max(0, y - win);
+  const x1 = Math.min(w, x + win + 1), y1 = Math.min(h, y + win + 1);
+  const W = w + 1;
+  const sum = integral[y1 * W + x1] - integral[y0 * W + x1] - integral[y1 * W + x0] + integral[y0 * W + x0];
+  return sum / ((x1 - x0) * (y1 - y0));
+}
+
+function fotoComponents(mask, w, h) {
+  const labels = new Int32Array(w * h);
+  const comps = [];
+  const stack = [];
+  let next = 0;
+  for (let p = 0; p < mask.length; p++) {
+    if (!mask[p] || labels[p]) continue;
+    next++;
+    let area = 0, minx = w, miny = h, maxx = 0, maxy = 0;
+    stack.length = 0; stack.push(p); labels[p] = next;
+    while (stack.length) {
+      const q = stack.pop();
+      const qx = q % w, qy = (q / w) | 0;
+      area++;
+      if (qx < minx) minx = qx; if (qx > maxx) maxx = qx;
+      if (qy < miny) miny = qy; if (qy > maxy) maxy = qy;
+      // 8 komşu
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        const nx = qx + dx, ny = qy + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const n = ny * w + nx;
+        if (mask[n] && !labels[n]) { labels[n] = next; stack.push(n); }
+      }
+    }
+    comps.push({ area, minx, miny, maxx, maxy });
+  }
+  return comps;
+}
+
+function fotoMedian(arr) {
+  if (!arr.length) return 0;
+  const s = arr.slice().sort((a, b) => a - b);
+  return s[(s.length / 2) | 0];
+}
+
+// Verilen eşikte tespit yapar; çizim yapmaz, sonucu döndürür.
+function fotoDetect(C) {
+  const { gray, w, h, meanMap } = fotoData;
+  const MIN_AREA = 40;
+
+  // İki kutupluluk: çiviler zeminden koyu da olabilir parlak da — ikisini de
+  // dene, "uzun-ince bileşen" sayısı yüksek olanı seç.
+  const build = (dark) => {
+    const m = new Uint8Array(w * h);
+    for (let p = 0; p < m.length; p++) {
+      m[p] = dark ? (gray[p] < meanMap[p] - C ? 1 : 0) : (gray[p] > meanMap[p] + C ? 1 : 0);
+    }
+    const comps = fotoComponents(m, w, h);
+    let score = 0;
+    comps.forEach(c => {
+      if (c.area < MIN_AREA) return;
+      const bw = c.maxx - c.minx + 1, bh = c.maxy - c.miny + 1;
+      if (Math.max(bw, bh) / Math.max(1, Math.min(bw, bh)) >= 2.2) score++;
+    });
+    return { comps, score };
+  };
+  const dark = build(true), light = build(false);
+  const pick = dark.score >= light.score ? dark : light;
+
+  // Tek çivi alanı tahmini: uzun-ince bileşenlerin medyan alanı
+  const singleAreas = [];
+  pick.comps.forEach(c => {
+    if (c.area < MIN_AREA) return;
+    const bw = c.maxx - c.minx + 1, bh = c.maxy - c.miny + 1;
+    if (Math.max(bw, bh) / Math.max(1, Math.min(bw, bh)) >= 2.2) singleAreas.push(c.area);
+  });
+  const unit = fotoMedian(singleAreas) || fotoMedian(pick.comps.filter(c => c.area >= MIN_AREA).map(c => c.area)) || MIN_AREA * 4;
+
+  let total = 0, parca = 0;
+  const boxes = [];
+  pick.comps.forEach(c => {
+    if (c.area < MIN_AREA) return;
+    if (c.area > unit * 25) { boxes.push({ c, skip: true }); return; } // gölge/dev leke
+    const k = Math.max(1, Math.round(c.area / unit));
+    total += k; parca++;
+    boxes.push({ c, k });
+  });
+  return { total, parca, boxes };
+}
+
+function fotoDraw(det) {
+  const { img, w, h } = fotoData;
+  fotoCtx.drawImage(img, 0, 0, w, h);
+  det.boxes.forEach(b => {
+    const c = b.c;
+    fotoCtx.lineWidth = 2;
+    if (b.skip) {
+      fotoCtx.strokeStyle = 'rgba(150,150,150,0.8)';
+      fotoCtx.strokeRect(c.minx, c.miny, c.maxx - c.minx, c.maxy - c.miny);
+      return;
+    }
+    fotoCtx.strokeStyle = b.k === 1 ? 'rgba(52,211,153,0.95)' : 'rgba(255,176,32,0.95)';
+    fotoCtx.strokeRect(c.minx, c.miny, c.maxx - c.minx, c.maxy - c.miny);
+    if (b.k > 1) {
+      fotoCtx.fillStyle = 'rgba(255,176,32,0.95)';
+      fotoCtx.font = 'bold 16px system-ui';
+      fotoCtx.fillText('x' + b.k, c.minx, Math.max(14, c.miny - 3));
+    }
+  });
+  fotoCount = det.total;
+  fotoResult.textContent = det.total > 0
+    ? `Tahmini: ${det.total} çivi (${det.parca} küme işaretlendi)`
+    : 'Hiç çivi bulamadım — ışığı/zemini değiştir veya ince ayarı oynat.';
+}
+
+function fotoAnalyze() {
+  if (!fotoData) return;
+  fotoDraw(fotoDetect(parseInt(fotoThresh.value)));
+}
+
+// Otomatik eşik: birkaç eşik dene, sonucun KARARLI olduğu (en çok tekrar
+// eden sayıyı veren) eşiği seç — gürültülü zeminlerde elle oynamaya gerek
+// kalmadan doğru sayıya oturur.
+function fotoAutoTune() {
+  if (!fotoData) return;
+  const Cs = [8, 12, 16, 20, 24];
+  const dets = Cs.map(c => fotoDetect(c));
+  const counts = dets.map(d => d.total);
+  let bestCount = counts[0], bestFreq = 0;
+  counts.forEach(v => {
+    const f = counts.filter(x => x === v).length;
+    if (f > bestFreq || (f === bestFreq && v < bestCount)) { bestFreq = f; bestCount = v; }
+  });
+  const idxs = counts.map((v, i) => v === bestCount ? i : -1).filter(i => i >= 0);
+  const pickIdx = idxs[(idxs.length / 2) | 0];
+  fotoThresh.value = Cs[pickIdx];
+  fotoThreshVal.textContent = Cs[pickIdx];
+  fotoDraw(dets[pickIdx]);
+}
+
+fotoThresh.addEventListener('input', () => {
+  fotoThreshVal.textContent = fotoThresh.value;
+  fotoAnalyze();
+});
+document.getElementById('fotoPlus').addEventListener('click', () => {
+  fotoCount++;
+  fotoResult.textContent = `Tahmini: ${fotoCount} çivi (elle düzeltildi)`;
+});
+document.getElementById('fotoMinus').addEventListener('click', () => {
+  fotoCount = Math.max(0, fotoCount - 1);
+  fotoResult.textContent = `Tahmini: ${fotoCount} çivi (elle düzeltildi)`;
+});
+document.getElementById('fotoLogBtn').addEventListener('click', () => {
+  if (!fotoCount) { fotoResult.textContent = 'Kaydedilecek sayım yok.'; return; }
+  addLog(`📸 Fotoğrafla sayım: ${fotoCount} ipsiz çivi`);
+  fotoResult.textContent = `✅ Notlara kaydedildi: ${fotoCount} çivi`;
 });
 
 // ---- Cihazlar arası senkronizasyon: birden fazla ücretsiz servisi otomatik
