@@ -618,7 +618,7 @@ window.addEventListener('error', function (e) {
 
 <h1>🔩 Çivi Sayacı</h1>
 <div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
-<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-18 · 23</div>
+<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-18 · 24</div>
 
 <div class="tabs" id="tabNav">
   <button class="tab-btn active" id="tabBtnCounter" data-tab="counter">🔩 Sayaç</button>
@@ -693,8 +693,9 @@ window.addEventListener('error', function (e) {
       <button class="preset-btn" data-vwpreset="high" type="button">Çok Hassas</button>
     </div>
     <label style="font-size:0.8rem; color:#98a2b8; display:flex; justify-content:space-between; margin-top:12px;">Algılama aralığı (saniye) <span id="vwCooldownVal">0.3</span></label>
-    <input type="range" id="vwCooldownSlider" min="0.1" max="0.8" value="0.3" step="0.05" style="width:100%;">
+    <input type="range" id="vwCooldownSlider" min="0.1" max="2" value="0.3" step="0.05" style="width:100%;">
     <button class="camera-toggle" id="vwCalibBtn" style="margin-top:12px;">🎯 Yandan Atış Kalibrasyonu Başlat</button>
+    <div id="vwCalibStatus" style="font-size:0.75rem; color:#98a2b8; text-align:center; margin-top:6px; min-height:1em; line-height:1.4;"></div>
   </div>
   <div id="viewerCmdDiag" style="font-size:0.72rem; color:#98a2b8; margin-top:8px; text-align:center; min-height:1em;"></div>
   <div id="viewerAiNote" style="display:none; font-size:0.75rem; color:#ffb020; margin-top:8px; text-align:center; line-height:1.4;"></div>
@@ -829,7 +830,10 @@ window.addEventListener('error', function (e) {
 
 <div class="wake-status" id="wakeStatus"></div>
 
-<div class="settings" id="motionSettings">
+<!-- Ayar paneli telefonda artık gösterilmiyor: tüm ayarlar iPad'deki
+     Uzaktan Kontrol panelinden yapılır (telefon salt sensör). Panel DOM'da
+     kalır çünkü ayar değerleri buradaki gizli kaydırıcılarda tutuluyor. -->
+<div class="settings" id="motionSettings" style="display:none;">
   <div class="stats-title">📷 Algılama Ayarları (Manuel)</div>
   <button class="camera-toggle" id="calibBtn" style="margin-bottom:6px;">🎯 Yandan Atış Kalibrasyonu</button>
   <div id="calibStatus" style="font-size:0.75rem; color:#98a2b8; text-align:center; margin-bottom:10px; min-height:1em; line-height:1.4;"></div>
@@ -841,14 +845,14 @@ window.addEventListener('error', function (e) {
     <button class="preset-btn active" id="presetHigh" data-preset="high" type="button">Çok Hassas</button>
   </div>
   <label style="margin-top:14px;">Algılama aralığı (saniye) <span id="motionCooldownVal">0.3</span></label>
-  <input type="range" id="motionCooldownSlider" min="0.1" max="0.8" value="0.3" step="0.05">
+  <input type="range" id="motionCooldownSlider" min="0.1" max="2" value="0.3" step="0.05">
 </div>
 
 <div class="hint" id="hintBox">
   Kamerayı aç, telefonu kutunun ağzına yakın ve sabit tut. Yeşil köşeli çerçeve algılanan alanı gösterir; algılama, kamera açılır açılmaz bu alanda otomatik ve hassas şekilde başlar.<br><br>
   Alan otomatik konumu tam uymuyorsa video üzerindeki "✏️ Elle Çiz" ile kutunun ağzını parmağınla çizip kendi alanını tanımlayabilirsin — çizdiğin alan hatırlanır, "🎯 Otomatik Alan"a basarak istediğin zaman geri dönebilirsin.<br><br>
-  Ekrandaki "Hareket seviyesi" sayısını izle: birkaç çivi at, hangi değerlere çıktığını gör, sonra "Hareket hassasiyeti" kaydırıcısını veya hazır ayarlardan birini (Az Hassas / Orta / Çok Hassas) seç.<br><br>
-  <b>Yandan atışlar için:</b> "Çok Hassas"ı seç (algılayıcı artık hızlı/bulanık geçişleri de görüyor) ve "✏️ Elle Çiz" ile alanı kutunun ağzından biraz DAHA GENİŞ çiz — çivinin uçuş yolu da alana girsin ki kamera onu daha uzun süre görsün.<br><br>
+  Hassasiyet, algılama aralığı ve kalibrasyon ayarlarının hepsi izleyen cihazdaki (iPad) "🎮 Uzaktan Kontrol" panelinde — oradan değiştirdiğin her şey anında bu telefona uygulanır. Telefonda ayar yapmana gerek yok.<br><br>
+  <b>Yandan atışlar için:</b> iPad'den "Çok Hassas"ı seç (algılayıcı hızlı/bulanık geçişleri de görüyor) ve "✏️ Elle Çiz" ile alanı kutunun ağzından biraz DAHA GENİŞ çiz — çivinin uçuş yolu da alana girsin ki kamera onu daha uzun süre görsün.<br><br>
   Yanlış sayımları her zaman +1 / −1 ile elle düzeltebilirsin. Ne yaptığın "Notlar" sekmesine otomatik olarak kaydediliyor.
 </div>
 
@@ -1447,7 +1451,7 @@ function applyDetectSettings(thresh, cooldownMs, source) {
     document.querySelectorAll('#motionSettings .preset-btn').forEach(b => b.classList.remove('active'));
     parts.push('hassasiyet %' + thresh);
   }
-  if (typeof cooldownMs === 'number' && cooldownMs >= 100 && cooldownMs <= 800) {
+  if (typeof cooldownMs === 'number' && cooldownMs >= 100 && cooldownMs <= 2000) {
     motionCooldown = cooldownMs;
     motionCooldownSlider.value = (cooldownMs / 1000).toFixed(2).replace(/0$/, '');
     motionCooldownVal.textContent = motionCooldownSlider.value;
@@ -1587,6 +1591,7 @@ function finishCalibration() {
     calibStatusEl.textContent = '❌ Hiç atış göremedim. Kamera o bölgeyi fiziksel olarak görmüyor olabilir: kamerayı kutuya yaklaştır/açıyı değiştir ve "✏️ Elle Çiz" ile alanı atış yolunu da kapsayacak şekilde GENİŞ çiz, sonra tekrar dene.';
     addLog('🎯 Kalibrasyon: hiç atış algılanamadı (kamera açısı/alan sorunu olabilir)');
     if (prefs.voice) speak('Hiç atış göremedim. Kamerayı yaklaştırıp alanı genişletmeyi dene.');
+    pushSyncIfBroadcasting(); // sonuç iPad'de de görünsün
     return;
   }
   const minPeak = Math.min.apply(null, peaks);
@@ -1598,6 +1603,7 @@ function finishCalibration() {
   calibStatusEl.textContent = '✅ ' + peaks.length + ' atış gördüm (zirveler: ' + peaks.map(p => p.toFixed(2)).join(', ') + '). Hassasiyet otomatik olarak ' + newThr + ' yapıldı — en zayıf atışın bile yakalanır.';
   addLog('🎯 Kalibrasyon: ' + peaks.length + ' atış ölçüldü, hassasiyet ' + newThr + ' yapıldı');
   if (prefs.voice) speak(peaks.length + ' atış gördüm. Hassasiyeti ayarladım.');
+  pushSyncIfBroadcasting(); // yeni hassasiyet ve sonuç yazısı iPad'e gitsin
 }
 
 // Kalibrasyon hem telefondaki düğmeden hem uzaktan (iPad) başlatılabilir.
@@ -2932,8 +2938,10 @@ const VIEWER_HIDE_IDS = [
   'statusRow', 'gozcuLine', 'soundToggle', 'voiceToggle', 'speakCountBtn', 'cameraBtn',
   'videoWrap', 'roiControls', 'motionToggle', 'motionMeterWrap', 'motionLevelReadout',
   'manualRow', 'resetBtn', 'reportBtn', 'wakeStatus',
-  'motionSettings', 'hintBox'
+  'hintBox'
 ];
+// NOT: motionSettings bu listede DEĞİL — telefonda da kalıcı olarak gizli
+// (inline display:none); setViewerModeUI onu yanlışlıkla açmasın.
 
 // Analiz panelleri: telefonda gizli (varsayılan display:none), sadece
 // izleyen cihazda (iPad) gösterilir. İstatistikler paneli kullanıcı isteğiyle
@@ -2974,7 +2982,8 @@ function buildSyncPayload() {
     aiNote: (gozcuNote && Date.now() - gozcuNote.ts < 10 * 60 * 1000) ? gozcuNote : null,
     // Telefonun anlık algılama ayarları — iPad'deki ayar kaydırıcıları
     // gerçek değeri göstersin diye gönderilir.
-    det: { thresh: motionThreshold, cooldownMs: motionCooldown, calib: calibActive },
+    det: { thresh: motionThreshold, cooldownMs: motionCooldown, calib: calibActive,
+           calibMsg: calibStatusEl ? calibStatusEl.textContent : '' },
     updatedAt: Date.now()
   };
 }
@@ -3460,7 +3469,13 @@ document.getElementById('vwCalibBtn').addEventListener('click', () => {
 
 // Telefondan gelen gerçek ayar değerleriyle izleyici kaydırıcılarını eşitle.
 function vwSyncDetectFromRemote(det) {
-  if (!det || Date.now() - vwLocalChangeAt < 5000) return;
+  if (!det) return;
+  // Kalibrasyon durum yazısı her zaman güncellenir (kaydırıcılardan bağımsız).
+  const vcs = document.getElementById('vwCalibStatus');
+  if (vcs && typeof det.calibMsg === 'string' && vcs.textContent !== det.calibMsg) {
+    vcs.textContent = det.calibMsg;
+  }
+  if (Date.now() - vwLocalChangeAt < 5000) return;
   if (typeof det.thresh === 'number' && parseFloat(vwThreshSlider.value) !== det.thresh) {
     vwThreshSlider.value = det.thresh;
     vwThreshVal.textContent = det.thresh;
