@@ -618,7 +618,7 @@ window.addEventListener('error', function (e) {
 
 <h1>🔩 Çivi Sayacı</h1>
 <div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
-<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-17 · 22</div>
+<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-18 · 23</div>
 
 <div class="tabs" id="tabNav">
   <button class="tab-btn active" id="tabBtnCounter" data-tab="counter">🔩 Sayaç</button>
@@ -682,6 +682,19 @@ window.addEventListener('error', function (e) {
   <div class="row" style="margin-bottom:0;">
     <button id="viewerMinusBtn">−1</button>
     <button id="viewerPlusBtn">+1</button>
+  </div>
+  <div style="margin-top:14px; border-top:1px solid rgba(255,255,255,0.1); padding-top:12px;">
+    <div style="font-size:0.82rem; color:#98a2b8; margin-bottom:8px;">📷 Algılama Ayarları — buradan değiştir, telefona anında uygulanır</div>
+    <label style="font-size:0.8rem; color:#98a2b8; display:flex; justify-content:space-between;">Hareket hassasiyeti <span id="vwThreshVal">2</span></label>
+    <input type="range" id="vwThreshSlider" min="0.1" max="20" value="2" step="0.1" style="width:100%;">
+    <div class="preset-row" id="vwPresetRow" style="margin-top:6px;">
+      <button class="preset-btn" data-vwpreset="low" type="button">Az Hassas</button>
+      <button class="preset-btn" data-vwpreset="mid" type="button">Orta</button>
+      <button class="preset-btn" data-vwpreset="high" type="button">Çok Hassas</button>
+    </div>
+    <label style="font-size:0.8rem; color:#98a2b8; display:flex; justify-content:space-between; margin-top:12px;">Algılama aralığı (saniye) <span id="vwCooldownVal">0.3</span></label>
+    <input type="range" id="vwCooldownSlider" min="0.1" max="0.8" value="0.3" step="0.05" style="width:100%;">
+    <button class="camera-toggle" id="vwCalibBtn" style="margin-top:12px;">🎯 Yandan Atış Kalibrasyonu Başlat</button>
   </div>
   <div id="viewerCmdDiag" style="font-size:0.72rem; color:#98a2b8; margin-top:8px; text-align:center; min-height:1em;"></div>
   <div id="viewerAiNote" style="display:none; font-size:0.75rem; color:#ffb020; margin-top:8px; text-align:center; line-height:1.4;"></div>
@@ -827,8 +840,8 @@ window.addEventListener('error', function (e) {
     <button class="preset-btn" id="presetMid" data-preset="mid" type="button">Orta</button>
     <button class="preset-btn active" id="presetHigh" data-preset="high" type="button">Çok Hassas</button>
   </div>
-  <label style="margin-top:14px;">Algılama aralığı (ms) <span id="motionCooldownVal">300</span></label>
-  <input type="range" id="motionCooldownSlider" min="100" max="800" value="300" step="10">
+  <label style="margin-top:14px;">Algılama aralığı (saniye) <span id="motionCooldownVal">0.3</span></label>
+  <input type="range" id="motionCooldownSlider" min="0.1" max="0.8" value="0.3" step="0.05">
 </div>
 
 <div class="hint" id="hintBox">
@@ -1417,10 +1430,31 @@ motionThreshSlider.addEventListener('input', () => {
   motionThreshVal.textContent = motionThreshold;
   document.querySelectorAll('#motionSettings .preset-btn').forEach(b => b.classList.remove('active'));
 });
+// Kaydırıcı saniye cinsinden; içeride ms olarak tutulur.
 motionCooldownSlider.addEventListener('input', () => {
-  motionCooldown = parseInt(motionCooldownSlider.value);
-  motionCooldownVal.textContent = motionCooldown;
+  motionCooldown = Math.round(parseFloat(motionCooldownSlider.value) * 1000);
+  motionCooldownVal.textContent = motionCooldownSlider.value;
 });
+
+// Uzaktan (iPad) gelen algılama ayarlarını telefona uygular ve arayüzü
+// eşitler — telefondaki kaydırıcılar da yeni değeri gösterir.
+function applyDetectSettings(thresh, cooldownMs, source) {
+  const parts = [];
+  if (typeof thresh === 'number' && thresh >= 0.1 && thresh <= 20) {
+    motionThreshold = thresh;
+    motionThreshSlider.value = thresh;
+    motionThreshVal.textContent = thresh;
+    document.querySelectorAll('#motionSettings .preset-btn').forEach(b => b.classList.remove('active'));
+    parts.push('hassasiyet %' + thresh);
+  }
+  if (typeof cooldownMs === 'number' && cooldownMs >= 100 && cooldownMs <= 800) {
+    motionCooldown = cooldownMs;
+    motionCooldownSlider.value = (cooldownMs / 1000).toFixed(2).replace(/0$/, '');
+    motionCooldownVal.textContent = motionCooldownSlider.value;
+    parts.push('aralık ' + (cooldownMs / 1000) + ' sn');
+  }
+  if (parts.length) addLog('Algılama ayarı güncellendi (' + source + '): ' + parts.join(', '));
+}
 
 // Returns percentage (0-100) of pixels whose brightness changed sharply
 // since the previous frame. Far more sensitive to a small, fast-moving
@@ -1566,7 +1600,8 @@ function finishCalibration() {
   if (prefs.voice) speak(peaks.length + ' atış gördüm. Hassasiyeti ayarladım.');
 }
 
-document.getElementById('calibBtn').addEventListener('click', () => {
+// Kalibrasyon hem telefondaki düğmeden hem uzaktan (iPad) başlatılabilir.
+function startCalibrationRun(source) {
   if (!motionListening) {
     calibStatusEl.textContent = '⚠️ Önce kamerayı aç (algılama çalışıyor olmalı).';
     return;
@@ -1577,8 +1612,9 @@ document.getElementById('calibBtn').addEventListener('click', () => {
   calibUntil = performance.now() + 12000;
   calibStatusEl.textContent = '🎯 Başladı! 12 saniye içinde birkaç YANDAN atış yap...';
   if (prefs.voice) speak('Kalibrasyon başladı. Yandan atışlarını yap.');
-  addLog('🎯 Yandan atış kalibrasyonu başlatıldı');
-});
+  addLog('🎯 Yandan atış kalibrasyonu başlatıldı' + (source ? ' (' + source + ')' : ''));
+}
+document.getElementById('calibBtn').addEventListener('click', () => startCalibrationRun(''));
 
 function motionDetectLoop() {
   if (!motionListening) return;
@@ -2936,6 +2972,9 @@ function buildSyncPayload() {
     detecting: motionListening && !motionPaused,
     days: trimmedDays,
     aiNote: (gozcuNote && Date.now() - gozcuNote.ts < 10 * 60 * 1000) ? gozcuNote : null,
+    // Telefonun anlık algılama ayarları — iPad'deki ayar kaydırıcıları
+    // gerçek değeri göstersin diye gönderilir.
+    det: { thresh: motionThreshold, cooldownMs: motionCooldown, calib: calibActive },
     updatedAt: Date.now()
   };
 }
@@ -3107,6 +3146,15 @@ function handleRemoteCommand(cmd) {
     scheduleCloudPush();
     addLog('Ayarlar izleyen cihazdan güncellendi (hedef/ücret)');
   }
+  else if (cmd.action === 'setDetect') {
+    // iPad'deki hassasiyet/aralık kaydırıcıları telefona uygulanır.
+    applyDetectSettings(cmd.thresh, cmd.cooldownMs, 'iPad');
+    pushSyncIfBroadcasting(); // iPad onaylı güncel değeri hemen geri görsün
+  }
+  else if (cmd.action === 'calib') {
+    startCalibrationRun('iPad\'ten');
+    pushSyncIfBroadcasting();
+  }
 }
 
 function startCommandListener(topicId) {
@@ -3250,6 +3298,7 @@ function renderRemoteStats(data) {
   const sld = document.getElementById('syncLastData');
   if (sld) sld.textContent = 'son veri: ' + new Date().toLocaleTimeString('tr-TR');
   updateViewerControls(data);
+  vwSyncDetectFromRemote(data.det);
   // Telefonun Akıllı Gözcü uyarısını izleyende de göster.
   const ain = document.getElementById('viewerAiNote');
   if (ain) {
@@ -3320,12 +3369,13 @@ function updateViewerControls(data) {
   }
 }
 
-async function sendRemoteCommand(action) {
+async function sendRemoteCommand(action, extra) {
   if (!syncBucketId || syncWatchProviderKey !== 'ntfy') return;
+  const msg = Object.assign({ action, ts: Date.now() }, extra || {});
   // Doğrudan bağlantı varsa komut oradan gider: anında ve hız sınırsız.
   if (p2pWatchConn && p2pWatchConn.open) {
     try {
-      p2pWatchConn.send({ action, ts: Date.now() });
+      p2pWatchConn.send(msg);
       viewerCmdDiag.textContent = '✅ Gönderildi ⚡';
       setTimeout(() => { if (viewerCmdDiag.textContent === '✅ Gönderildi ⚡') viewerCmdDiag.textContent = ''; }, 1500);
       return;
@@ -3335,7 +3385,7 @@ async function sendRemoteCommand(action) {
   try {
     const res = await fetch(`https://ntfy.sh/${syncBucketId}-cmd`, {
       method: 'POST',
-      body: JSON.stringify({ action, ts: Date.now() })
+      body: JSON.stringify(msg)
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     viewerCmdDiag.textContent = '✅ Gönderildi';
@@ -3364,6 +3414,65 @@ viewerPauseBtn.addEventListener('click', () => {
 });
 viewerPlusBtn.addEventListener('click', () => sendRemoteCommand('inc'));
 viewerMinusBtn.addEventListener('click', () => sendRemoteCommand('dec'));
+
+// ---- İzleyen cihazdaki algılama ayarları: değişince telefona gönderilir;
+// telefondan gelen veri de (kullanıcı o an oynatmıyorsa) kaydırıcıları
+// gerçek değerle eşitler. ----
+const vwThreshSlider = document.getElementById('vwThreshSlider');
+const vwThreshVal = document.getElementById('vwThreshVal');
+const vwCooldownSlider = document.getElementById('vwCooldownSlider');
+const vwCooldownVal = document.getElementById('vwCooldownVal');
+let vwLocalChangeAt = 0; // son yerel dokunuş — gelen veri üstüne yazmasın
+
+function vwSendDetect() {
+  vwLocalChangeAt = Date.now();
+  sendRemoteCommand('setDetect', {
+    thresh: parseFloat(vwThreshSlider.value),
+    cooldownMs: Math.round(parseFloat(vwCooldownSlider.value) * 1000)
+  });
+}
+vwThreshSlider.addEventListener('input', () => {
+  vwLocalChangeAt = Date.now();
+  vwThreshVal.textContent = vwThreshSlider.value;
+  document.querySelectorAll('#vwPresetRow .preset-btn').forEach(b => b.classList.remove('active'));
+});
+vwThreshSlider.addEventListener('change', vwSendDetect);
+vwCooldownSlider.addEventListener('input', () => {
+  vwLocalChangeAt = Date.now();
+  vwCooldownVal.textContent = vwCooldownSlider.value;
+});
+vwCooldownSlider.addEventListener('change', vwSendDetect);
+const VW_PRESETS = { low: 6, mid: 3, high: 1 };
+document.querySelectorAll('#vwPresetRow .preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const val = VW_PRESETS[btn.dataset.vwpreset];
+    if (val === undefined) return;
+    vwThreshSlider.value = val;
+    vwThreshVal.textContent = val;
+    document.querySelectorAll('#vwPresetRow .preset-btn').forEach(b => b.classList.toggle('active', b === btn));
+    vwSendDetect();
+  });
+});
+document.getElementById('vwCalibBtn').addEventListener('click', () => {
+  sendRemoteCommand('calib');
+  viewerCmdDiag.textContent = '🎯 Kalibrasyon başlatıldı — 12 saniye içinde telefondaki kutuya birkaç YANDAN atış yap.';
+});
+
+// Telefondan gelen gerçek ayar değerleriyle izleyici kaydırıcılarını eşitle.
+function vwSyncDetectFromRemote(det) {
+  if (!det || Date.now() - vwLocalChangeAt < 5000) return;
+  if (typeof det.thresh === 'number' && parseFloat(vwThreshSlider.value) !== det.thresh) {
+    vwThreshSlider.value = det.thresh;
+    vwThreshVal.textContent = det.thresh;
+  }
+  if (typeof det.cooldownMs === 'number') {
+    const s = det.cooldownMs / 1000;
+    if (parseFloat(vwCooldownSlider.value) !== s) {
+      vwCooldownSlider.value = s;
+      vwCooldownVal.textContent = s;
+    }
+  }
+}
 
 // ---- İzleme: ntfy için canlı akış (SSE), jsonblob için yoklama.
 // Saniyede bir yoklama ntfy'nin istek sınırına takılıp HTTP 429 hatası
