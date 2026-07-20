@@ -70,6 +70,12 @@
     transition: transform 0.15s ease;
   }
   .counter-box.pulse { transform: scale(1.06); }
+  /* İzleyen cihazda (iPad) her yeni çivi onayında sayacın etrafında flaş */
+  @keyframes vwFlashAnim {
+    0%   { box-shadow: 0 0 70px 14px rgba(255,220,90,0.95), inset 0 0 50px rgba(255,220,90,0.65); border-color: rgba(255,230,140,0.95); }
+    100% { box-shadow: 0 10px 40px rgba(240,165,0,0.14), inset 0 1px 0 rgba(255,255,255,0.07); border-color: rgba(255,176,32,0.35); }
+  }
+  .counter-box.vw-flash { animation: vwFlashAnim 0.45s ease-out; }
   #count {
     font-size: 5rem;
     font-weight: 800;
@@ -618,7 +624,7 @@ window.addEventListener('error', function (e) {
 
 <h1>🔩 Çivi Sayacı</h1>
 <div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
-<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-18 · 24</div>
+<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-18 · 25</div>
 
 <div class="tabs" id="tabNav">
   <button class="tab-btn active" id="tabBtnCounter" data-tab="counter">🔩 Sayaç</button>
@@ -674,6 +680,8 @@ window.addEventListener('error', function (e) {
 <div class="counter-box" id="counterBox">
   <div id="count">0</div>
   <div class="label">çivi</div>
+  <!-- Sadece izleyen cihazda: telefonun şarjı ve ısınma durumu -->
+  <div id="viewerDeviceInfo" style="display:none; font-size:0.78rem; color:#9aa5b1; margin-top:10px;"></div>
 </div>
 
 <div class="stats-panel" id="viewerControls" style="display:none;">
@@ -1622,6 +1630,38 @@ function startCalibrationRun(source) {
 }
 document.getElementById('calibBtn').addEventListener('click', () => startCalibrationRun(''));
 
+// ---- 🔋 Pil ve 🌡 ısınma göstergesi (iPad'e gönderilir) ----
+// Pil: tarayıcının pil arayüzünden anlık yüzde + şarjda mı bilgisi.
+let batInfo = null;
+if (navigator.getBattery) {
+  navigator.getBattery().then((b) => {
+    const upd = () => { batInfo = { pct: Math.round(b.level * 100), charging: b.charging }; };
+    upd();
+    b.addEventListener('levelchange', upd);
+    b.addEventListener('chargingchange', upd);
+  }).catch(() => { /* pil bilgisi yoksa gösterilmez */ });
+}
+// Isınma: tarayıcılar telefonun termometresine güvenlik gereği HİÇBİR
+// siteye açmaz — doğrudan derece okunamaz. Onun yerine ısınmanın en
+// güvenilir dışa vuran belirtisi kullanılır: telefon ısınınca kendini
+// yavaşlatır ve analiz kare hızı düşer. Hedef ~25 kare/sn; belirgin
+// düşüş "ısınıyor" işaretidir. 5 dakikada bir değerlendirilir.
+let heatFrames = 0;
+let heatWinStart = performance.now();
+let heatInfo = null;
+setInterval(() => {
+  const elapsed = (performance.now() - heatWinStart) / 1000;
+  const frames = heatFrames;
+  heatFrames = 0;
+  heatWinStart = performance.now();
+  if (!motionListening || elapsed < 240) return; // kamera kapalı ya da pencere eksikse ölçme
+  const fps = frames / elapsed;
+  const state = fps >= 19 ? 'Serin' : fps >= 13 ? 'Ilık' : 'Sıcak olabilir';
+  heatInfo = { fps: Math.round(fps), state, at: Date.now() };
+  if (state !== 'Serin') addLog('🌡 Isınma göstergesi: ' + state + ' (' + Math.round(fps) + ' kare/sn)');
+  pushSyncIfBroadcasting(); // 5 dakikalık ölçüm iPad'e gitsin
+}, 5 * 60 * 1000);
+
 function motionDetectLoop() {
   if (!motionListening) return;
   // Isınma önlemi: analiz en fazla ~25 kare/sn (ekran 60fps yenilense bile).
@@ -1633,6 +1673,7 @@ function motionDetectLoop() {
     return;
   }
   lastAnalysisAt = nowMs;
+  heatFrames++; // ısınma göstergesi için gerçekleşen analiz karesi sayılır
   const level = computeMotionLevel();
   const displayLevel = Math.min(100, (level / 25) * 100);
   motionMeter.style.width = displayLevel + '%';
@@ -1685,6 +1726,9 @@ function startMotionDetection() {
   motionArmed = true;
   motionPaused = false;
   motionListening = true;
+  // Isınma ölçüm penceresi temiz başlasın (kapalı geçen süre karışmasın)
+  heatFrames = 0;
+  heatWinStart = performance.now();
   motionMeterWrap.style.display = 'block';
   motionLevelReadout.style.display = 'block';
   if (gozcuLine) { gozcuLine.style.display = 'block'; gozcuLine.textContent = '🤖 Gözcü: izliyor'; }
@@ -2947,7 +2991,7 @@ const VIEWER_HIDE_IDS = [
 // izleyen cihazda (iPad) gösterilir. İstatistikler paneli kullanıcı isteğiyle
 // arka planda tutuluyor (ekranda gösterilmiyor); veriler yine hesaplanıp gece
 // Telegram raporunda gönderiliyor. Hedef ve kazanç panelleri iPad'te kalır.
-const VIEWER_SHOW_IDS = ['goalPanel', 'earnPanel', 'weekChartPanel'];
+const VIEWER_SHOW_IDS = ['goalPanel', 'earnPanel', 'weekChartPanel', 'viewerDeviceInfo'];
 
 function setViewerModeUI(isViewer) {
   VIEWER_HIDE_IDS.forEach(id => {
@@ -2984,6 +3028,8 @@ function buildSyncPayload() {
     // gerçek değeri göstersin diye gönderilir.
     det: { thresh: motionThreshold, cooldownMs: motionCooldown, calib: calibActive,
            calibMsg: calibStatusEl ? calibStatusEl.textContent : '' },
+    bat: batInfo,   // telefonun anlık şarjı (yüzde + şarjda mı)
+    heat: heatInfo, // 5 dakikalık ısınma göstergesi (kare hızına dayalı)
     updatedAt: Date.now()
   };
 }
@@ -3299,11 +3345,31 @@ async function pollRemoteStats(force) {
 let lastRemoteState = null;
 
 function renderRemoteStats(data) {
+  const prevCount = lastRemoteState ? (lastRemoteState.count || 0) : null;
   lastRemoteState = data;
   lastRemoteDataAt = Date.now();
   count = data.count || 0;
   countEl.textContent = count;
   videoBadge.textContent = count;
+  // Her yeni çivi onayında sayacın etrafında flaş patlat.
+  if (prevCount !== null && count > prevCount) {
+    const box = document.getElementById('counterBox');
+    box.classList.remove('vw-flash');
+    void box.offsetWidth; // animasyonu baştan tetiklemek için akışı zorla
+    box.classList.add('vw-flash');
+  }
+  // Telefonun şarjı ve ısınma durumu — sayının hemen altında küçük yazı.
+  const vdi = document.getElementById('viewerDeviceInfo');
+  if (vdi) {
+    const parts = [];
+    if (data.bat && typeof data.bat.pct === 'number') {
+      parts.push('🔋 %' + data.bat.pct + (data.bat.charging ? ' ⚡şarjda' : ''));
+    }
+    if (data.heat && data.heat.state) {
+      parts.push('🌡 ' + data.heat.state);
+    }
+    vdi.textContent = parts.join('  ·  ') || '🔋 telefon verisi bekleniyor…';
+  }
   const sld = document.getElementById('syncLastData');
   if (sld) sld.textContent = 'son veri: ' + new Date().toLocaleTimeString('tr-TR');
   updateViewerControls(data);
