@@ -50,11 +50,18 @@
       "batches": 39
     },
     "2026-07-20": {
-      "nails": 145,
-      "workMs": 2668000,
+      "nails": 2045,
+      "workMs": 29793000,
       "firstTs": 1784536489636,
-      "lastTs": 1784539167676,
-      "batches": 2
+      "lastTs": 1784578996410,
+      "batches": 41
+    },
+    "2026-07-21": {
+      "nails": 171,
+      "workMs": 2199000,
+      "firstTs": 1784614616411,
+      "lastTs": 1784616943619,
+      "batches": 3
     }
   },
   "sent": [
@@ -72,5 +79,5 @@
   ],
   "rate": 3,
   "rateUnit": "each",
-  "goal": 770
+  "goal": 1706
 }
