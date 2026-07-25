@@ -624,7 +624,7 @@ window.addEventListener('error', function (e) {
 
 <h1>🔩 Çivi Sayacı</h1>
 <div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
-<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-18 · 25</div>
+<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-20 · 26</div>
 
 <div class="tabs" id="tabNav">
   <button class="tab-btn active" id="tabBtnCounter" data-tab="counter">🔩 Sayaç</button>
@@ -701,7 +701,7 @@ window.addEventListener('error', function (e) {
       <button class="preset-btn" data-vwpreset="high" type="button">Çok Hassas</button>
     </div>
     <label style="font-size:0.8rem; color:#98a2b8; display:flex; justify-content:space-between; margin-top:12px;">Algılama aralığı (saniye) <span id="vwCooldownVal">0.3</span></label>
-    <input type="range" id="vwCooldownSlider" min="0.1" max="2" value="0.3" step="0.05" style="width:100%;">
+    <input type="range" id="vwCooldownSlider" min="0.1" max="5" value="0.3" step="0.05" style="width:100%;">
     <button class="camera-toggle" id="vwCalibBtn" style="margin-top:12px;">🎯 Yandan Atış Kalibrasyonu Başlat</button>
     <div id="vwCalibStatus" style="font-size:0.75rem; color:#98a2b8; text-align:center; margin-top:6px; min-height:1em; line-height:1.4;"></div>
   </div>
@@ -853,7 +853,7 @@ window.addEventListener('error', function (e) {
     <button class="preset-btn active" id="presetHigh" data-preset="high" type="button">Çok Hassas</button>
   </div>
   <label style="margin-top:14px;">Algılama aralığı (saniye) <span id="motionCooldownVal">0.3</span></label>
-  <input type="range" id="motionCooldownSlider" min="0.1" max="2" value="0.3" step="0.05">
+  <input type="range" id="motionCooldownSlider" min="0.1" max="5" value="0.3" step="0.05">
 </div>
 
 <div class="hint" id="hintBox">
@@ -1459,7 +1459,7 @@ function applyDetectSettings(thresh, cooldownMs, source) {
     document.querySelectorAll('#motionSettings .preset-btn').forEach(b => b.classList.remove('active'));
     parts.push('hassasiyet %' + thresh);
   }
-  if (typeof cooldownMs === 'number' && cooldownMs >= 100 && cooldownMs <= 2000) {
+  if (typeof cooldownMs === 'number' && cooldownMs >= 100 && cooldownMs <= 5000) {
     motionCooldown = cooldownMs;
     motionCooldownSlider.value = (cooldownMs / 1000).toFixed(2).replace(/0$/, '');
     motionCooldownVal.textContent = motionCooldownSlider.value;
@@ -1825,9 +1825,47 @@ function updateCount(delta, source) {
   updateStats();
   updateGoalAndEarnings();
   renderWeekChart();
+  saveCounterState(); // sayfa yenilense bile sayı kaybolmasın
   if (navigator.vibrate) navigator.vibrate(40);
   pushSyncIfBroadcasting();
 }
+
+// ---- Sayaç kalıcılığı: sayfa yanlışlıkla yenilense de, gece yarısı (00:00)
+// geçse de sayı ve tur geçmişi KAYBOLMAZ; yalnızca kullanıcı "Sıfırla"ya
+// basınca temizlenir. ----
+const COUNTER_STORAGE_KEY = 'civiSayaciSayacDurumu';
+
+function saveCounterState() {
+  try {
+    localStorage.setItem(COUNTER_STORAGE_KEY, JSON.stringify({
+      count,
+      nailTimestamps: nailTimestamps.slice(-3000),
+      batchTimes,
+      lastBatchMark
+    }));
+  } catch (e) { /* depolama dolu/kapalıysa sessizce geç */ }
+}
+
+function loadCounterState() {
+  try {
+    const raw = localStorage.getItem(COUNTER_STORAGE_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (typeof s.count !== 'number' || s.count <= 0) return;
+    count = s.count;
+    nailTimestamps = Array.isArray(s.nailTimestamps) ? s.nailTimestamps : [];
+    batchTimes = Array.isArray(s.batchTimes) ? s.batchTimes : [];
+    lastBatchMark = s.lastBatchMark || 0;
+    countEl.textContent = count;
+    videoBadge.textContent = count;
+    renderBatchHistory();
+    updateStats();
+    addLog(`Sayaç geri yüklendi: ${count} çivi (sayfa yenilendi, sayı korundu)`);
+  } catch (e) { /* bozuk kayıt: sıfırdan devam */ }
+}
+// Not defteri (loadNotes) yüklendikten SONRA çalışsın diye ertelenir —
+// yoksa geri yükleme kaydı notlara yazılamadan üzerine yazılırdı.
+setTimeout(loadCounterState, 0);
 
 document.getElementById('plusBtn').addEventListener('click', () => updateCount(1, 'manuel +1'));
 document.getElementById('minusBtn').addEventListener('click', () => updateCount(-1, 'manuel -1'));
@@ -1839,6 +1877,7 @@ document.getElementById('resetBtn').addEventListener('click', () => {
     nailTimestamps = [];
     batchTimes = [];
     lastBatchMark = 0;
+    try { localStorage.removeItem(COUNTER_STORAGE_KEY); } catch (e) {}
     renderBatchHistory();
     updateStats();
     pushSyncIfBroadcasting();
