@@ -64,11 +64,18 @@
       "batches": 36
     },
     "2026-07-24": {
-      "nails": 95,
-      "workMs": 1314000,
+      "nails": 450,
+      "workMs": 5994000,
       "firstTs": 1784915569354,
-      "lastTs": 1784917299399,
-      "batches": 1
+      "lastTs": 1784923013457,
+      "batches": 9
+    },
+    "2026-07-25": {
+      "nails": 143,
+      "workMs": 2443000,
+      "firstTs": 1784963987891,
+      "lastTs": 1784966687983,
+      "batches": 2
     }
   },
   "sent": [
