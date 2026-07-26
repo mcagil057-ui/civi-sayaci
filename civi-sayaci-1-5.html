@@ -624,7 +624,7 @@ window.addEventListener('error', function (e) {
 
 <h1>🔩 Çivi Sayacı</h1>
 <div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
-<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-20 · 26</div>
+<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-25 · 27</div>
 
 <div class="tabs" id="tabNav">
   <button class="tab-btn active" id="tabBtnCounter" data-tab="counter">🔩 Sayaç</button>
@@ -704,6 +704,24 @@ window.addEventListener('error', function (e) {
     <input type="range" id="vwCooldownSlider" min="0.1" max="5" value="0.3" step="0.05" style="width:100%;">
     <button class="camera-toggle" id="vwCalibBtn" style="margin-top:12px;">🎯 Yandan Atış Kalibrasyonu Başlat</button>
     <div id="vwCalibStatus" style="font-size:0.75rem; color:#98a2b8; text-align:center; margin-top:6px; min-height:1em; line-height:1.4;"></div>
+  </div>
+  <div style="margin-top:14px; border-top:1px solid rgba(255,255,255,0.1); padding-top:12px;">
+    <div style="font-size:0.82rem; color:#98a2b8; margin-bottom:8px;">📷 Görüş Alanı</div>
+    <div class="preset-row" id="vwViewRow">
+      <button class="preset-btn active" id="vwViewNormalBtn" type="button">▭ Normal</button>
+      <button class="preset-btn" id="vwViewWideBtn" type="button">📐 Geniş</button>
+    </div>
+    <button class="camera-toggle" id="vwLiveBtn" style="margin-top:10px;">📺 Görüntüyü Göster (1 dk)</button>
+    <div id="vwLiveWrap" style="display:none; position:relative; margin-top:10px; border-radius:12px; overflow:hidden; touch-action:none; border:1px solid rgba(255,255,255,0.15);">
+      <video id="vwLiveVideo" autoplay playsinline muted style="width:100%; display:block;"></video>
+      <div id="vwRoiRect" style="display:none; position:absolute; border:2px dashed #ffb020; background:rgba(255,176,32,0.12); pointer-events:none;"></div>
+      <div id="vwLiveCount" style="position:absolute; top:6px; right:8px; background:rgba(0,0,0,0.55); color:#fff; font-size:0.72rem; padding:3px 8px; border-radius:8px;">60 sn</div>
+    </div>
+    <div class="preset-row" id="vwRoiRow" style="display:none; margin-top:8px;">
+      <button class="preset-btn" id="vwRoiAutoBtn" type="button">🎯 Otomatik Alan</button>
+      <button class="preset-btn" id="vwRoiDrawBtn" type="button">✏️ Elle Çiz</button>
+    </div>
+    <div id="vwLiveHint" style="display:none; font-size:0.72rem; color:#ffb020; margin-top:6px; text-align:center;">Görüntünün üzerinde parmağınla kutunun ağzını çiz</div>
   </div>
   <div id="viewerCmdDiag" style="font-size:0.72rem; color:#98a2b8; margin-top:8px; text-align:center; min-height:1em;"></div>
   <div id="viewerAiNote" style="display:none; font-size:0.75rem; color:#ffb020; margin-top:8px; text-align:center; line-height:1.4;"></div>
@@ -1181,6 +1199,7 @@ let camStream = null;
 
 async function toggleCamera() {
   if (cameraOn) {
+    if (typeof stopLiveShare === 'function') stopLiveShare(); // canlı görüntü açıksa kapat
     if (camStream) camStream.getTracks().forEach(t => t.stop());
     video.srcObject = null;
     videoWrap.classList.remove('show');
@@ -1302,8 +1321,35 @@ function saveRoi() {
   } catch (e) { /* depolama erişilemez olabilir, sessizce geç */ }
 }
 
+// Geniş görüş: iPad'deki "Geniş" düğmesi açar — algılama alanı neredeyse
+// tüm kareye yayılır (yandan atışların uçuş yolu da görülür). Donanım
+// destekliyorsa kameranın gerçek görüş açısı da genişletilir (zoom en aza).
+const WIDE_ROI = { x0: 0.02, y0: 0.02, x1: 0.98, y1: 0.98 };
+let wideViewOn = false;
+
 function activeRoi() {
+  if (wideViewOn) return WIDE_ROI;
   return (roiMode === 'manual' && manualRoi) ? manualRoi : DEFAULT_ROI;
+}
+
+function setWideView(on, source) {
+  wideViewOn = !!on;
+  try {
+    const track = camStream && camStream.getVideoTracks()[0];
+    if (track && track.getCapabilities) {
+      const caps = track.getCapabilities();
+      if (caps.zoom && typeof caps.zoom.min === 'number') {
+        const z = wideViewOn ? caps.zoom.min
+                             : Math.min(Math.max(1, caps.zoom.min), caps.zoom.max);
+        track.applyConstraints({ advanced: [{ zoom: z }] }).catch(() => {});
+      }
+    }
+  } catch (e) { /* zoom desteklenmiyorsa yalnızca alan genişler */ }
+  applyRoiToGuide();
+  recomputeVideoRect();
+  prevGray = null; // alan değişti: sahte tetikleme olmasın
+  addLog('Görüş alanı: ' + (wideViewOn ? 'GENİŞ' : 'normal') + (source ? ' (' + source + ')' : ''));
+  pushSyncIfBroadcasting();
 }
 
 function applyRoiToGuide() {
@@ -1313,7 +1359,8 @@ function applyRoiToGuide() {
   boxGuide.style.width = ((roi.x1 - roi.x0) * 100) + '%';
   boxGuide.style.height = ((roi.y1 - roi.y0) * 100) + '%';
   boxGuide.classList.toggle('manual', roiMode === 'manual');
-  guideLabel.textContent = roiMode === 'manual' ? 'Elle çizilen alan' : 'Otomatik alan';
+  guideLabel.textContent = wideViewOn ? 'Geniş alan'
+    : roiMode === 'manual' ? 'Elle çizilen alan' : 'Otomatik alan';
   roiAutoBtn.classList.toggle('active', roiMode === 'auto');
   roiManualBtn.classList.toggle('active', roiMode === 'manual');
 }
@@ -1339,6 +1386,22 @@ function roiToVideoRect(roi) {
 
 function recomputeVideoRect() {
   currentVideoRect = roiToVideoRect(activeRoi());
+}
+
+// iPad'den çizilen alan kameranın HAM karesi üzerinden oranlı gelir
+// (iPad canlı görüntüyü kırpmadan gösterir). Telefonda ROI ekran-oranlı
+// (object-fit:cover kırpmalı) tutulduğu için tersine çevrilir.
+function srcFracToWrapRoi(r) {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const cw = videoWrap.clientWidth, ch = videoWrap.clientHeight;
+  if (!vw || !vh || !cw || !ch) return null;
+  const scale = Math.max(cw / vw, ch / vh);
+  const offX = (vw * scale - cw) / 2;
+  const offY = (vh * scale - ch) / 2;
+  const clamp = (v) => Math.max(0, Math.min(1, v));
+  const fx = (f) => clamp((f * vw * scale - offX) / cw);
+  const fy = (f) => clamp((f * vh * scale - offY) / ch);
+  return { x0: fx(r.x0), y0: fy(r.y0), x1: fx(r.x1), y1: fy(r.y1) };
 }
 
 function setRoiMode(mode) {
@@ -3066,7 +3129,7 @@ function buildSyncPayload() {
     // Telefonun anlık algılama ayarları — iPad'deki ayar kaydırıcıları
     // gerçek değeri göstersin diye gönderilir.
     det: { thresh: motionThreshold, cooldownMs: motionCooldown, calib: calibActive,
-           calibMsg: calibStatusEl ? calibStatusEl.textContent : '' },
+           calibMsg: calibStatusEl ? calibStatusEl.textContent : '', wide: wideViewOn },
     bat: batInfo,   // telefonun anlık şarjı (yüzde + şarjda mı)
     heat: heatInfo, // 5 dakikalık ısınma göstergesi (kare hızına dayalı)
     updatedAt: Date.now()
@@ -3105,6 +3168,8 @@ async function pushSyncData() {
 let p2pPeer = null;          // yayıncının peer nesnesi
 let p2pConns = [];           // yayıncıya bağlı izleyici kanalları
 let p2pWatchConn = null;     // izleyicinin yayıncıya kanalı
+let p2pWatchPeer = null;     // izleyicinin kendi peer nesnesi (canlı görüntü araması için)
+let vwLiveCallRef = null;    // izleyicideki aktif canlı görüntü araması
 let p2pRetryTimer = null;
 
 function p2pPeerId(topic) { return 'cs-' + topic; }
@@ -3153,6 +3218,17 @@ function startP2PWatch(topic) {
   if (typeof Peer === 'undefined') return;
   try {
     const me = new Peer(); // rastgele kimlik
+    p2pWatchPeer = me;
+    // Telefon "Görüntüyü Göster" isteğine kamera akışıyla arama yaparak
+    // yanıt verir; izleyici aramayı kabul edip görüntüyü gösterir.
+    me.on('call', (call) => {
+      try {
+        call.answer(); // tek yönlü: iPad yalnızca izler
+        call.on('stream', (s) => showViewerLive(s));
+        call.on('close', () => hideViewerLive());
+        vwLiveCallRef = call;
+      } catch (e) { /* medya desteklenmiyorsa görüntü gösterilemez */ }
+    });
     me.on('open', () => {
       const conn = me.connect(p2pPeerId(topic));
       conn.on('open', () => {
@@ -3184,7 +3260,30 @@ function startP2PWatch(topic) {
   } catch (e) { /* sessiz */ }
 }
 
+// ---- 📺 Canlı görüntü: iPad "Görüntüyü Göster"e basınca telefon kamera
+// akışını doğrudan bağlantı (P2P) üzerinden 1 dakikalığına yollar. ----
+let liveShareTimer = null;
+let liveCalls = [];
+
+function startLiveShare() {
+  if (!cameraOn || !camStream) { addLog('📺 Canlı görüntü istendi ama kamera kapalı'); return; }
+  if (!p2pPeer || p2pConns.length === 0) { addLog('📺 Canlı görüntü istendi ama doğrudan bağlantı yok'); return; }
+  stopLiveShare();
+  p2pConns.forEach(c => {
+    try { liveCalls.push(p2pPeer.call(c.peer, camStream)); } catch (e) { /* kanal kopuk olabilir */ }
+  });
+  addLog('📺 Canlı görüntü iPad\'e 1 dakikalığına açıldı');
+  liveShareTimer = setTimeout(stopLiveShare, 65000);
+}
+
+function stopLiveShare() {
+  if (liveShareTimer) { clearTimeout(liveShareTimer); liveShareTimer = null; }
+  liveCalls.forEach(c => { try { c.close(); } catch (e) {} });
+  liveCalls = [];
+}
+
 function stopP2P() {
+  stopLiveShare();
   if (p2pRetryTimer) { clearTimeout(p2pRetryTimer); p2pRetryTimer = null; }
   p2pConns.forEach(c => { try { c.close(); } catch (e) {} });
   p2pConns = [];
@@ -3247,6 +3346,35 @@ function handleRemoteCommand(cmd) {
   }
   else if (cmd.action === 'calib') {
     startCalibrationRun('iPad\'ten');
+    pushSyncIfBroadcasting();
+  }
+  else if (cmd.action === 'setView') {
+    setWideView(!!cmd.wide, 'iPad');
+  }
+  else if (cmd.action === 'showCam') {
+    startLiveShare();
+  }
+  else if (cmd.action === 'setRoi') {
+    if (cmd.mode === 'auto') {
+      drawLayer.classList.remove('active');
+      roiHint.style.display = 'none';
+      setRoiMode('auto');
+      addLog('Algılama alanı iPad\'den otomatike döndürüldü');
+    } else if (cmd.mode === 'manual' && cmd.roi) {
+      const wr = srcFracToWrapRoi(cmd.roi);
+      if (wr && (wr.x1 - wr.x0) >= 0.05 && (wr.y1 - wr.y0) >= 0.05) {
+        manualRoi = wr;
+        roiMode = 'manual';
+        wideViewOn = false; // elle çizim geniş modu geçersiz kılar
+        applyRoiToGuide();
+        recomputeVideoRect();
+        saveRoi();
+        prevGray = null;
+        addLog('Algılama alanı iPad\'den çizildi');
+      } else {
+        addLog('iPad\'den gelen alan uygulanamadı (kamera kapalı ya da alan çok küçük)');
+      }
+    }
     pushSyncIfBroadcasting();
   }
 }
@@ -3572,6 +3700,125 @@ document.getElementById('vwCalibBtn').addEventListener('click', () => {
   viewerCmdDiag.textContent = '🎯 Kalibrasyon başlatıldı — 12 saniye içinde telefondaki kutuya birkaç YANDAN atış yap.';
 });
 
+// ---- 📷 Görüş Alanı (iPad): Geniş/Normal + canlı görüntü + alan çizme ----
+const vwViewWideBtn = document.getElementById('vwViewWideBtn');
+const vwViewNormalBtn = document.getElementById('vwViewNormalBtn');
+const vwLiveBtn = document.getElementById('vwLiveBtn');
+const vwLiveWrap = document.getElementById('vwLiveWrap');
+const vwLiveVideo = document.getElementById('vwLiveVideo');
+const vwLiveCount = document.getElementById('vwLiveCount');
+const vwRoiRect = document.getElementById('vwRoiRect');
+const vwRoiRow = document.getElementById('vwRoiRow');
+const vwRoiDrawBtn = document.getElementById('vwRoiDrawBtn');
+const vwLiveHint = document.getElementById('vwLiveHint');
+let vwLiveTick = null, vwLiveLeft = 0, vwDrawArm = false, vwDrawing = null;
+
+vwViewWideBtn.addEventListener('click', () => {
+  sendRemoteCommand('setView', { wide: true });
+  vwViewWideBtn.classList.add('active');
+  vwViewNormalBtn.classList.remove('active');
+});
+vwViewNormalBtn.addEventListener('click', () => {
+  sendRemoteCommand('setView', { wide: false });
+  vwViewNormalBtn.classList.add('active');
+  vwViewWideBtn.classList.remove('active');
+});
+
+vwLiveBtn.addEventListener('click', () => {
+  if (!(p2pWatchConn && p2pWatchConn.open)) {
+    viewerCmdDiag.textContent = '⚠️ Canlı görüntü için doğrudan bağlantı gerekli — birkaç saniye bekleyip tekrar dene.';
+    return;
+  }
+  sendRemoteCommand('showCam');
+  viewerCmdDiag.textContent = '📺 Görüntü isteniyor...';
+});
+
+function showViewerLive(stream) {
+  try { vwLiveVideo.srcObject = stream; } catch (e) { return; }
+  vwLiveWrap.style.display = 'block';
+  vwRoiRow.style.display = 'flex';
+  viewerCmdDiag.textContent = '';
+  vwLiveLeft = 60;
+  vwLiveCount.textContent = vwLiveLeft + ' sn';
+  if (vwLiveTick) clearInterval(vwLiveTick);
+  vwLiveTick = setInterval(() => {
+    vwLiveLeft--;
+    vwLiveCount.textContent = Math.max(0, vwLiveLeft) + ' sn';
+    if (vwLiveLeft <= 0) hideViewerLive();
+  }, 1000);
+}
+
+function hideViewerLive() {
+  if (vwLiveTick) { clearInterval(vwLiveTick); vwLiveTick = null; }
+  if (vwLiveCallRef) { try { vwLiveCallRef.close(); } catch (e) {} vwLiveCallRef = null; }
+  vwLiveVideo.srcObject = null;
+  vwLiveWrap.style.display = 'none';
+  vwRoiRow.style.display = 'none';
+  vwLiveHint.style.display = 'none';
+  vwRoiRect.style.display = 'none';
+  vwDrawArm = false; vwDrawing = null;
+}
+
+document.getElementById('vwRoiAutoBtn').addEventListener('click', () => {
+  sendRemoteCommand('setRoi', { mode: 'auto' });
+  viewerCmdDiag.textContent = '🎯 Alan otomatike döndürüldü.';
+  vwDrawArm = false;
+  vwLiveHint.style.display = 'none';
+});
+vwRoiDrawBtn.addEventListener('click', () => {
+  vwDrawArm = true;
+  vwLiveHint.style.display = 'block';
+});
+
+// Canlı görüntü kırpılmadan (ham kare oranında) gösterildiği için
+// çizilen dikdörtgenin görüntü içi oranları doğrudan kaynak kare
+// oranlarıdır; telefon bunları kendi ekran düzenine çevirir.
+function vwPointFrac(e) {
+  const rect = vwLiveWrap.getBoundingClientRect();
+  const clamp = (v) => Math.max(0, Math.min(1, v));
+  return { x: clamp((e.clientX - rect.left) / rect.width), y: clamp((e.clientY - rect.top) / rect.height) };
+}
+function vwRenderRect() {
+  const r = {
+    x0: Math.min(vwDrawing.x0, vwDrawing.x1), y0: Math.min(vwDrawing.y0, vwDrawing.y1),
+    x1: Math.max(vwDrawing.x0, vwDrawing.x1), y1: Math.max(vwDrawing.y0, vwDrawing.y1)
+  };
+  vwRoiRect.style.display = 'block';
+  vwRoiRect.style.left = (r.x0 * 100) + '%';
+  vwRoiRect.style.top = (r.y0 * 100) + '%';
+  vwRoiRect.style.width = ((r.x1 - r.x0) * 100) + '%';
+  vwRoiRect.style.height = ((r.y1 - r.y0) * 100) + '%';
+  return r;
+}
+vwLiveWrap.addEventListener('pointerdown', (e) => {
+  if (!vwDrawArm) return;
+  e.preventDefault();
+  const p = vwPointFrac(e);
+  vwDrawing = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+  vwRenderRect();
+});
+vwLiveWrap.addEventListener('pointermove', (e) => {
+  if (!vwDrawing) return;
+  e.preventDefault();
+  const p = vwPointFrac(e);
+  vwDrawing.x1 = p.x; vwDrawing.y1 = p.y;
+  vwRenderRect();
+});
+window.addEventListener('pointerup', () => {
+  if (!vwDrawing) return;
+  const r = vwRenderRect();
+  vwDrawing = null;
+  vwDrawArm = false;
+  vwLiveHint.style.display = 'none';
+  if ((r.x1 - r.x0) < 0.05 || (r.y1 - r.y0) < 0.05) {
+    vwRoiRect.style.display = 'none'; // yanlışlıkla dokunma: iptal
+    return;
+  }
+  sendRemoteCommand('setRoi', { mode: 'manual', roi: r });
+  viewerCmdDiag.textContent = '✅ Çizdiğin alan telefona gönderildi.';
+  setTimeout(() => { vwRoiRect.style.display = 'none'; }, 1500);
+});
+
 // Telefondan gelen gerçek ayar değerleriyle izleyici kaydırıcılarını eşitle.
 function vwSyncDetectFromRemote(det) {
   if (!det) return;
@@ -3579,6 +3826,11 @@ function vwSyncDetectFromRemote(det) {
   const vcs = document.getElementById('vwCalibStatus');
   if (vcs && typeof det.calibMsg === 'string' && vcs.textContent !== det.calibMsg) {
     vcs.textContent = det.calibMsg;
+  }
+  // Geniş/Normal düğmeleri telefonun gerçek durumunu göstersin.
+  if (typeof det.wide === 'boolean') {
+    vwViewWideBtn.classList.toggle('active', det.wide);
+    vwViewNormalBtn.classList.toggle('active', !det.wide);
   }
   if (Date.now() - vwLocalChangeAt < 5000) return;
   if (typeof det.thresh === 'number' && parseFloat(vwThreshSlider.value) !== det.thresh) {
