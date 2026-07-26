@@ -624,7 +624,7 @@ window.addEventListener('error', function (e) {
 
 <h1>🔩 Çivi Sayacı</h1>
 <div class="subtitle">Kutuya düşen çivileri kamerayla otomatik sayar</div>
-<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-25 · 27</div>
+<div style="font-size:0.68rem; color:#626d80; margin-top:-14px; margin-bottom:18px;">sürüm 2026-07-26 · 28</div>
 
 <div class="tabs" id="tabNav">
   <button class="tab-btn active" id="tabBtnCounter" data-tab="counter">🔩 Sayaç</button>
@@ -711,6 +711,8 @@ window.addEventListener('error', function (e) {
       <button class="preset-btn active" id="vwViewNormalBtn" type="button">▭ Normal</button>
       <button class="preset-btn" id="vwViewWideBtn" type="button">📐 Geniş</button>
     </div>
+    <button class="camera-toggle" id="vwCamSwitchBtn" style="margin-top:10px;">🔄 Kamera Değiştir</button>
+    <div style="font-size:0.7rem; color:#98a2b8; text-align:center; margin-top:4px; line-height:1.4;">Telefonda birden fazla arka kamera varsa (geniş açı vb.) sırayla dener — "Görüntüyü Göster" ile hangisinin daha geniş gördüğünü seç.</div>
     <button class="camera-toggle" id="vwLiveBtn" style="margin-top:10px;">📺 Görüntüyü Göster (1 dk)</button>
     <div id="vwLiveWrap" style="display:none; position:relative; margin-top:10px; border-radius:12px; overflow:hidden; touch-action:none; border:1px solid rgba(255,255,255,0.15);">
       <video id="vwLiveVideo" autoplay playsinline muted style="width:100%; display:block;"></video>
@@ -1236,6 +1238,7 @@ async function toggleCamera() {
     motionToggle.style.display = 'block';
     roiControls.style.display = 'block';
     addLog('Kamera açıldı, otomatik algılama başlatılıyor');
+    refreshCamDevices(); // izin alındıktan sonra kamera listesi netleşir
     // Kamera açılır açılmaz otomatik ve hassas şekilde algılamayı başlat.
     // Video boyutları hazır olmadan alan hesaplanamayacağı için metadata'yı bekliyoruz.
     const beginDetection = () => {
@@ -1257,6 +1260,68 @@ async function toggleCamera() {
 
 cameraBtn.addEventListener('click', toggleCamera);
 window.addEventListener('resize', () => { if (cameraOn) recomputeVideoRect(); });
+
+// ---- 🔄 Kamera değiştirme: telefonlarda birden fazla arka kamera
+// (normal + geniş açı vb.) ayrı aygıt olarak görünür. iPad'deki düğme
+// sırayla hepsini dener — canlı görüntüyle hangisinin daha GENİŞ
+// gördüğü seçilebilir. ----
+let camDevices = [];
+let camDeviceIdx = 0;
+
+async function refreshCamDevices() {
+  try {
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    camDevices = devs.filter(d => d.kind === 'videoinput');
+    const curId = camStream && camStream.getVideoTracks()[0]
+      ? camStream.getVideoTracks()[0].getSettings().deviceId : null;
+    const i = camDevices.findIndex(d => d.deviceId === curId);
+    if (i >= 0) camDeviceIdx = i;
+  } catch (e) { camDevices = []; }
+}
+
+async function switchCamera(source) {
+  if (!cameraOn) { addLog('Kamera değiştirilemedi: kamera kapalı'); return; }
+  await refreshCamDevices();
+  if (camDevices.length < 2) {
+    addLog('Bu telefonda geçilecek başka kamera bulunamadı (tek kamera görünüyor)');
+    pushSyncIfBroadcasting();
+    return;
+  }
+  const oldId = camStream && camStream.getVideoTracks()[0]
+    ? camStream.getVideoTracks()[0].getSettings().deviceId : null;
+  const nextIdx = (camDeviceIdx + 1) % camDevices.length;
+  const target = camDevices[nextIdx];
+  const wasLive = liveCalls.length > 0;
+  // Android'de ikinci kamera, ilki kapatılmadan çoğu zaman açılmaz.
+  if (camStream) camStream.getTracks().forEach(t => t.stop());
+  const open = (deviceId) => navigator.mediaDevices.getUserMedia({
+    video: { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 30 } },
+    audio: false
+  });
+  try {
+    camStream = await open(target.deviceId);
+    camDeviceIdx = nextIdx;
+    addLog('Kamera değiştirildi: ' + (nextIdx + 1) + '/' + camDevices.length +
+           (target.label ? ' (' + target.label + ')' : '') + (source ? ' — ' + source : ''));
+  } catch (err) {
+    // Yeni kamera açılamadı: eskisine geri dön ki sayım kesilmesin.
+    try { camStream = await open(oldId); } catch (e2) {
+      showDiag('📷 Kamera değiştirilemedi ve eski kamera geri açılamadı: ' + e2.message);
+      addLog('Kamera değişimi başarısız: ' + err.message);
+      pushSyncIfBroadcasting();
+      return;
+    }
+    addLog('Bu kameraya geçilemedi (' + err.message + '), eski kamera geri açıldı');
+  }
+  video.srcObject = camStream;
+  prevGray = null; // kaynak değişti: sahte tetikleme olmasın
+  const applyNow = () => { applyRoiToGuide(); recomputeVideoRect(); };
+  if (video.readyState >= 1 && video.videoWidth) applyNow();
+  else video.addEventListener('loadedmetadata', applyNow, { once: true });
+  if (wideViewOn) setWideView(true, 'kamera değişimi'); // zoom yeni kamerada da denensin
+  if (wasLive && typeof stopLiveShare === 'function') { stopLiveShare(); startLiveShare(); }
+  pushSyncIfBroadcasting();
+}
 
 // ---- Motion-based detection (visual nail-drop detection) ----
 const motionToggle = document.getElementById('motionToggle');
@@ -1341,7 +1406,15 @@ function setWideView(on, source) {
       if (caps.zoom && typeof caps.zoom.min === 'number') {
         const z = wideViewOn ? caps.zoom.min
                              : Math.min(Math.max(1, caps.zoom.min), caps.zoom.max);
-        track.applyConstraints({ advanced: [{ zoom: z }] }).catch(() => {});
+        // Bazı tarayıcılar 'advanced' ister, bazıları düz kısıt — ikisi de denenir.
+        track.applyConstraints({ advanced: [{ zoom: z }] })
+          .catch(() => track.applyConstraints({ zoom: z }))
+          .catch(() => {});
+        if (wideViewOn && caps.zoom.min >= 1) {
+          addLog('Bu kamera 1x altına inemiyor — daha geniş görüş için "Kamera Değiştir"i dene veya telefonu biraz geri çek');
+        }
+      } else if (wideViewOn) {
+        addLog('Bu kamerada zoom denetimi yok — daha geniş görüş için "Kamera Değiştir"i dene veya telefonu biraz geri çek');
       }
     }
   } catch (e) { /* zoom desteklenmiyorsa yalnızca alan genişler */ }
@@ -3129,7 +3202,8 @@ function buildSyncPayload() {
     // Telefonun anlık algılama ayarları — iPad'deki ayar kaydırıcıları
     // gerçek değeri göstersin diye gönderilir.
     det: { thresh: motionThreshold, cooldownMs: motionCooldown, calib: calibActive,
-           calibMsg: calibStatusEl ? calibStatusEl.textContent : '', wide: wideViewOn },
+           calibMsg: calibStatusEl ? calibStatusEl.textContent : '', wide: wideViewOn,
+           cam: { i: camDeviceIdx + 1, n: camDevices.length } },
     bat: batInfo,   // telefonun anlık şarjı (yüzde + şarjda mı)
     heat: heatInfo, // 5 dakikalık ısınma göstergesi (kare hızına dayalı)
     updatedAt: Date.now()
@@ -3353,6 +3427,9 @@ function handleRemoteCommand(cmd) {
   }
   else if (cmd.action === 'showCam') {
     startLiveShare();
+  }
+  else if (cmd.action === 'switchCam') {
+    switchCamera('iPad');
   }
   else if (cmd.action === 'setRoi') {
     if (cmd.mode === 'auto') {
@@ -3733,6 +3810,12 @@ vwLiveBtn.addEventListener('click', () => {
   viewerCmdDiag.textContent = '📺 Görüntü isteniyor...';
 });
 
+const vwCamSwitchBtn = document.getElementById('vwCamSwitchBtn');
+vwCamSwitchBtn.addEventListener('click', () => {
+  sendRemoteCommand('switchCam');
+  viewerCmdDiag.textContent = '🔄 Kamera değiştiriliyor...';
+});
+
 function showViewerLive(stream) {
   try { vwLiveVideo.srcObject = stream; } catch (e) { return; }
   vwLiveWrap.style.display = 'block';
@@ -3831,6 +3914,12 @@ function vwSyncDetectFromRemote(det) {
   if (typeof det.wide === 'boolean') {
     vwViewWideBtn.classList.toggle('active', det.wide);
     vwViewNormalBtn.classList.toggle('active', !det.wide);
+  }
+  // Kamera sayısı/sırası: "🔄 Kamera Değiştir (2/3)" gibi göster.
+  if (det.cam && det.cam.n > 1) {
+    vwCamSwitchBtn.textContent = '🔄 Kamera Değiştir (' + det.cam.i + '/' + det.cam.n + ')';
+  } else if (det.cam && det.cam.n === 1) {
+    vwCamSwitchBtn.textContent = '🔄 Kamera Değiştir (tek kamera)';
   }
   if (Date.now() - vwLocalChangeAt < 5000) return;
   if (typeof det.thresh === 'number' && parseFloat(vwThreshSlider.value) !== det.thresh) {
