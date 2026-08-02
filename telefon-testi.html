@@ -97,6 +97,7 @@
   .testHead{display:flex; justify-content:space-between; align-items:center; gap:10px}
   .stage{margin-top:12px}
   #fxCanvas{width:100%; height:230px; border-radius:10px; background:var(--card2); display:block; touch-action:none}
+  #glCanvas{width:100%; height:150px; border-radius:10px; background:var(--card2); display:block; margin-top:12px}
   .feedWrap{height:300px; overflow:hidden; border-radius:10px; background:var(--card2); border:1px solid var(--line); position:relative}
   .feedInner{will-change:transform}
   .post{background:var(--card); border-bottom:1px solid var(--line); padding:12px}
@@ -106,17 +107,25 @@
   .pLine{height:8px; border-radius:4px; background:var(--card2); margin-top:6px}
   .pMedia{height:150px; border-radius:8px; margin-top:10px; display:flex; align-items:center; justify-content:center; font-size:42px}
 
+  .seg{display:flex; gap:6px; margin-top:12px}
+  .seg button{
+    flex:1; padding:8px 4px; border-radius:9px; border:1px solid var(--line); background:var(--card2);
+    color:var(--muted); font-family:inherit; font-size:.84rem; font-weight:600; cursor:pointer; min-height:40px;
+  }
+  .seg button[aria-pressed="true"]{background:var(--btn); color:var(--btn-ink); border-color:var(--btn)}
+  .seg button:disabled{opacity:.5; cursor:default}
+
   .resGrid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px}
   .resBox{background:var(--card2); border:1px solid var(--line); border-radius:10px; padding:10px 12px}
   .resBox .k{font-size:.72rem; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:600}
   .resBox .v{font-size:1.25rem; font-weight:750; letter-spacing:-.01em; margin-top:2px}
   .resBox .s{font-size:.78rem; color:var(--muted); margin-top:1px}
   .wide{grid-column:1/-1}
+  .liveGrid{display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-top:12px}
+  .liveGrid .resBox{padding:8px 9px}
+  .liveGrid .v{font-size:1.05rem}
+  @media (max-width:380px){ .liveGrid{grid-template-columns:repeat(2,1fr)} }
 
-  /* Isınma testi canlı alanı */
-  .liveRow{display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-top:12px}
-  .liveVal{font-size:2.3rem; font-weight:800; letter-spacing:-.02em; line-height:1}
-  .liveLbl{font-size:.8rem; color:var(--muted)}
   #thChartBox{position:relative; margin-top:10px}
   #thChart{width:100%; height:190px; display:block}
   .tt{
@@ -174,7 +183,7 @@
     <div class="eyebrow">Tarayıcı tabanlı tanı aracı</div>
     <h1>Telefon Sağlık Testi</h1>
     <p class="sub">Telefonunuz kasıyor ve ısınıyorsa nedenini daraltmak için üç ölçüm yapar:
-    ekran akıcılığı, işlemci hızı ve ısınınca hızın düşüp düşmediği (termal kısma).
+    ekran akıcılığı, işlemci hızı ve uzun yük altında hızın düşüp düşmediği (termal kısma).
     Sonuca göre size özel öneriler listeler.</p>
     <p class="hint" id="desktopHint" hidden>💡 Şu an telefon dışı bir cihazda görünüyorsunuz.
     Bu sayfanın linkini <strong>sorun yaşadığınız telefonda</strong> açıp testi orada çalıştırın.</p>
@@ -188,7 +197,7 @@
 
   <section class="card">
     <button class="btnPrimary" id="runAll">▶ Tüm Testleri Çalıştır
-      <span class="btnSub">yaklaşık 1,5 dakika · ekran açık kalsın</span>
+      <span class="btnSub" id="runAllSub">yaklaşık 3,5 dakika · ekran açık kalsın</span>
     </button>
     <ol class="steps" id="steps">
       <li data-step="fps">1 · Akıcılık</li>
@@ -196,7 +205,8 @@
       <li data-step="thermal">3 · Isınma</li>
     </ol>
     <p class="note">En doğru sonuç için: telefonu <strong>şarjdan çıkarın</strong>, test bitene kadar
-    başka uygulamaya geçmeyin. Isınma testi sırasında telefonun ısınması normaldir ve zarar vermez.</p>
+    başka uygulamaya geçmeyin. Isınma testi telefonu bilerek tam güçte çalıştırır; ısınması ve
+    pilin birkaç puan düşmesi normaldir, zarar vermez.</p>
     <p class="err" id="runErr" hidden></p>
   </section>
 
@@ -227,26 +237,35 @@
   <section class="card" id="thCard">
     <div class="testHead">
       <div>
-        <h2 class="cardTitle">Isınma testi <span class="mono" style="font-weight:400;color:var(--muted);font-size:.8rem">60 sn</span></h2>
-        <p class="cardDesc">Telefonu 1 dakika tam yükte çalıştırır ve hızını saniye saniye izler.
-        Hız belirgin düşüyorsa telefon ısınınca kendini yavaşlatıyor demektir — “ısınıyor ve kasıyor” şikâyetinin en sık nedeni.</p>
+        <h2 class="cardTitle">Isınma testi</h2>
+        <p class="cardDesc">Bütün işlemci çekirdeklerini <strong>ve</strong> grafik birimini (GPU) aynı anda tam güçte çalıştırıp
+        hızı saniye saniye izler. Isındıkça hız düşüyorsa termal kısma var demektir — “ısınıyor ve kasıyor” şikâyetinin en sık nedeni.
+        Süre uzadıkça test zorlaşır ve daha güvenilir olur.</p>
       </div>
       <button class="btnSmall" id="thBtn">Çalıştır</button>
     </div>
+    <div class="seg" id="thSeg" role="group" aria-label="Test süresi">
+      <button data-dur="60">1 dk · hızlı</button>
+      <button data-dur="180" aria-pressed="true">3 dk · önerilen</button>
+      <button data-dur="300">5 dk · tam</button>
+    </div>
     <div id="thLiveBox" hidden>
-      <div class="liveRow">
-        <div><div class="liveVal mono" id="thNow">%100</div><div class="liveLbl">anlık hız (başlangıca göre)</div></div>
-        <div style="text-align:right"><div class="liveVal mono" id="thLeft">60</div><div class="liveLbl">kalan saniye</div></div>
+      <canvas id="glCanvas" aria-label="GPU yük animasyonu" role="img"></canvas>
+      <div class="liveGrid">
+        <div class="resBox"><div class="k">Anlık hız</div><div class="v mono" id="thNow">%100</div></div>
+        <div class="resBox"><div class="k">GPU</div><div class="v mono" id="thGpu">—</div></div>
+        <div class="resBox"><div class="k">Pil</div><div class="v mono" id="thBat">—</div></div>
+        <div class="resBox"><div class="k">Kalan</div><div class="v mono" id="thLeft">–</div></div>
       </div>
     </div>
     <div id="thChartBox" hidden>
-      <canvas id="thChart" aria-label="Yük altında hızın zamana göre değişim grafiği" role="img"></canvas>
+      <canvas id="thChart" aria-label="Yük altında işlemci hızının zamana göre değişim grafiği" role="img"></canvas>
       <div class="tt" id="thTT"></div>
     </div>
     <div class="resGrid" id="thRes" hidden></div>
     <details class="dataTbl" id="thTbl" hidden>
       <summary>Veriyi tablo olarak gör</summary>
-      <table><thead><tr><th>Aralık</th><td>Hız</td></tr></thead><tbody id="thTblBody"></tbody></table>
+      <table><thead><tr><th>Aralık</th><td>İşlemci hızı</td><td>GPU</td></tr></thead><tbody id="thTblBody"></tbody></table>
     </details>
   </section>
 
@@ -303,6 +322,7 @@
     </ul></div></details>
 
     <details class="tip"><summary>🧪 En doğru sonucu almak için</summary><div class="tipBody"><ul>
+      <li>Isınma testinde <strong>3 dk önerilen, 5 dk en güvenilir</strong> sonucu verir; 1 dk yalnızca hızlı ön kontroldür. Ciddi ısınma sorunu arıyorsanız 5 dk’yı seçin.</li>
       <li>Testi bir kez telefon <strong>soğukken</strong> (10 dk dokunmadan bekletip) çalıştırın.</li>
       <li>Sonra 10–15 dakika sosyal medyada gezip testi <strong>hemen tekrar</strong> çalıştırın.</li>
       <li>İki sonucu aşağıdaki <em>Geçmiş</em> bölümünden karşılaştırın: ikinci testte puan ve hız belirgin düşüyorsa kasmanın kaynağı ısınmadır — “Isınma için yapılacaklar” listesine odaklanın.</li>
@@ -326,7 +346,8 @@
   </section>
 
   <p class="footNote">Bu araç tarayıcı içinde çalışır; sıcaklık sensörüne, pil sağlığı verisine veya diğer uygulamalara doğrudan erişemez.
-  Ölçümler kesin donanım puanı değil, sorunun kaynağını daraltan göstergelerdir. Hiçbir veri telefon dışına gönderilmez.</p>
+  Ölçümler kesin donanım puanı değil, sorunun kaynağını daraltan göstergelerdir. Hiçbir veri telefon dışına gönderilmez.
+  Not: Bazı tarayıcılar yüksek yenilemeli (90/120 Hz) ekranlarda web sayfalarını 60 Hz ile sınırlar; yenileme hızı ölçümü tarayıcının izin verdiği hızı gösterir.</p>
 </div>
 
 <script>
@@ -349,6 +370,7 @@ const yieldMain = () => new Promise((r) => { _yq.push(r); _mc.port2.postMessage(
 const state = {
   running: false, aborted: false,
   refreshRate: 60, refreshReady: null,
+  thDur: 180,
   results: {}, sink: 0,
 };
 
@@ -388,7 +410,7 @@ async function fillDeviceInfo() {
     infoRow('İşlemci çekirdeği', navigator.hardwareConcurrency || '—'),
     infoRow('RAM (yaklaşık)', dm ? (dm >= 8 ? '8 GB veya üzeri' : '~' + dm + ' GB') : '—'),
     infoRow('Ekran', screen.width + '×' + screen.height + ' · ' + (window.devicePixelRatio || 1) + 'x'),
-    infoRow('Yenileme hızı', '…', 'iRefresh'),
+    infoRow('Yenileme hızı (tarayıcıda)', '…', 'iRefresh'),
     infoRow('Pil', '…', 'iBattery'),
     infoRow('Bağlantı', '…', 'iNet'),
     infoRow('Tarayıcıya açık depolama', '…', 'iStorage'),
@@ -434,18 +456,37 @@ async function fillDeviceInfo() {
   } catch (e) { $('#iStorage').textContent = '—'; }
 }
 
-// Boşta ekran yenileme hızını ölç (akıcılık kıyası için taban).
+/* ---------- yenileme hızı ----------
+   Değişken yenilemeli (LTPO) ekranlar boşta 60 Hz'e ve altına iner; doğru ölçüm için
+   ekranda GERÇEKTEN hareket eden bir öğe varken ölçüp en hızlı kararlı kareye bakarız. */
+function snapHz(hz) {
+  for (const c of [60, 90, 120, 144, 165]) if (Math.abs(hz - c) / c < 0.09) return c;
+  return Math.round(hz);
+}
+function setRefresh(rr) {
+  if (rr <= state.refreshRate) return;
+  state.refreshRate = rr;
+  const el = $('#iRefresh'); if (el) el.textContent = rr + ' Hz';
+}
 async function measureRefresh() {
-  await new Promise((r) => setTimeout(r, 350));
+  const dot = document.createElement('div');
+  dot.style.cssText = 'position:fixed;top:10px;right:10px;width:10px;height:10px;border-radius:50%;background:var(--chart);opacity:.55;z-index:99;pointer-events:none';
+  document.body.appendChild(dot);
+  await nextFrame();
   const ds = [];
   let prev = await nextFrame();
-  for (let i = 0; i < 42; i++) { const t = await nextFrame(); ds.push(t - prev); prev = t; }
+  const t0 = prev;
+  while (performance.now() - t0 < 1200) {
+    const t = await nextFrame();
+    ds.push(t - prev); prev = t;
+    dot.style.transform = 'translateX(' + (-30 + 26 * Math.sin(t / 90)) + 'px)'; // ekranı uyanık tutan hareket
+  }
+  dot.remove();
   ds.sort((a, b) => a - b);
-  const med = ds[Math.floor(ds.length / 2)] || 16.7;
-  let rr = clamp(Math.round(1000 / med), 30, 240);
-  for (const snap of [60, 90, 120, 144]) if (Math.abs(rr - snap) / snap < 0.09) { rr = snap; break; }
-  state.refreshRate = rr;
-  $('#iRefresh').textContent = rr + ' Hz';
+  const p10 = ds[Math.floor(ds.length * 0.1)] || 16.7;
+  state.refreshRate = 30; // setRefresh yalnızca yükseltir
+  setRefresh(clamp(snapHz(1000 / p10), 30, 240));
+  $('#iRefresh').textContent = state.refreshRate + ' Hz';
 }
 
 /* ---------- ortak test altyapısı ---------- */
@@ -468,6 +509,24 @@ async function benchmarkFor(wallMs, onTick) {
   return { units, active, ups: units / (active / 1000) };
 }
 
+const CRUNCH_SRC = 'const crunch=(n)=>{let x=0;for(let i=0;i<n;i++){x+=Math.sqrt(i&2047)*Math.sin(i&255);}return x;};';
+
+// Ölçüm işçisi: kesintisiz döngüde çalışır, her pencere sonunda saniyedeki iş birimini bildirir.
+function spawnMeterWorker(winMs, onWindow) {
+  try {
+    const src = CRUNCH_SRC +
+      'let sink=0,units=0,w0=performance.now();' +
+      'for(;;){sink+=crunch(20000);units++;const n=performance.now();' +
+      'if(n-w0>=' + winMs + '){postMessage(units/((n-w0)/1000));units=0;w0=n;if(sink>1e15)sink=0;}}';
+    const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+    const w = new Worker(url);
+    w.onmessage = (ev) => onWindow(ev.data);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    return w;
+  } catch (e) { return null; }
+}
+
+// Isıtma işçileri: sadece çekirdekleri meşgul eder.
 function spawnLoadWorkers(n) {
   const ws = [];
   try {
@@ -479,12 +538,48 @@ function spawnLoadWorkers(n) {
   return ws;
 }
 
-async function withTestLock(btns, fn) {
+/* GPU yükü: her pikselde yüzlerce trigonometri işlemi yapan WebGL plazma efekti. */
+const glState = { gl: null, ok: false, timeLoc: null, resLoc: null };
+function initGL() {
+  if (glState.gl) return glState.ok;
+  const cv = $('#glCanvas');
+  try {
+    const gl = cv.getContext('webgl', { antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: false });
+    if (!gl) return (glState.ok = false);
+    const vs = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vs, 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}');
+    gl.compileShader(vs);
+    const fs = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fs,
+      'precision highp float;uniform float t;uniform vec2 r;' +
+      'void main(){vec2 uv=gl_FragCoord.xy/r;float x=uv.x*7.0,y=uv.y*7.0;vec3 c=vec3(0.);' +
+      'for(int i=0;i<120;i++){float f=float(i);' +
+      'c+=0.012*vec3(sin(x+t+f*0.31)+cos(y*1.3-t*1.1+f*0.17),sin(x*1.7-t*0.8+f*0.23)+cos(y+t+f*0.13),cos(x+y+t*1.3+f*0.11));}' +
+      'gl_FragColor=vec4(0.5+0.5*c,1.0);}');
+    gl.compileShader(fs);
+    const pr = gl.createProgram();
+    gl.attachShader(pr, vs); gl.attachShader(pr, fs); gl.linkProgram(pr);
+    if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) return (glState.ok = false);
+    gl.useProgram(pr);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(pr, 'p');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    glState.gl = gl; glState.timeLoc = gl.getUniformLocation(pr, 't'); glState.resLoc = gl.getUniformLocation(pr, 'r');
+    glState.ok = true;
+  } catch (e) { glState.ok = false; }
+  return glState.ok;
+}
+
+async function withTestLock(fn) {
   if (state.running) return false;
   state.running = true; state.aborted = false;
   $('#runErr').hidden = true;
   const all = ['#runAll', '#fpsBtn', '#cpuBtn', '#thBtn'].map((s) => $(s));
   all.forEach((b) => (b.disabled = true));
+  document.querySelectorAll('#thSeg button').forEach((b) => (b.disabled = true));
   let wl = null;
   try { if (navigator.wakeLock) wl = await navigator.wakeLock.request('screen'); } catch (e) {}
   const onHide = () => { if (document.hidden) state.aborted = true; };
@@ -503,6 +598,7 @@ async function withTestLock(btns, fn) {
     document.removeEventListener('visibilitychange', onHide);
     if (wl) try { await wl.release(); } catch (e) {}
     all.forEach((b) => (b.disabled = false));
+    document.querySelectorAll('#thSeg button').forEach((b) => (b.disabled = false));
     state.running = false;
     document.documentElement.dataset.sink = String(Math.round(state.sink % 997));
   }
@@ -527,7 +623,6 @@ function buildFeed() {
 }
 
 async function measureFrames(durMs, perFrame) {
-  const ideal = 1000 / state.refreshRate;
   const ds = [];
   let prev = await nextFrame();
   const t0 = prev;
@@ -540,8 +635,11 @@ async function measureFrames(durMs, perFrame) {
   }
   const dur = prev - t0;
   const fps = ds.length / (dur / 1000);
+  const sorted = ds.slice().sort((a, b) => a - b);
+  const fast = 1000 / (sorted[Math.floor(sorted.length * 0.1)] || 16.7); // en hızlı kararlı kare → ekran hızı ipucu
+  const ideal = 1000 / Math.max(state.refreshRate, snapHz(fast) > state.refreshRate ? snapHz(fast) : state.refreshRate);
   const dropped = ds.filter((d) => d > ideal * 1.6).length;
-  return { fps, dropped, droppedPct: (dropped / ds.length) * 100, worst: Math.max.apply(null, ds) };
+  return { fps, fast, dropped, droppedPct: (dropped / ds.length) * 100, worst: Math.max.apply(null, ds) };
 }
 
 async function fpsTest() {
@@ -572,6 +670,7 @@ async function fpsTest() {
     }
   });
   box.hidden = true;
+  setRefresh(snapHz(a.fast)); // hareket sırasında ekran hızlandıysa hedefi güncelle
 
   // B: akış kaydırma benzetimi (DOM yükü)
   const fb = $('#feedBox'); fb.hidden = false;
@@ -582,6 +681,7 @@ async function fpsTest() {
     inner.style.transform = 'translateY(-' + ((t * 0.4) % span).toFixed(1) + 'px)';
   });
   fb.hidden = true; inner.innerHTML = '';
+  setRefresh(snapHz(b.fast));
 
   state.results.fps = { a, b };
   renderFps();
@@ -590,8 +690,9 @@ async function fpsTest() {
 
 function fpsBox(k, r) {
   const rr = state.refreshRate;
-  const pct = clamp(r.fps / rr, 0, 1);
-  const tone = pct < 0.6 || r.droppedPct > 25 ? 'var(--crit)' : pct < 0.85 || r.droppedPct > 10 ? 'var(--warn)' : 'var(--good)';
+  const bad = r.fps < 40 || r.droppedPct > 25;
+  const mid = r.fps < Math.min(rr * 0.75, 55) || r.droppedPct > 12;
+  const tone = bad ? 'var(--crit)' : mid ? 'var(--warn)' : 'var(--good)';
   return '<div class="resBox"><div class="k">' + k + '</div>' +
     '<div class="v mono" style="color:' + tone + '">' + nf0.format(r.fps) + ' <span style="font-size:.8rem;font-weight:500">fps</span></div>' +
     '<div class="s">hedef ' + rr + ' · kayıp kare %' + nf0.format(r.droppedPct) + ' · en uzun donma ' + nf0.format(r.worst) + ' ms</div></div>';
@@ -600,7 +701,9 @@ function fpsBox(k, r) {
 function renderFps() {
   const r = state.results.fps; if (!r) return;
   const el = $('#fpsRes'); el.hidden = false;
-  el.innerHTML = fpsBox('Grafik çizimi', r.a) + fpsBox('Akış kaydırma', r.b);
+  let html = fpsBox('Grafik çizimi', r.a) + fpsBox('Akış kaydırma', r.b);
+  if (state.refreshRate >= 90) html += '<div class="resBox wide"><div class="s">Not: 90/120 Hz ekranlarda tarayıcılar ağır sayfa içeriğini çoğu zaman daha düşük karede çalıştırır; asıl gösterge fps sayısından çok kayıp kare ve donma süresidir.</div></div>';
+  el.innerHTML = html;
 }
 
 /* ---------- 2) işlemci testi ---------- */
@@ -615,66 +718,143 @@ async function cpuTest() {
   renderDiagnosis();
 }
 
-/* ---------- 3) ısınma testi ---------- */
-const TH_SECS = 60, TH_WIN = 3;
+/* ---------- 3) ısınma testi ----------
+   Ölçüm ayrı bir işçide (worker) kesintisiz yapılır; ana iş parçacığı GPU'yu yükler
+   ve ekranı günceller. Böylece CPU hızı ile GPU akıcılığı aynı anda, birbirini
+   bozmadan izlenir. Worker kullanılamıyorsa eski ana-iş-parçacığı yöntemine dönülür. */
+function thWin(dur) { return dur <= 60 ? 3 : dur <= 180 ? 6 : 10; }
+function fmtLeft(s) { return s >= 60 ? Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') : String(s); }
 
 async function thermalTest() {
+  const dur = state.thDur, winMs = thWin(dur) * 1000;
   const liveBox = $('#thLiveBox'), chartBox = $('#thChartBox');
   liveBox.hidden = false; chartBox.hidden = false;
   $('#thRes').hidden = true; $('#thTbl').hidden = true;
+  $('#thNow').textContent = '%100'; $('#thGpu').textContent = '—';
+  $('#thLeft').textContent = fmtLeft(dur);
+  $('#thBat').textContent = state.battery ? '%' + Math.round(state.battery.level * 100) : '—';
+
   const cores = navigator.hardwareConcurrency || 4;
-  const workers = spawnLoadWorkers(clamp(cores - 1, 1, 6));
   const b0 = state.battery ? state.battery.level : null;
-  const wins = [];
-  let winU0 = 0, winA0 = 0, lastWin = 0, baseline = 0;
-  try {
-    await benchmarkFor(700); // ısınma turu
-    const total = await benchmarkFor(TH_SECS * 1000, (t, units, active) => {
-      $('#thLeft').textContent = String(Math.max(0, Math.ceil(TH_SECS - t / 1000)));
-      const wi = Math.floor(t / (TH_WIN * 1000));
-      if (wi > lastWin) {
-        const ups = (units - winU0) / ((active - winA0) / 1000);
-        winU0 = units; winA0 = active; lastWin = wi;
-        if (!baseline) baseline = ups;
-        baseline = Math.max(baseline, wins.length < 3 ? ups : baseline);
-        wins.push(ups);
-        const pct = clamp((ups / baseline) * 100, 0, 130);
-        $('#thNow').textContent = '%' + nf0.format(pct);
-        $('#thNow').style.color = pct < 75 ? 'var(--heat)' : '';
-        drawChart(wins.map((w) => (w / baseline) * 100));
-      }
-    });
-    // son (kısmi) pencereyi de ekle ki eğri 60. saniyeye kadar uzasın
-    if (total.active - winA0 > 1200) wins.push((total.units - winU0) / ((total.active - winA0) / 1000));
-  } finally {
-    workers.forEach((w) => { try { w.terminate(); } catch (e) {} });
+  const wins = [], gwins = [];
+  let baseline = 0, meter = null, loaders = [], mode = 'worker';
+
+  // GPU hazırlığı
+  const gpuOk = initGL();
+  const glcv = $('#glCanvas');
+  if (gpuOk) {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    glcv.width = glcv.clientWidth * dpr; glcv.height = glcv.clientHeight * dpr;
+    glState.gl.viewport(0, 0, glcv.width, glcv.height);
+    glState.gl.uniform2f(glState.resLoc, glcv.width, glcv.height);
   }
+
+  const onCpuWindow = (ups) => {
+    if (!baseline || wins.length < 3) baseline = Math.max(baseline, ups);
+    wins.push(ups);
+    const pct = clamp((ups / baseline) * 100, 0, 130);
+    $('#thNow').textContent = '%' + nf0.format(pct);
+    $('#thNow').style.color = pct < 75 ? 'var(--heat)' : '';
+    drawChart(wins.map((w) => (w / baseline) * 100), false, dur);
+  };
+
+  meter = spawnMeterWorker(winMs, onCpuWindow);
+  if (meter) {
+    loaders = spawnLoadWorkers(clamp(cores - 2, 1, 6));
+  } else mode = 'main';
+
+  try {
+    if (mode === 'worker') {
+      // Ana iş parçacığı: GPU döngüsü + sayaçlar. CPU ölçümü işçiden geliyor.
+      const t0 = performance.now();
+      let gFrames = 0, gWin0 = t0, prev = t0;
+      while (true) {
+        const t = await nextFrame();
+        if (state.aborted) throw new Error('abort');
+        const el = t - t0;
+        if (gpuOk) {
+          const gl = glState.gl;
+          gl.uniform1f(glState.timeLoc, el / 1000);
+          gl.drawArrays(gl.TRIANGLES, 0, 3);
+        }
+        gFrames++;
+        if (t - gWin0 >= winMs) {
+          const gfps = gFrames / ((t - gWin0) / 1000);
+          gwins.push(gfps); gFrames = 0; gWin0 = t;
+          if (gpuOk) $('#thGpu').textContent = nf0.format(gfps) + ' fps';
+        }
+        if (Math.floor(el / 1000) !== Math.floor((prev - t0) / 1000)) {
+          $('#thLeft').textContent = fmtLeft(Math.max(0, Math.ceil(dur - el / 1000)));
+          if (state.battery) $('#thBat').textContent = '%' + Math.round(state.battery.level * 100);
+        }
+        prev = t;
+        if (el >= dur * 1000) break;
+      }
+    } else {
+      // Yedek yol: worker yoksa ölçüm ana iş parçacığında (GPU ölçümü yapılmaz).
+      let winU0 = 0, winA0 = 0, lastWin = 0;
+      await benchmarkFor(700);
+      const total = await benchmarkFor(dur * 1000, (t, units, active) => {
+        $('#thLeft').textContent = fmtLeft(Math.max(0, Math.ceil(dur - t / 1000)));
+        if (state.battery) $('#thBat').textContent = '%' + Math.round(state.battery.level * 100);
+        const wi = Math.floor(t / winMs);
+        if (wi > lastWin) {
+          const ups = (units - winU0) / ((active - winA0) / 1000);
+          winU0 = units; winA0 = active; lastWin = wi;
+          onCpuWindow(ups);
+        }
+      });
+      if (total.active - winA0 > winMs * 0.4) onCpuWindow((total.units - winU0) / ((total.active - winA0) / 1000));
+    }
+  } finally {
+    if (meter) try { meter.terminate(); } catch (e) {}
+    loaders.forEach((w) => { try { w.terminate(); } catch (e) {} });
+  }
+
   const b1 = state.battery ? state.battery.level : null;
   liveBox.hidden = true;
   if (wins.length < 4) throw new Error('yetersiz veri');
+
   const curve = wins.map((w) => (w / baseline) * 100);
   const endAvg = wins.slice(-3).reduce((a, x) => a + x, 0) / 3;
-  const drop = clamp((baseline - endAvg) / baseline, 0, 1);
+  const cpuDrop = clamp((baseline - endAvg) / baseline, 0, 1);
+  let gpu = null;
+  if (mode === 'worker' && gpuOk && gwins.length >= 4) {
+    const gBase = Math.max.apply(null, gwins.slice(0, 3));
+    const gEnd = gwins.slice(-3).reduce((a, x) => a + x, 0) / 3;
+    gpu = { start: gBase, end: gEnd, drop: clamp((gBase - gEnd) / gBase, 0, 1), curve: gwins.map((g) => Math.round(g)) };
+  }
   const batteryDrop = b0 != null && b1 != null && !state.battery.charging ? Math.max(0, (b0 - b1) * 100) : null;
-  state.results.thermal = { curve, drop, batteryDrop, workers: workers.length + 1 };
-  drawChart(curve, true);
+  state.results.thermal = {
+    curve, cpuDrop, gpu, batteryDrop, dur, win: thWin(dur), mode,
+    threads: mode === 'worker' ? loaders.length + 1 : 1,
+    drop: Math.max(cpuDrop, gpu ? gpu.drop : 0),
+  };
+  drawChart(curve, true, dur);
   renderThermal();
   renderDiagnosis();
 }
 
 function renderThermal() {
   const r = state.results.thermal; if (!r) return;
-  const dropPct = Math.round(r.drop * 100);
-  const tone = r.drop >= 0.25 ? 'var(--crit)' : r.drop >= 0.1 ? 'var(--warn)' : 'var(--good)';
+  const tone = (d) => d >= 0.25 ? 'var(--crit)' : d >= 0.1 ? 'var(--warn)' : 'var(--good)';
   const el = $('#thRes'); el.hidden = false;
-  el.innerHTML =
-    '<div class="resBox"><div class="k">Hız kaybı</div><div class="v mono" style="color:' + tone + '">%' + nf0.format(dropPct) + '</div><div class="s">60 sn tam yük sonunda</div></div>' +
+  const durTxt = r.dur >= 60 ? (r.dur / 60) + ' dk' : r.dur + ' sn';
+  let html =
+    '<div class="resBox"><div class="k">İşlemci hız kaybı</div><div class="v mono" style="color:' + tone(r.cpuDrop) + '">%' + nf0.format(r.cpuDrop * 100) + '</div><div class="s">' + durTxt + ' tam yük sonunda</div></div>';
+  if (r.gpu) html +=
+    '<div class="resBox"><div class="k">GPU akıcılık kaybı</div><div class="v mono" style="color:' + tone(r.gpu.drop) + '">%' + nf0.format(r.gpu.drop * 100) + '</div><div class="s">' + nf0.format(r.gpu.start) + ' → ' + nf0.format(r.gpu.end) + ' fps</div></div>';
+  else html += '<div class="resBox"><div class="k">GPU</div><div class="v mono">—</div><div class="s">bu tarayıcıda ölçülemedi</div></div>';
+  html +=
     '<div class="resBox"><div class="k">Pil düşüşü</div><div class="v mono">' + (r.batteryDrop == null ? '—' : '%' + nf1.format(r.batteryDrop)) + '</div><div class="s">test boyunca' + (r.batteryDrop == null ? ' (tarayıcı paylaşmıyor)' : '') + '</div></div>' +
-    '<div class="resBox wide"><div class="s">' + r.workers + ' iş parçacığı ile yüklendi. %10 altı kayıp normaldir; %25 üzeri belirgin termal kısma işaretidir.</div></div>';
+    '<div class="resBox"><div class="k">Yük</div><div class="v mono">' + r.threads + '+GPU</div><div class="s">' + (r.mode === 'worker' ? r.threads + ' iş parçacığı + grafik birimi' : 'tek iş parçacığı (tarayıcı worker desteklemedi)') + '</div></div>' +
+    '<div class="resBox wide"><div class="s">%10 altı kayıp normaldir; %25 üzeri belirgin termal kısma işaretidir. Süre uzadıkça (3–5 dk) sonuç daha güvenilirdir.</div></div>';
+  el.innerHTML = html;
   // veri tablosu
   const tb = $('#thTblBody');
   tb.innerHTML = r.curve.map((p, i) =>
-    '<tr><th>' + (i * TH_WIN) + '–' + ((i + 1) * TH_WIN) + ' sn</th><td class="mono">%' + nf0.format(p) + '</td></tr>').join('');
+    '<tr><th>' + (i * r.win) + '–' + ((i + 1) * r.win) + ' sn</th><td class="mono">%' + nf0.format(p) + '</td><td class="mono">' +
+    (r.gpu && r.gpu.curve[i] != null ? r.gpu.curve[i] + ' fps' : '—') + '</td></tr>').join('');
   $('#thTbl').hidden = false;
 }
 
@@ -688,8 +868,15 @@ function chartTokens() {
   };
 }
 const PAD = { l: 34, r: 12, t: 14, b: 22 };
+function xTicks(dur) {
+  if (dur <= 60) return [0, 15, 30, 45, 60];
+  if (dur <= 180) return [0, 60, 120, 180];
+  return [0, 60, 120, 180, 240, 300];
+}
 
-function drawChart(curve, final) {
+function drawChart(curve, final, dur) {
+  dur = dur || (state.results.thermal ? state.results.thermal.dur : state.thDur);
+  const win = thWin(dur);
   const cv = $('#thChart');
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const cw = cv.clientWidth || 300, ch = cv.clientHeight || 190;
@@ -700,7 +887,8 @@ function drawChart(curve, final) {
   const T = chartTokens();
   const pw = cw - PAD.l - PAD.r, ph = ch - PAD.t - PAD.b;
   const yMax = 110, yMin = Math.min(40, Math.floor(Math.min.apply(null, curve.concat([100])) / 10) * 10);
-  const X = (i) => PAD.l + (curve.length < 2 ? 0 : (i / (Math.ceil(TH_SECS / TH_WIN) - 1)) * pw);
+  const nMax = Math.ceil(dur / win) - 1;
+  const X = (i) => PAD.l + (nMax < 1 ? 0 : (i / nMax) * pw);
   const Y = (v) => PAD.t + (1 - (v - yMin) / (yMax - yMin)) * ph;
 
   x2.font = '10px ui-monospace,Menlo,monospace';
@@ -714,9 +902,10 @@ function drawChart(curve, final) {
     x2.fillStyle = T.muted; x2.fillText('%' + g, PAD.l - 5, Y(g));
   }
   x2.textAlign = 'center'; x2.textBaseline = 'top';
-  for (const s of [0, 15, 30, 45, 60]) {
-    const xi = PAD.l + (s / TH_SECS) * pw;
-    x2.fillStyle = T.muted; x2.fillText(s + 'sn', xi, ch - PAD.b + 6);
+  for (const s of xTicks(dur)) {
+    const xi = PAD.l + (s / dur) * pw;
+    x2.fillStyle = T.muted;
+    x2.fillText(dur <= 60 ? s + 'sn' : (s / 60) + 'dk', xi, ch - PAD.b + 6);
   }
   if (final) { // kısma eşiği etiketi
     x2.textAlign = 'left';
@@ -750,12 +939,12 @@ function drawChart(curve, final) {
     const rect = cv.getBoundingClientRect();
     const x = ev.clientX - rect.left;
     const pw = rect.width - PAD.l - PAD.r;
-    const n = Math.ceil(TH_SECS / TH_WIN) - 1;
+    const n = Math.ceil(r.dur / r.win) - 1;
     const i = clamp(Math.round(((x - PAD.l) / pw) * n), 0, r.curve.length - 1);
     tt.style.left = (PAD.l + (i / n) * pw) + 'px';
     tt.style.top = '46px';
     tt.style.display = 'block';
-    tt.textContent = (i * TH_WIN) + '–' + ((i + 1) * TH_WIN) + ' sn · hız %' + nf0.format(r.curve[i]);
+    tt.textContent = (i * r.win) + '–' + ((i + 1) * r.win) + ' sn · hız %' + nf0.format(r.curve[i]);
   }
   cv.addEventListener('pointermove', onMove);
   cv.addEventListener('pointerdown', onMove);
@@ -773,19 +962,22 @@ function computeFindings() {
   const F = [];
   const r = state.results;
   if (r.thermal) {
-    const d = Math.round(r.thermal.drop * 100);
-    if (r.thermal.drop >= 0.25) F.push({ sev: 'crit', title: 'Isınınca belirgin hız kaybı: %' + d, body: 'Telefon yük altında ısındıkça işlemcisini ciddi biçimde yavaşlatıyor (termal kısma). “Sosyal medyada gezerken ısınıyor ve kasıyor” şikâyetinin tipik nedeni tam olarak budur.', tips: ['Pil sağlığını kontrol edin — yıpranmış pil hem ısınmayı hem kısmayı artırır (yol: aşağıdaki “Pil sağlığı” başlığı). Telefon 2+ yaşındaysa pil değişimi bu tabloyu çoğu kez düzeltir.', 'Kılıfı çıkarıp testi tekrarlayın; sonuç düzeliyorsa kılıf ısıyı hapsediyor.', 'Şarjda yoğun kullanmayın; arka plan yenilemeyi ve kullanılmayan uygulamaları kısıtlayın.', 'Durup dururken de ısınıyorsa Ayarlar → Pil listesinde aşırı tüketen tanımadık uygulama arayın.'] });
-    else if (r.thermal.drop >= 0.1) F.push({ sev: 'warn', title: 'Isınınca hafif hız kaybı: %' + d, body: 'Bir miktar termal kısma var; sınırda bir durum. Uzun kullanımda kasma hissettirebilir.', tips: ['Kılıfı çıkarıp ve telefon soğukken testi tekrarlayıp karşılaştırın.', 'Şarj sırasında ağır kullanımdan kaçının.', 'Pil 2 yaşından eskiyse sağlığını kontrol ettirin.'] });
-    else F.push({ sev: 'ok', title: 'Isınma altında hız dengeli (kayıp %' + d + ')', body: '60 saniyelik tam yükte hız kaybı düşük kaldı — belirgin bir termal kısma görünmüyor.' });
-    if (r.thermal.batteryDrop != null && r.thermal.batteryDrop >= 3) F.push({ sev: 'warn', title: '1 dakikalık testte pil %' + nf1.format(r.thermal.batteryDrop) + ' düştü', body: 'Yük altında bu kadar hızlı tükenme, pilin yıprandığına işaret edebilir. Yıpranmış pil ısınmayı da artırır.', tips: ['Pil sağlığını kontrol edin; %80 altındaysa değişimi düşünün.'] });
+    const t = r.thermal;
+    const d = Math.round(t.drop * 100);
+    const parts = 'işlemci %' + nf0.format(t.cpuDrop * 100) + (t.gpu ? ', GPU %' + nf0.format(t.gpu.drop * 100) : '') + ' yavaşladı';
+    const durTxt = t.dur >= 60 ? (t.dur / 60) + ' dakikalık' : t.dur + ' saniyelik';
+    if (t.drop >= 0.25) F.push({ sev: 'crit', title: 'Isınınca belirgin hız kaybı: %' + d, body: durTxt + ' tam yük sonunda ' + parts + '. Telefon ısındıkça kendini ciddi biçimde yavaşlatıyor (termal kısma). “Sosyal medyada gezerken ısınıyor ve kasıyor” şikâyetinin tipik nedeni tam olarak budur.', tips: ['Pil sağlığını kontrol edin — yıpranmış pil hem ısınmayı hem kısmayı artırır (yol: aşağıdaki “Pil sağlığı” başlığı). Telefon 2+ yaşındaysa pil değişimi bu tabloyu çoğu kez düzeltir.', 'Kılıfı çıkarıp testi tekrarlayın; sonuç düzeliyorsa kılıf ısıyı hapsediyor.', 'Şarjda yoğun kullanmayın; arka plan yenilemeyi ve kullanılmayan uygulamaları kısıtlayın.', 'Durup dururken de ısınıyorsa Ayarlar → Pil listesinde aşırı tüketen tanımadık uygulama arayın.'] });
+    else if (t.drop >= 0.1) F.push({ sev: 'warn', title: 'Isınınca hafif hız kaybı: %' + d, body: durTxt + ' tam yük sonunda ' + parts + '. Sınırda bir durum; uzun kullanımda kasma hissettirebilir.', tips: ['Kılıfı çıkarıp ve telefon soğukken testi tekrarlayıp karşılaştırın.', 'Daha kesin sonuç için 5 dk’lık testi deneyin.', 'Pil 2 yaşından eskiyse sağlığını kontrol ettirin.'] });
+    else F.push({ sev: 'ok', title: 'Isınma altında hız dengeli (kayıp %' + d + ')', body: durTxt + ' tam yükte belirgin termal kısma görülmedi.' + (t.dur <= 60 ? ' 1 dk kısa bir süredir; kesinleştirmek için 3–5 dk’lık testi de çalıştırın.' : '') });
+    const batLimit = (t.dur / 60) * 3; // dakika başına ~%3 üstü şüpheli
+    if (t.batteryDrop != null && t.batteryDrop >= Math.max(3, batLimit)) F.push({ sev: 'warn', title: 'Testte pil hızlı tükendi (%' + nf1.format(t.batteryDrop) + ' / ' + (t.dur / 60 >= 1 ? (t.dur / 60) + ' dk' : t.dur + ' sn') + ')', body: 'Yük altında bu kadar hızlı tükenme, pilin yıprandığına işaret edebilir. Yıpranmış pil ısınmayı da artırır.', tips: ['Pil sağlığını kontrol edin; %80 altındaysa değişimi düşünün.'] });
   }
   if (r.fps) {
     const rr = state.refreshRate;
     const worstFps = Math.min(r.fps.a.fps, r.fps.b.fps);
-    const ratio = worstFps / rr;
     const worstDrop = Math.max(r.fps.a.droppedPct, r.fps.b.droppedPct);
-    if (ratio < 0.6 || worstDrop > 25) F.push({ sev: 'crit', title: 'Ekranda ciddi takılma (ortalama ' + nf0.format(worstFps) + ' fps, hedef ' + rr + ')', body: 'Kaydırma sırasında hissettiğiniz takılmanın ekrandaki karşılığı bu. Isınma testi de kötüyse neden ısınmadır; ısınma iyiyse arka plan yükü, dolu depolama veya düşük RAM olasıdır.', tips: ['Animasyonları azaltın (Android: Geliştirici seçenekleri → animasyon ölçeği 0,5x; iPhone: Erişilebilirlik → Hareketi Azalt).', 'Sosyal medya uygulamalarının önbelleğini temizleyin ve telefonu yeniden başlatın.', 'Depolamayı boşaltın; %15 boş alan bırakın.'] });
-    else if (ratio < 0.85 || worstDrop > 10) F.push({ sev: 'warn', title: 'Ekran akıcılığı dalgalı (ortalama ' + nf0.format(worstFps) + ' fps, hedef ' + rr + ')', body: 'Ara ara kare atlıyor; yoğun uygulamalarda takılma olarak hissedilir.', tips: ['Arka plandaki uygulamaları kapatıp yeniden test edin.', 'Önbellek temizliği ve yeniden başlatma çoğu kez yeterli olur.'] });
+    if (worstFps < 40 || worstDrop > 25) F.push({ sev: 'crit', title: 'Ekranda ciddi takılma (ortalama ' + nf0.format(worstFps) + ' fps)', body: 'Kaydırma sırasında hissettiğiniz takılmanın ekrandaki karşılığı bu. Isınma testi de kötüyse neden ısınmadır; ısınma iyiyse arka plan yükü, dolu depolama veya düşük RAM olasıdır.', tips: ['Animasyonları azaltın (Android: Geliştirici seçenekleri → animasyon ölçeği 0,5x; iPhone: Erişilebilirlik → Hareketi Azalt).', 'Sosyal medya uygulamalarının önbelleğini temizleyin ve telefonu yeniden başlatın.', 'Depolamayı boşaltın; %15 boş alan bırakın.'] });
+    else if (worstFps < Math.min(rr * 0.75, 55) || worstDrop > 12) F.push({ sev: 'warn', title: 'Ekran akıcılığı dalgalı (ortalama ' + nf0.format(worstFps) + ' fps, hedef ' + rr + ')', body: 'Ara ara kare atlıyor; yoğun uygulamalarda takılma olarak hissedilir.', tips: ['Arka plandaki uygulamaları kapatıp yeniden test edin.', 'Önbellek temizliği ve yeniden başlatma çoğu kez yeterli olur.'] });
     else F.push({ sev: 'ok', title: 'Ekran akıcılığı iyi (' + nf0.format(worstFps) + ' fps / hedef ' + rr + ')', body: 'Tarayıcı içinde belirgin takılma ölçülmedi. Kasma belirli uygulamalardaysa sorun o uygulamaların yükünde veya önbelleğinde olabilir.' });
   }
   const dm = navigator.deviceMemory;
@@ -805,7 +997,7 @@ function computeScore() {
   const r = state.results;
   if (!r.thermal || !r.fps) return null;
   const rr = state.refreshRate;
-  const ratio = clamp(Math.min(r.fps.a.fps, r.fps.b.fps) / rr, 0, 1);
+  const ratio = clamp(Math.min(r.fps.a.fps, r.fps.b.fps) / Math.min(rr, 90), 0, 1);
   let s = 100;
   s -= clamp(r.thermal.drop * 160, 0, 45);
   s -= clamp((1 - ratio) * 90, 0, 30);
@@ -842,8 +1034,9 @@ const HKEY = 'telefon-testi-gecmis';
 function loadHist() { try { return JSON.parse(localStorage.getItem(HKEY)) || []; } catch (e) { return []; } }
 function saveHistEntry() {
   const score = computeScore(); if (score == null) return;
+  const t = state.results.thermal;
   const h = loadHist();
-  h.unshift({ t: Date.now(), score, drop: Math.round(state.results.thermal.drop * 100), fps: Math.round(Math.min(state.results.fps.a.fps, state.results.fps.b.fps)) });
+  h.unshift({ t: Date.now(), score, drop: Math.round(t.drop * 100), dur: t.dur, fps: Math.round(Math.min(state.results.fps.a.fps, state.results.fps.b.fps)) });
   localStorage.setItem(HKEY, JSON.stringify(h.slice(0, 8)));
   renderHist();
 }
@@ -854,8 +1047,9 @@ function renderHist() {
     const prev = h[i + 1];
     const d = prev ? e.score - prev.score : 0;
     const delta = prev && d !== 0 ? '<span class="histDelta mono ' + (d > 0 ? 'up' : 'down') + '">' + (d > 0 ? '▲' : '▼') + Math.abs(d) + '</span>' : '';
+    const durTxt = e.dur ? (e.dur >= 60 ? Math.round(e.dur / 60) + 'dk' : e.dur + 'sn') : '';
     return '<div class="histRow"><span class="histScore mono">' + e.score + '</span>' + delta +
-      '<span class="histDate">' + new Date(e.t).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + '</span>' +
+      '<span class="histDate">' + new Date(e.t).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + (durTxt ? ' · ' + durTxt : '') + '</span>' +
       '<span class="mono" style="color:var(--muted)">ısı kaybı %' + e.drop + ' · ' + e.fps + ' fps</span></div>';
   }).join('');
 }
@@ -869,10 +1063,23 @@ function setStep(name, cls) {
   });
 }
 
-$('#fpsBtn').addEventListener('click', () => withTestLock(null, fpsTest));
-$('#cpuBtn').addEventListener('click', () => withTestLock(null, cpuTest));
-$('#thBtn').addEventListener('click', () => withTestLock(null, thermalTest));
-$('#runAll').addEventListener('click', () => withTestLock(null, async () => {
+function updateDurUI() {
+  document.querySelectorAll('#thSeg button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.dur) === state.thDur)));
+  const total = 12 + 6 + state.thDur + 18; // fps + cpu + ısınma + aralar
+  $('#runAllSub').textContent = 'yaklaşık ' + nf1.format(Math.round(total / 30) / 2) + ' dakika · ekran açık kalsın';
+}
+document.querySelectorAll('#thSeg button').forEach((b) => b.addEventListener('click', () => {
+  if (state.running) return;
+  state.thDur = Number(b.dataset.dur);
+  try { localStorage.setItem('telefon-testi-sure', String(state.thDur)); } catch (e) {}
+  updateDurUI();
+}));
+try { const saved = Number(localStorage.getItem('telefon-testi-sure')); if ([60, 180, 300].includes(saved)) state.thDur = saved; } catch (e) {}
+
+$('#fpsBtn').addEventListener('click', () => withTestLock(fpsTest));
+$('#cpuBtn').addEventListener('click', () => withTestLock(cpuTest));
+$('#thBtn').addEventListener('click', () => withTestLock(thermalTest));
+$('#runAll').addEventListener('click', () => withTestLock(async () => {
   try {
     setStep(null);
     setStep('fps', 'active'); await fpsTest(); setStep('fps', 'done');
@@ -887,30 +1094,33 @@ $('#runAll').addEventListener('click', () => withTestLock(null, async () => {
 fillDeviceInfo();
 state.refreshReady = measureRefresh();
 renderHist();
+updateDurUI();
 
 // Tema değişince grafiği jetonlarla yeniden çiz.
 try {
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    if (state.results.thermal) drawChart(state.results.thermal.curve, true);
+    if (state.results.thermal) drawChart(state.results.thermal.curve, true, state.results.thermal.dur);
   });
 } catch (e) {}
-window.addEventListener('resize', () => { if (state.results.thermal) drawChart(state.results.thermal.curve, true); });
+window.addEventListener('resize', () => { if (state.results.thermal) drawChart(state.results.thermal.curve, true, state.results.thermal.dur); });
 
 // ?demo=1 → sahte veriyle görünümü doldurur (geliştirme/önizleme içindir, geçmişe yazmaz).
 if (new URLSearchParams(location.search).has('demo')) {
-  state.refreshRate = 60;
+  state.refreshRate = 120;
+  $('#iRefresh') && ($('#iRefresh').textContent = '120 Hz');
   state.results.fps = {
-    a: { fps: 52, dropped: 22, droppedPct: 9, worst: 88 },
-    b: { fps: 38, dropped: 61, droppedPct: 24, worst: 190 },
+    a: { fps: 96, fast: 118, dropped: 22, droppedPct: 9, worst: 88 },
+    b: { fps: 72, fast: 110, dropped: 61, droppedPct: 24, worst: 190 },
   };
   state.results.cpu = { score: 1240 };
-  const demoCurve = [100, 98, 96, 91, 86, 83, 80, 78, 76, 75, 73, 72, 70, 69, 68, 67, 66, 66, 65, 64];
-  state.results.thermal = { curve: demoCurve, drop: 0.34, batteryDrop: 2.5, workers: 5 };
+  const demoCurve = [100, 99, 97, 95, 92, 89, 87, 85, 83, 81, 80, 78, 77, 76, 75, 74, 73, 72, 71, 70, 70, 69, 69, 68, 68, 67, 67, 66, 66, 65];
+  const demoG = demoCurve.map((v, i) => Math.round(118 * (1 - 0.35 * i / demoCurve.length)));
+  state.results.thermal = { curve: demoCurve, cpuDrop: 0.32, dur: 180, win: 6, mode: 'worker', threads: 7, drop: 0.35, batteryDrop: 7.5, gpu: { start: 118, end: 78, drop: 0.35, curve: demoG } };
   $('#cpuRes').hidden = false;
   $('#cpuRes').innerHTML = '<div class="resBox"><div class="k">Hız puanı</div><div class="v mono">' + nf0.format(1240) + '</div><div class="s">tek çekirdek, göreli puan</div></div>';
   $('#thChartBox').hidden = false;
   renderFps(); renderThermal(); renderDiagnosis();
-  requestAnimationFrame(() => drawChart(demoCurve, true));
+  requestAnimationFrame(() => drawChart(demoCurve, true, 180));
 }
 </script>
 <!-- ICERIK-BITIS -->
