@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Telefon Sağlık Testi</title>
+</head>
+<body>
+<!-- ICERIK-BASLANGIC -->
+<style>
+  /* Jeton sistemi: açık tema varsayılan; koyu tema medya sorgusu + data-theme ile. */
+  :root{
+    --bg:#EFF3F5; --card:#FFFFFF; --card2:#F4F8F9; --ink:#14252B; --muted:#5B6E75;
+    --line:#DBE3E6; --chart:#0891B2; --btn:#0C7285; --btn-ink:#FFFFFF;
+    --good:#157F51; --good-bg:#E4F3EB; --warn:#96570A; --warn-bg:#FBEFDC;
+    --crit:#B3261E; --crit-bg:#FBE7E5; --info:#3D5A66; --info-bg:#E8EFF2;
+    --heat:#C2410C; --shadow:0 1px 2px rgba(20,37,43,.06),0 4px 14px rgba(20,37,43,.05);
+    color-scheme:light dark;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0D1315; --card:#151C1F; --card2:#1B2427; --ink:#E5ECEE; --muted:#8EA1A8;
+      --line:#263236; --chart:#2CA6B2; --btn:#2CA6B2; --btn-ink:#06282C;
+      --good:#4CC38A; --good-bg:#15291F; --warn:#E2A54B; --warn-bg:#2B2213;
+      --crit:#F0716B; --crit-bg:#301A18; --info:#9FB6BF; --info-bg:#1B2A30;
+      --heat:#FF8A50; --shadow:none;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#EFF3F5; --card:#FFFFFF; --card2:#F4F8F9; --ink:#14252B; --muted:#5B6E75;
+    --line:#DBE3E6; --chart:#0891B2; --btn:#0C7285; --btn-ink:#FFFFFF;
+    --good:#157F51; --good-bg:#E4F3EB; --warn:#96570A; --warn-bg:#FBEFDC;
+    --crit:#B3261E; --crit-bg:#FBE7E5; --info:#3D5A66; --info-bg:#E8EFF2;
+    --heat:#C2410C; --shadow:0 1px 2px rgba(20,37,43,.06),0 4px 14px rgba(20,37,43,.05);
+  }
+  :root[data-theme="dark"]{
+    --bg:#0D1315; --card:#151C1F; --card2:#1B2427; --ink:#E5ECEE; --muted:#8EA1A8;
+    --line:#263236; --chart:#2CA6B2; --btn:#2CA6B2; --btn-ink:#06282C;
+    --good:#4CC38A; --good-bg:#15291F; --warn:#E2A54B; --warn-bg:#2B2213;
+    --crit:#F0716B; --crit-bg:#301A18; --info:#9FB6BF; --info-bg:#1B2A30;
+    --heat:#FF8A50; --shadow:none;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    font-size:16px; line-height:1.55; -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:640px; margin:0 auto; padding:20px 16px 56px; display:flex; flex-direction:column; gap:14px}
+  .mono{font-family:ui-monospace,"SF Mono","Roboto Mono",Menlo,Consolas,monospace; font-variant-numeric:tabular-nums}
+
+  .hdr{padding:8px 4px 2px}
+  .eyebrow{font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); font-weight:600}
+  h1{margin:4px 0 6px; font-size:clamp(1.55rem,6vw,2rem); letter-spacing:-.02em; line-height:1.15; text-wrap:balance}
+  .sub{margin:0; color:var(--muted); font-size:.95rem; max-width:56ch}
+  .hint{margin:12px 0 0; padding:10px 12px; border-radius:10px; background:var(--warn-bg); color:var(--warn); font-size:.9rem}
+
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; box-shadow:var(--shadow)}
+  .cardTitle{margin:0 0 4px; font-size:1.02rem; letter-spacing:-.01em}
+  .cardDesc{margin:0 0 12px; color:var(--muted); font-size:.88rem}
+
+  /* Cihaz bilgisi listesi */
+  .info{margin:8px 0 0; display:grid; grid-template-columns:1fr; gap:0}
+  .info .row{display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:7px 0; border-top:1px solid var(--line)}
+  .info .row:first-child{border-top:0}
+  .info dt{color:var(--muted); font-size:.86rem; flex:none}
+  .info dd{margin:0; text-align:right; font-size:.9rem; overflow-wrap:anywhere}
+  .meter{height:6px; border-radius:99px; background:var(--card2); border:1px solid var(--line); overflow:hidden; margin-top:5px}
+  .meter i{display:block; height:100%; background:var(--chart)}
+
+  /* Testi başlat */
+  .btnPrimary{
+    display:flex; flex-direction:column; align-items:center; gap:2px; width:100%;
+    padding:14px 18px; border:0; border-radius:12px; background:var(--btn); color:var(--btn-ink);
+    font-size:1.06rem; font-weight:700; font-family:inherit; cursor:pointer; min-height:52px;
+  }
+  .btnPrimary .btnSub{font-size:.78rem; font-weight:500; opacity:.85}
+  .btnPrimary:disabled{opacity:.55; cursor:default}
+  .btnSmall{
+    padding:9px 14px; border:1px solid var(--line); border-radius:10px; background:var(--card2);
+    color:var(--ink); font-size:.86rem; font-weight:600; font-family:inherit; cursor:pointer; min-height:42px;
+  }
+  .btnSmall:disabled{opacity:.5; cursor:default}
+  button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid var(--chart); outline-offset:2px}
+
+  .steps{list-style:none; display:flex; gap:6px; margin:12px 0 0; padding:0}
+  .steps li{
+    flex:1; text-align:center; font-size:.78rem; font-weight:600; color:var(--muted);
+    padding:7px 4px; border-radius:9px; background:var(--card2); border:1px solid var(--line);
+  }
+  .steps li.active{color:var(--btn-ink); background:var(--btn); border-color:var(--btn)}
+  .steps li.done{color:var(--good); background:var(--good-bg); border-color:transparent}
+  .note{margin:12px 0 0; color:var(--muted); font-size:.84rem}
+  .err{margin:12px 0 0; padding:10px 12px; border-radius:10px; background:var(--crit-bg); color:var(--crit); font-size:.88rem}
+
+  .testHead{display:flex; justify-content:space-between; align-items:center; gap:10px}
+  .stage{margin-top:12px}
+  #fxCanvas{width:100%; height:230px; border-radius:10px; background:var(--card2); display:block; touch-action:none}
+  .feedWrap{height:300px; overflow:hidden; border-radius:10px; background:var(--card2); border:1px solid var(--line); position:relative}
+  .feedInner{will-change:transform}
+  .post{background:var(--card); border-bottom:1px solid var(--line); padding:12px}
+  .postTop{display:flex; align-items:center; gap:10px; margin-bottom:8px}
+  .avatar{width:36px; height:36px; border-radius:50%; flex:none}
+  .pName{height:10px; border-radius:5px; background:var(--line); width:40%}
+  .pLine{height:8px; border-radius:4px; background:var(--card2); margin-top:6px}
+  .pMedia{height:150px; border-radius:8px; margin-top:10px; display:flex; align-items:center; justify-content:center; font-size:42px}
+
+  .resGrid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px}
+  .resBox{background:var(--card2); border:1px solid var(--line); border-radius:10px; padding:10px 12px}
+  .resBox .k{font-size:.72rem; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:600}
+  .resBox .v{font-size:1.25rem; font-weight:750; letter-spacing:-.01em; margin-top:2px}
+  .resBox .s{font-size:.78rem; color:var(--muted); margin-top:1px}
+  .wide{grid-column:1/-1}
+
+  /* Isınma testi canlı alanı */
+  .liveRow{display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-top:12px}
+  .liveVal{font-size:2.3rem; font-weight:800; letter-spacing:-.02em; line-height:1}
+  .liveLbl{font-size:.8rem; color:var(--muted)}
+  #thChartBox{position:relative; margin-top:10px}
+  #thChart{width:100%; height:190px; display:block}
+  .tt{
+    position:absolute; pointer-events:none; background:var(--ink); color:var(--bg);
+    font-size:.76rem; padding:4px 8px; border-radius:7px; transform:translate(-50%,-130%);
+    white-space:nowrap; display:none;
+  }
+  details.dataTbl{margin-top:10px; font-size:.84rem; color:var(--muted)}
+  details.dataTbl table{border-collapse:collapse; margin-top:8px; width:100%}
+  details.dataTbl td,details.dataTbl th{border-top:1px solid var(--line); padding:4px 6px; text-align:right; font-weight:400}
+  details.dataTbl th{text-align:left}
+
+  /* Teşhis */
+  .gaugeRow{display:flex; align-items:center; gap:18px; margin:6px 0 14px}
+  .gauge{flex:none}
+  .gaugeTxt .big{font-size:1.35rem; font-weight:800; letter-spacing:-.01em}
+  .gaugeTxt .lbl{color:var(--muted); font-size:.86rem}
+  .finding{border:1px solid var(--line); border-left:4px solid var(--info); border-radius:10px; padding:11px 13px; margin-top:10px; background:var(--card)}
+  .finding p{margin:5px 0 0; font-size:.88rem; color:var(--muted)}
+  .finding .fTitle{font-weight:700; font-size:.94rem; display:flex; gap:8px; align-items:baseline}
+  .finding ul{margin:7px 0 0; padding-left:19px; font-size:.86rem; color:var(--ink)}
+  .finding li{margin-top:5px}
+  .finding.sev-crit{border-left-color:var(--crit); background:var(--crit-bg)}
+  .finding.sev-warn{border-left-color:var(--warn); background:var(--warn-bg)}
+  .finding.sev-ok{border-left-color:var(--good)}
+  .finding.sev-crit p,.finding.sev-warn p{color:var(--ink); opacity:.82}
+  .pill{font-size:.68rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; padding:2px 8px; border-radius:99px; flex:none}
+  .pill.crit{background:var(--crit); color:var(--card)}
+  .pill.warn{background:var(--warn); color:var(--card)}
+  .pill.ok{background:var(--good); color:var(--card)}
+  .pill.info{background:var(--info); color:var(--card)}
+
+  /* İpuçları */
+  details.tip{border:1px solid var(--line); border-radius:10px; margin-top:8px; background:var(--card2)}
+  details.tip summary{padding:11px 13px; font-weight:650; font-size:.92rem; cursor:pointer; list-style-position:inside}
+  details.tip[open] summary{border-bottom:1px solid var(--line)}
+  details.tip .tipBody{padding:4px 14px 12px}
+  details.tip ul{margin:6px 0 0; padding-left:18px; font-size:.87rem}
+  details.tip li{margin-top:7px}
+
+  /* Geçmiş */
+  .hist{margin-top:6px}
+  .histRow{display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--line); font-size:.86rem}
+  .histRow:first-child{border-top:0}
+  .histScore{font-weight:750; min-width:34px}
+  .histDate{color:var(--muted); flex:1}
+  .histDelta.up{color:var(--good)} .histDelta.down{color:var(--crit)}
+  .footNote{color:var(--muted); font-size:.8rem; padding:0 6px}
+  .srOnly{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)}
+  @media (prefers-reduced-motion:reduce){ *{animation:none!important; transition:none!important} }
+</style>
+
+<div class="wrap">
+  <header class="hdr">
+    <div class="eyebrow">Tarayıcı tabanlı tanı aracı</div>
+    <h1>Telefon Sağlık Testi</h1>
+    <p class="sub">Telefonunuz kasıyor ve ısınıyorsa nedenini daraltmak için üç ölçüm yapar:
+    ekran akıcılığı, işlemci hızı ve ısınınca hızın düşüp düşmediği (termal kısma).
+    Sonuca göre size özel öneriler listeler.</p>
+    <p class="hint" id="desktopHint" hidden>💡 Şu an telefon dışı bir cihazda görünüyorsunuz.
+    Bu sayfanın linkini <strong>sorun yaşadığınız telefonda</strong> açıp testi orada çalıştırın.</p>
+  </header>
+
+  <section class="card">
+    <h2 class="cardTitle">Cihazınız</h2>
+    <p class="cardDesc">Tarayıcının paylaştığı bilgiler. “—” görüyorsanız tarayıcınız o bilgiyi vermiyor demektir (özellikle iPhone birçok bilgiyi gizler).</p>
+    <dl class="info" id="infoList"></dl>
+  </section>
+
+  <section class="card">
+    <button class="btnPrimary" id="runAll">▶ Tüm Testleri Çalıştır
+      <span class="btnSub">yaklaşık 1,5 dakika · ekran açık kalsın</span>
+    </button>
+    <ol class="steps" id="steps">
+      <li data-step="fps">1 · Akıcılık</li>
+      <li data-step="cpu">2 · İşlemci</li>
+      <li data-step="thermal">3 · Isınma</li>
+    </ol>
+    <p class="note">En doğru sonuç için: telefonu <strong>şarjdan çıkarın</strong>, test bitene kadar
+    başka uygulamaya geçmeyin. Isınma testi sırasında telefonun ısınması normaldir ve zarar vermez.</p>
+    <p class="err" id="runErr" hidden></p>
+  </section>
+
+  <section class="card" id="fpsCard">
+    <div class="testHead">
+      <div>
+        <h2 class="cardTitle">Akıcılık testi</h2>
+        <p class="cardDesc">Sosyal medyadaki takılma hissini ölçer: önce grafik çizimi, sonra akış kaydırma benzetimi.</p>
+      </div>
+      <button class="btnSmall" id="fpsBtn">Çalıştır</button>
+    </div>
+    <div class="stage" id="fxStageBox" hidden><canvas id="fxCanvas"></canvas></div>
+    <div class="stage" id="feedBox" hidden><div class="feedWrap"><div class="feedInner" id="feedInner"></div></div></div>
+    <div class="resGrid" id="fpsRes" hidden></div>
+  </section>
+
+  <section class="card" id="cpuCard">
+    <div class="testHead">
+      <div>
+        <h2 class="cardTitle">İşlemci hız testi</h2>
+        <p class="cardDesc">Kısa bir hesap yükü ile telefonun anlık hızını puanlar. Bu puan, ısınma testindeki düşüşü izlemekte kullanılır.</p>
+      </div>
+      <button class="btnSmall" id="cpuBtn">Çalıştır</button>
+    </div>
+    <div class="resGrid" id="cpuRes" hidden></div>
+  </section>
+
+  <section class="card" id="thCard">
+    <div class="testHead">
+      <div>
+        <h2 class="cardTitle">Isınma testi <span class="mono" style="font-weight:400;color:var(--muted);font-size:.8rem">60 sn</span></h2>
+        <p class="cardDesc">Telefonu 1 dakika tam yükte çalıştırır ve hızını saniye saniye izler.
+        Hız belirgin düşüyorsa telefon ısınınca kendini yavaşlatıyor demektir — “ısınıyor ve kasıyor” şikâyetinin en sık nedeni.</p>
+      </div>
+      <button class="btnSmall" id="thBtn">Çalıştır</button>
+    </div>
+    <div id="thLiveBox" hidden>
+      <div class="liveRow">
+        <div><div class="liveVal mono" id="thNow">%100</div><div class="liveLbl">anlık hız (başlangıca göre)</div></div>
+        <div style="text-align:right"><div class="liveVal mono" id="thLeft">60</div><div class="liveLbl">kalan saniye</div></div>
+      </div>
+    </div>
+    <div id="thChartBox" hidden>
+      <canvas id="thChart" aria-label="Yük altında hızın zamana göre değişim grafiği" role="img"></canvas>
+      <div class="tt" id="thTT"></div>
+    </div>
+    <div class="resGrid" id="thRes" hidden></div>
+    <details class="dataTbl" id="thTbl" hidden>
+      <summary>Veriyi tablo olarak gör</summary>
+      <table><thead><tr><th>Aralık</th><td>Hız</td></tr></thead><tbody id="thTblBody"></tbody></table>
+    </details>
+  </section>
+
+  <section class="card" id="diagCard" hidden>
+    <h2 class="cardTitle">Teşhis</h2>
+    <p class="cardDesc" id="diagNote"></p>
+    <div class="gaugeRow" id="gaugeRow" hidden>
+      <svg class="gauge" width="110" height="110" viewBox="0 0 110 110" aria-hidden="true">
+        <circle cx="55" cy="55" r="48" fill="none" stroke="var(--line)" stroke-width="10"/>
+        <circle id="gaugeArc" cx="55" cy="55" r="48" fill="none" stroke="var(--good)" stroke-width="10"
+          stroke-linecap="round" stroke-dasharray="301.6" stroke-dashoffset="301.6" transform="rotate(-90 55 55)"/>
+        <text id="gaugeVal" x="55" y="53" text-anchor="middle" font-size="26" font-weight="800"
+          font-family="ui-monospace,Menlo,monospace" fill="currentColor">–</text>
+        <text x="55" y="72" text-anchor="middle" font-size="10" fill="var(--muted)">/ 100</text>
+      </svg>
+      <div class="gaugeTxt">
+        <div class="big" id="gaugeLbl">–</div>
+        <div class="lbl">Genel sağlık puanı: ısınma dayanımı, akıcılık, bellek ve depolama birlikte değerlendirilir.</div>
+      </div>
+    </div>
+    <div id="findings"></div>
+  </section>
+
+  <section class="card">
+    <h2 class="cardTitle">İpuçları ve çözüm adımları</h2>
+    <p class="cardDesc">Test sonucundan bağımsız, en sık işe yarayan adımlar.</p>
+
+    <details class="tip"><summary>🔥 Isınma için yapılacaklar</summary><div class="tipBody"><ul>
+      <li><strong>Kılıfı çıkarın</strong> ve aynı kullanımda fark var mı bakın — kalın/tam kapalı kılıflar ısıyı hapseder.</li>
+      <li><strong>Şarjda yoğun kullanmayın.</strong> Hızlı şarj + video/sosyal medya, ısınmanın en büyük ikilisidir.</li>
+      <li>Ekran parlaklığını düşürün ya da otomatiğe alın; ekran en çok ısı üreten parçalardandır.</li>
+      <li>Çekimin zayıf olduğu yerlerde telefon anteni zorlar ve ısınır; 5G sorun çıkarıyorsa <em>Ayarlar → Mobil ağ</em>’dan LTE/4G’yi deneyin.</li>
+      <li>Kullanmadığınızda GPS, Bluetooth ve kişisel erişim noktasını kapatın.</li>
+      <li>Arka plan yenilemeyi kısıtlayın — iPhone: <em>Ayarlar → Genel → Arka Planda Yenileme</em>; Android: <em>Ayarlar → Pil → arka plan kısıtlamaları</em>.</li>
+      <li><strong>Durup dururken bile ısınıyorsa:</strong> <em>Ayarlar → Pil → Pil kullanımı</em> listesine bakın. Tanımadığınız bir uygulama tepelerdeyse kaldırın; gizli reklam yazılımları telefonu sürekli çalıştırır.</li>
+      <li>Sistem ve uygulama güncellemelerini yükleyin — ısınma düzeltmeleri çoğu kez güncellemeyle gelir.</li>
+    </ul></div></details>
+
+    <details class="tip"><summary>🐢 Kasma için yapılacaklar</summary><div class="tipBody"><ul>
+      <li><strong>Sosyal medya önbelleklerini temizleyin.</strong> Android: <em>Ayarlar → Uygulamalar → Instagram/TikTok/YouTube → Depolama → Önbelleği temizle</em>. iPhone’da bu seçenek yoktur; uygulamayı silip yeniden kurmak önbelleği sıfırlar. Bu önbellekler sessizce GB’larca yer kaplar.</li>
+      <li><strong>Depolamada en az %15 boş yer bırakın.</strong> <em>Ayarlar → Depolama</em>’dan neyin yer kapladığına bakın; fotoğraf ve videoları Google Fotoğraflar/iCloud’a taşıyın. WhatsApp’ta <em>Ayarlar → Depolama ve Veri → Depolamayı Yönet</em>’i temizleyin.</li>
+      <li>Telefonu <strong>haftada bir yeniden başlatın</strong> — birikmiş arka plan işlemlerini temizler.</li>
+      <li>Kullanmadığınız uygulamaları kaldırın; birçoğu arka planda çalışmaya devam eder.</li>
+      <li>Animasyonları hızlandırın — Android: <em>Geliştirici seçenekleri → animasyon ölçekleri 0,5x</em>; iPhone: <em>Erişilebilirlik → Hareket → Hareketi Azalt</em>. Telefon gözle görülür çevik hissettirir.</li>
+      <li>Ana ekrandaki widget, canlı duvar kağıdı ve tema efektlerini azaltın.</li>
+      <li>RAM’i azsa uygulamaların <strong>Lite sürümlerini</strong> ya da tarayıcıdan (instagram.com gibi) kullanmayı deneyin.</li>
+    </ul></div></details>
+
+    <details class="tip"><summary>🔋 Pil sağlığı nasıl kontrol edilir?</summary><div class="tipBody"><ul>
+      <li><strong>iPhone:</strong> <em>Ayarlar → Pil → Pil Sağlığı</em>. Maksimum kapasite <strong>%80’in altındaysa</strong> pil ömrünü doldurmuştur; hem hızlı ısınır hem sistem hızı kısar.</li>
+      <li><strong>Android:</strong> <em>Ayarlar → Pil</em> altında “Pil sağlığı” varsa oradan; Samsung’da <em>Samsung Members → Yardım → Tanılama</em>; yoksa <em>AccuBattery</em> gibi bir uygulama birkaç günde tahmin verir.</li>
+      <li>Telefon 2 yaşından büyükse ve “çabuk bitiyor + ısınıyor + kasıyor” üçlüsü varsa, <strong>pil değişimi</strong> bu şikâyetlerin üçünü birden çözebilir. Yetkili/güvenilir serviste değiştirin.</li>
+      <li>⚠️ Kasada kabarma, ekranda ayrılma fark ederseniz pili şişmiş olabilir — telefonu şarj etmeyin, en kısa sürede servise götürün.</li>
+    </ul></div></details>
+
+    <details class="tip"><summary>🧪 En doğru sonucu almak için</summary><div class="tipBody"><ul>
+      <li>Testi bir kez telefon <strong>soğukken</strong> (10 dk dokunmadan bekletip) çalıştırın.</li>
+      <li>Sonra 10–15 dakika sosyal medyada gezip testi <strong>hemen tekrar</strong> çalıştırın.</li>
+      <li>İki sonucu aşağıdaki <em>Geçmiş</em> bölümünden karşılaştırın: ikinci testte puan ve hız belirgin düşüyorsa kasmanın kaynağı ısınmadır — “Isınma için yapılacaklar” listesine odaklanın.</li>
+      <li>Testleri hep aynı tarayıcıda yapın; farklı tarayıcıların puanları birbiriyle kıyaslanmaz.</li>
+    </ul></div></details>
+
+    <details class="tip"><summary>🚨 Hiçbiri işe yaramadıysa</summary><div class="tipBody"><ul>
+      <li>Yedeğinizi alıp <strong>fabrika ayarlarına dönün</strong> — yazılımsal sorunların çoğunu kökten çözer. İlk kurulumda uygulamaları toplu geri yüklemek yerine tek tek kurun; sorun bir uygulamadan geliyorsa böyle yakalarsınız.</li>
+      <li>Fabrika ayarından sonra bile boştayken ısınıyorsa sorun donanımdadır (pil, şarj soketi, anakart) — servise gösterin.</li>
+      <li>Telefon 4 yaşını geçtiyse: güncel sosyal medya uygulamaları eski donanımı gerçekten zorlar; Lite sürümler bir süre idare eder ama kalıcı çözüm cihaz yenilemek olabilir.</li>
+    </ul></div></details>
+  </section>
+
+  <section class="card" id="histCard" hidden>
+    <div class="testHead">
+      <h2 class="cardTitle">Geçmiş</h2>
+      <button class="btnSmall" id="histClear">Temizle</button>
+    </div>
+    <p class="cardDesc">Bu tarayıcıda yapılmış tam testler. Temizlik/soğuma öncesi–sonrası karşılaştırmak için kullanın.</p>
+    <div class="hist" id="histList"></div>
+  </section>
+
+  <p class="footNote">Bu araç tarayıcı içinde çalışır; sıcaklık sensörüne, pil sağlığı verisine veya diğer uygulamalara doğrudan erişemez.
+  Ölçümler kesin donanım puanı değil, sorunun kaynağını daraltan göstergelerdir. Hiçbir veri telefon dışına gönderilmez.</p>
+</div>
+
+<script>
+'use strict';
+document.documentElement.lang = 'tr'; // text-transform'un Türkçe İ/ı kurallarıyla çalışması için
+/* ---------- kısa yardımcılar ---------- */
+const $ = (s) => document.querySelector(s);
+const nf0 = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 });
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const nextFrame = () => new Promise((r) => requestAnimationFrame(r));
+const GB = 1024 * 1024 * 1024;
+
+// setTimeout(0) kısıtlamasına takılmadan ana iş parçacığına nefes aldırır.
+const _mc = new MessageChannel();
+const _yq = [];
+_mc.port1.onmessage = () => { const f = _yq.shift(); if (f) f(); };
+const yieldMain = () => new Promise((r) => { _yq.push(r); _mc.port2.postMessage(0); });
+
+const state = {
+  running: false, aborted: false,
+  refreshRate: 60, refreshReady: null,
+  results: {}, sink: 0,
+};
+
+/* ---------- cihaz bilgisi ---------- */
+function uaInfo() {
+  const ua = navigator.userAgent;
+  let os = '—', model = '';
+  const and = ua.match(/Android\s?([\d.]+)?/);
+  const ios = ua.match(/(?:iPhone|iPad).*?OS\s([\d_]+)/);
+  if (and) { os = 'Android' + (and[1] ? ' ' + and[1] : ''); const m = ua.match(/;\s?([^;)]+?)\sBuild\//); if (m) model = m[1].trim(); }
+  else if (ios) { os = (ua.includes('iPad') ? 'iPadOS ' : 'iOS ') + ios[1].replace(/_/g, '.'); model = ua.includes('iPad') ? 'iPad' : 'iPhone'; }
+  else if (/Windows/.test(ua)) os = 'Windows';
+  else if (/Mac OS X/.test(ua)) os = 'macOS';
+  else if (/Linux/.test(ua)) os = 'Linux';
+  let br = '—';
+  if (/SamsungBrowser\//.test(ua)) br = 'Samsung Internet';
+  else if (/EdgA?\//.test(ua)) br = 'Edge';
+  else if (/(FxiOS|Firefox)\//.test(ua)) br = 'Firefox';
+  else if (/(CriOS|Chrome)\//.test(ua)) br = 'Chrome';
+  else if (/Safari\//.test(ua)) br = 'Safari';
+  const mobile = /Android|iPhone|iPad|Mobile/.test(ua) || navigator.maxTouchPoints > 2;
+  return { os, model, br, mobile };
+}
+
+function infoRow(dt, dd, id) {
+  return '<div class="row"><dt>' + dt + '</dt><dd class="mono"' + (id ? ' id="' + id + '"' : '') + '>' + dd + '</dd></div>';
+}
+
+async function fillDeviceInfo() {
+  const u = uaInfo();
+  if (!u.mobile) $('#desktopHint').hidden = false;
+  const dm = navigator.deviceMemory;
+  const rows = [
+    infoRow('Model', u.model || '—', 'iModel'),
+    infoRow('İşletim sistemi', u.os),
+    infoRow('Tarayıcı', u.br),
+    infoRow('İşlemci çekirdeği', navigator.hardwareConcurrency || '—'),
+    infoRow('RAM (yaklaşık)', dm ? (dm >= 8 ? '8 GB veya üzeri' : '~' + dm + ' GB') : '—'),
+    infoRow('Ekran', screen.width + '×' + screen.height + ' · ' + (window.devicePixelRatio || 1) + 'x'),
+    infoRow('Yenileme hızı', '…', 'iRefresh'),
+    infoRow('Pil', '…', 'iBattery'),
+    infoRow('Bağlantı', '…', 'iNet'),
+    infoRow('Tarayıcıya açık depolama', '…', 'iStorage'),
+  ];
+  $('#infoList').innerHTML = rows.join('');
+
+  // Model (Android Chrome yüksek ayrıntı API'si daha doğru verir)
+  try {
+    if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+      const h = await navigator.userAgentData.getHighEntropyValues(['model']);
+      if (h.model) $('#iModel').textContent = h.model;
+    }
+  } catch (e) {}
+
+  // Pil
+  try {
+    if (navigator.getBattery) {
+      const b = await navigator.getBattery();
+      state.battery = b;
+      const show = () => { $('#iBattery').textContent = '%' + Math.round(b.level * 100) + (b.charging ? ' · şarjda ⚡' : ''); };
+      show(); b.addEventListener('levelchange', show); b.addEventListener('chargingchange', show);
+    } else $('#iBattery').textContent = '—';
+  } catch (e) { $('#iBattery').textContent = '—'; }
+
+  // Bağlantı
+  const c = navigator.connection;
+  if (c && c.effectiveType) {
+    state.net = { type: c.effectiveType, rtt: c.rtt, save: !!c.saveData };
+    $('#iNet').textContent = c.effectiveType.toUpperCase() + (c.rtt ? ' · ' + c.rtt + ' ms gecikme' : '') + (c.saveData ? ' · veri tasarrufu açık' : '');
+  } else $('#iNet').textContent = '—';
+
+  // Depolama
+  try {
+    if (navigator.storage && navigator.storage.estimate) {
+      const e = await navigator.storage.estimate();
+      if (e.quota) {
+        state.storage = { usage: e.usage || 0, quota: e.quota };
+        const pct = clamp((e.usage || 0) / e.quota * 100, 0, 100);
+        $('#iStorage').innerHTML = nf1.format((e.usage || 0) / GB) + ' / ' + nf1.format(e.quota / GB) +
+          ' GB<div class="meter" style="width:120px;margin-left:auto"><i style="width:' + pct.toFixed(1) + '%"></i></div>';
+      } else $('#iStorage').textContent = '—';
+    } else $('#iStorage').textContent = '—';
+  } catch (e) { $('#iStorage').textContent = '—'; }
+}
+
+// Boşta ekran yenileme hızını ölç (akıcılık kıyası için taban).
+async function measureRefresh() {
+  await new Promise((r) => setTimeout(r, 350));
+  const ds = [];
+  let prev = await nextFrame();
+  for (let i = 0; i < 42; i++) { const t = await nextFrame(); ds.push(t - prev); prev = t; }
+  ds.sort((a, b) => a - b);
+  const med = ds[Math.floor(ds.length / 2)] || 16.7;
+  let rr = clamp(Math.round(1000 / med), 30, 240);
+  for (const snap of [60, 90, 120, 144]) if (Math.abs(rr - snap) / snap < 0.09) { rr = snap; break; }
+  state.refreshRate = rr;
+  $('#iRefresh').textContent = rr + ' Hz';
+}
+
+/* ---------- ortak test altyapısı ---------- */
+function crunch(n) { let x = 0; for (let i = 0; i < n; i++) { x += Math.sqrt(i & 2047) * Math.sin(i & 255); } return x; }
+
+// wallMs boyunca 12 ms'lik yük paketleri çalıştırır; puan = paket-içi saniyede iş birimi.
+async function benchmarkFor(wallMs, onTick) {
+  const t0 = performance.now();
+  let units = 0, active = 0, lastPaint = t0;
+  while (performance.now() - t0 < wallMs) {
+    if (state.aborted) throw new Error('abort');
+    const b0 = performance.now();
+    do { state.sink += crunch(20000); units++; } while (performance.now() - b0 < 12);
+    active += performance.now() - b0;
+    await yieldMain();
+    const now = performance.now();
+    if (now - lastPaint > 90) { await nextFrame(); lastPaint = performance.now(); }
+    if (onTick) onTick(now - t0, units, active);
+  }
+  return { units, active, ups: units / (active / 1000) };
+}
+
+function spawnLoadWorkers(n) {
+  const ws = [];
+  try {
+    const src = 'let x=0;while(true){for(let i=0;i<250000;i++){x+=Math.sqrt(i&1023);}if(x>1e15)x=0;}';
+    const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+    for (let i = 0; i < n; i++) { try { ws.push(new Worker(url)); } catch (e) { break; } }
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  } catch (e) {}
+  return ws;
+}
+
+async function withTestLock(btns, fn) {
+  if (state.running) return false;
+  state.running = true; state.aborted = false;
+  $('#runErr').hidden = true;
+  const all = ['#runAll', '#fpsBtn', '#cpuBtn', '#thBtn'].map((s) => $(s));
+  all.forEach((b) => (b.disabled = true));
+  let wl = null;
+  try { if (navigator.wakeLock) wl = await navigator.wakeLock.request('screen'); } catch (e) {}
+  const onHide = () => { if (document.hidden) state.aborted = true; };
+  document.addEventListener('visibilitychange', onHide);
+  try {
+    await fn();
+    return true;
+  } catch (e) {
+    const el = $('#runErr');
+    el.hidden = false;
+    el.textContent = state.aborted
+      ? 'Test yarıda kaldı: ekran kapandı ya da başka uygulamaya geçildi. Ekranı açık tutup yeniden deneyin.'
+      : 'Test sırasında beklenmedik bir hata oluştu, yeniden deneyin. (' + (e && e.message ? e.message : e) + ')';
+    return false;
+  } finally {
+    document.removeEventListener('visibilitychange', onHide);
+    if (wl) try { await wl.release(); } catch (e) {}
+    all.forEach((b) => (b.disabled = false));
+    state.running = false;
+    document.documentElement.dataset.sink = String(Math.round(state.sink % 997));
+  }
+}
+
+/* ---------- 1) akıcılık testi ---------- */
+function buildFeed() {
+  const inner = $('#feedInner');
+  const emo = ['🌊', '🏔️', '🌆', '🍜', '🐈', '🌸', '⚽', '🎸', '🚗', '🏖️'];
+  let html = '';
+  for (let i = 0; i < 110; i++) {
+    const h1 = (i * 47) % 360, h2 = (h1 + 60) % 360;
+    html += '<div class="post"><div class="postTop">' +
+      '<div class="avatar" style="background:linear-gradient(135deg,hsl(' + h1 + ',65%,55%),hsl(' + h2 + ',65%,45%))"></div>' +
+      '<div style="flex:1"><div class="pName" style="width:' + (30 + (i * 13) % 40) + '%"></div></div></div>' +
+      '<div class="pLine" style="width:92%"></div><div class="pLine" style="width:' + (40 + (i * 29) % 50) + '%"></div>' +
+      '<div class="pMedia" style="background:linear-gradient(160deg,hsl(' + h1 + ',35%,80%),hsl(' + h2 + ',40%,65%))">' + emo[i % emo.length] + '</div>' +
+      '</div>';
+  }
+  inner.innerHTML = html;
+  return inner;
+}
+
+async function measureFrames(durMs, perFrame) {
+  const ideal = 1000 / state.refreshRate;
+  const ds = [];
+  let prev = await nextFrame();
+  const t0 = prev;
+  while (true) {
+    const t = await nextFrame();
+    if (state.aborted) throw new Error('abort');
+    ds.push(t - prev); prev = t;
+    perFrame(t - t0);
+    if (t - t0 >= durMs) break;
+  }
+  const dur = prev - t0;
+  const fps = ds.length / (dur / 1000);
+  const dropped = ds.filter((d) => d > ideal * 1.6).length;
+  return { fps, dropped, droppedPct: (dropped / ds.length) * 100, worst: Math.max.apply(null, ds) };
+}
+
+async function fpsTest() {
+  await state.refreshReady;
+  // A: canvas grafik yükü
+  const box = $('#fxStageBox'); box.hidden = false;
+  const cv = $('#fxCanvas');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = cv.clientWidth * dpr; cv.height = cv.clientHeight * dpr;
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  const dots = [];
+  for (let i = 0; i < 140; i++) dots.push({ x: (i * 97) % W, y: (i * 61) % H, vx: ((i % 7) - 3) * 0.9 * dpr, vy: ((i % 5) - 2) * 1.1 * dpr, r: (3 + (i % 6)) * dpr, h: (i * 31) % 360 });
+  const a = await measureFrames(6000, (t) => {
+    ctx.clearRect(0, 0, W, H);
+    for (let g = 0; g < 3; g++) {
+      const gx = W / 2 + Math.cos(t / 900 + g * 2.1) * W * 0.3, gy = H / 2 + Math.sin(t / 700 + g * 2.1) * H * 0.3;
+      const gr = ctx.createRadialGradient(gx, gy, 0, gx, gy, W * 0.25);
+      gr.addColorStop(0, 'hsla(' + (g * 120 + t / 30) + ',70%,60%,.35)'); gr.addColorStop(1, 'transparent');
+      ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+    }
+    for (const d of dots) {
+      d.x += d.vx; d.y += d.vy;
+      if (d.x < 0 || d.x > W) d.vx *= -1;
+      if (d.y < 0 || d.y > H) d.vy *= -1;
+      ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 6.2832);
+      ctx.fillStyle = 'hsla(' + d.h + ',65%,55%,.8)'; ctx.fill();
+    }
+  });
+  box.hidden = true;
+
+  // B: akış kaydırma benzetimi (DOM yükü)
+  const fb = $('#feedBox'); fb.hidden = false;
+  const inner = buildFeed();
+  await nextFrame();
+  const span = Math.max(inner.offsetHeight - 300, 600);
+  const b = await measureFrames(6000, (t) => {
+    inner.style.transform = 'translateY(-' + ((t * 0.4) % span).toFixed(1) + 'px)';
+  });
+  fb.hidden = true; inner.innerHTML = '';
+
+  state.results.fps = { a, b };
+  renderFps();
+  renderDiagnosis();
+}
+
+function fpsBox(k, r) {
+  const rr = state.refreshRate;
+  const pct = clamp(r.fps / rr, 0, 1);
+  const tone = pct < 0.6 || r.droppedPct > 25 ? 'var(--crit)' : pct < 0.85 || r.droppedPct > 10 ? 'var(--warn)' : 'var(--good)';
+  return '<div class="resBox"><div class="k">' + k + '</div>' +
+    '<div class="v mono" style="color:' + tone + '">' + nf0.format(r.fps) + ' <span style="font-size:.8rem;font-weight:500">fps</span></div>' +
+    '<div class="s">hedef ' + rr + ' · kayıp kare %' + nf0.format(r.droppedPct) + ' · en uzun donma ' + nf0.format(r.worst) + ' ms</div></div>';
+}
+
+function renderFps() {
+  const r = state.results.fps; if (!r) return;
+  const el = $('#fpsRes'); el.hidden = false;
+  el.innerHTML = fpsBox('Grafik çizimi', r.a) + fpsBox('Akış kaydırma', r.b);
+}
+
+/* ---------- 2) işlemci testi ---------- */
+async function cpuTest() {
+  const el = $('#cpuRes'); el.hidden = false;
+  el.innerHTML = '<div class="resBox wide"><div class="k">Ölçülüyor</div><div class="v mono" id="cpuLive">…</div><div class="s">yaklaşık 5 saniye</div></div>';
+  await benchmarkFor(700); // ısınma turu: JIT otursun
+  const r = await benchmarkFor(4000, (t, u, act) => { $('#cpuLive').textContent = nf0.format((u / (act / 1000)) * 10) + ' puan'; });
+  state.results.cpu = { score: Math.round(r.ups * 10) };
+  el.innerHTML = '<div class="resBox"><div class="k">Hız puanı</div><div class="v mono">' + nf0.format(state.results.cpu.score) + '</div><div class="s">tek çekirdek, göreli puan</div></div>' +
+    '<div class="resBox"><div class="k">Ne işe yarar?</div><div class="s" style="margin-top:6px">Puanın kendisi değil, ısınınca <strong>ne kadar düştüğü</strong> önemli — onu ısınma testi ölçer.</div></div>';
+  renderDiagnosis();
+}
+
+/* ---------- 3) ısınma testi ---------- */
+const TH_SECS = 60, TH_WIN = 3;
+
+async function thermalTest() {
+  const liveBox = $('#thLiveBox'), chartBox = $('#thChartBox');
+  liveBox.hidden = false; chartBox.hidden = false;
+  $('#thRes').hidden = true; $('#thTbl').hidden = true;
+  const cores = navigator.hardwareConcurrency || 4;
+  const workers = spawnLoadWorkers(clamp(cores - 1, 1, 6));
+  const b0 = state.battery ? state.battery.level : null;
+  const wins = [];
+  let winU0 = 0, winA0 = 0, lastWin = 0, baseline = 0;
+  try {
+    await benchmarkFor(700); // ısınma turu
+    const total = await benchmarkFor(TH_SECS * 1000, (t, units, active) => {
+      $('#thLeft').textContent = String(Math.max(0, Math.ceil(TH_SECS - t / 1000)));
+      const wi = Math.floor(t / (TH_WIN * 1000));
+      if (wi > lastWin) {
+        const ups = (units - winU0) / ((active - winA0) / 1000);
+        winU0 = units; winA0 = active; lastWin = wi;
+        if (!baseline) baseline = ups;
+        baseline = Math.max(baseline, wins.length < 3 ? ups : baseline);
+        wins.push(ups);
+        const pct = clamp((ups / baseline) * 100, 0, 130);
+        $('#thNow').textContent = '%' + nf0.format(pct);
+        $('#thNow').style.color = pct < 75 ? 'var(--heat)' : '';
+        drawChart(wins.map((w) => (w / baseline) * 100));
+      }
+    });
+    // son (kısmi) pencereyi de ekle ki eğri 60. saniyeye kadar uzasın
+    if (total.active - winA0 > 1200) wins.push((total.units - winU0) / ((total.active - winA0) / 1000));
+  } finally {
+    workers.forEach((w) => { try { w.terminate(); } catch (e) {} });
+  }
+  const b1 = state.battery ? state.battery.level : null;
+  liveBox.hidden = true;
+  if (wins.length < 4) throw new Error('yetersiz veri');
+  const curve = wins.map((w) => (w / baseline) * 100);
+  const endAvg = wins.slice(-3).reduce((a, x) => a + x, 0) / 3;
+  const drop = clamp((baseline - endAvg) / baseline, 0, 1);
+  const batteryDrop = b0 != null && b1 != null && !state.battery.charging ? Math.max(0, (b0 - b1) * 100) : null;
+  state.results.thermal = { curve, drop, batteryDrop, workers: workers.length + 1 };
+  drawChart(curve, true);
+  renderThermal();
+  renderDiagnosis();
+}
+
+function renderThermal() {
+  const r = state.results.thermal; if (!r) return;
+  const dropPct = Math.round(r.drop * 100);
+  const tone = r.drop >= 0.25 ? 'var(--crit)' : r.drop >= 0.1 ? 'var(--warn)' : 'var(--good)';
+  const el = $('#thRes'); el.hidden = false;
+  el.innerHTML =
+    '<div class="resBox"><div class="k">Hız kaybı</div><div class="v mono" style="color:' + tone + '">%' + nf0.format(dropPct) + '</div><div class="s">60 sn tam yük sonunda</div></div>' +
+    '<div class="resBox"><div class="k">Pil düşüşü</div><div class="v mono">' + (r.batteryDrop == null ? '—' : '%' + nf1.format(r.batteryDrop)) + '</div><div class="s">test boyunca' + (r.batteryDrop == null ? ' (tarayıcı paylaşmıyor)' : '') + '</div></div>' +
+    '<div class="resBox wide"><div class="s">' + r.workers + ' iş parçacığı ile yüklendi. %10 altı kayıp normaldir; %25 üzeri belirgin termal kısma işaretidir.</div></div>';
+  // veri tablosu
+  const tb = $('#thTblBody');
+  tb.innerHTML = r.curve.map((p, i) =>
+    '<tr><th>' + (i * TH_WIN) + '–' + ((i + 1) * TH_WIN) + ' sn</th><td class="mono">%' + nf0.format(p) + '</td></tr>').join('');
+  $('#thTbl').hidden = false;
+}
+
+/* ---------- grafik ---------- */
+function chartTokens() {
+  const cs = getComputedStyle(document.documentElement);
+  return {
+    line: cs.getPropertyValue('--chart').trim() || '#0891B2',
+    ink: cs.getPropertyValue('--ink').trim(), muted: cs.getPropertyValue('--muted').trim(),
+    grid: cs.getPropertyValue('--line').trim(), heat: cs.getPropertyValue('--heat').trim(),
+  };
+}
+const PAD = { l: 34, r: 12, t: 14, b: 22 };
+
+function drawChart(curve, final) {
+  const cv = $('#thChart');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = cv.clientWidth || 300, ch = cv.clientHeight || 190;
+  if (cv.width !== cw * dpr) { cv.width = cw * dpr; cv.height = ch * dpr; }
+  const x2 = cv.getContext('2d');
+  x2.setTransform(dpr, 0, 0, dpr, 0, 0);
+  x2.clearRect(0, 0, cw, ch);
+  const T = chartTokens();
+  const pw = cw - PAD.l - PAD.r, ph = ch - PAD.t - PAD.b;
+  const yMax = 110, yMin = Math.min(40, Math.floor(Math.min.apply(null, curve.concat([100])) / 10) * 10);
+  const X = (i) => PAD.l + (curve.length < 2 ? 0 : (i / (Math.ceil(TH_SECS / TH_WIN) - 1)) * pw);
+  const Y = (v) => PAD.t + (1 - (v - yMin) / (yMax - yMin)) * ph;
+
+  x2.font = '10px ui-monospace,Menlo,monospace';
+  x2.textAlign = 'right'; x2.textBaseline = 'middle';
+  for (const g of [100, 75, 50]) {
+    if (g < yMin) continue;
+    x2.strokeStyle = T.grid; x2.lineWidth = 1;
+    x2.setLineDash(g === 75 ? [4, 4] : []);
+    x2.beginPath(); x2.moveTo(PAD.l, Y(g)); x2.lineTo(cw - PAD.r, Y(g)); x2.stroke();
+    x2.setLineDash([]);
+    x2.fillStyle = T.muted; x2.fillText('%' + g, PAD.l - 5, Y(g));
+  }
+  x2.textAlign = 'center'; x2.textBaseline = 'top';
+  for (const s of [0, 15, 30, 45, 60]) {
+    const xi = PAD.l + (s / TH_SECS) * pw;
+    x2.fillStyle = T.muted; x2.fillText(s + 'sn', xi, ch - PAD.b + 6);
+  }
+  if (final) { // kısma eşiği etiketi
+    x2.textAlign = 'left';
+    x2.fillStyle = T.muted; x2.fillText('kısma eşiği', PAD.l + 4, Y(75) - 12);
+  }
+  if (!curve.length) return;
+
+  // alan + çizgi
+  x2.beginPath();
+  curve.forEach((v, i) => { const px = X(i), py = Y(clamp(v, yMin, yMax)); i ? x2.lineTo(px, py) : x2.moveTo(px, py); });
+  const lastX = X(curve.length - 1), lastY = Y(clamp(curve[curve.length - 1], yMin, yMax));
+  x2.save();
+  x2.lineTo(lastX, Y(yMin)); x2.lineTo(X(0), Y(yMin)); x2.closePath();
+  x2.globalAlpha = 0.13; x2.fillStyle = T.line; x2.fill();
+  x2.restore();
+  x2.beginPath();
+  curve.forEach((v, i) => { const px = X(i), py = Y(clamp(v, yMin, yMax)); i ? x2.lineTo(px, py) : x2.moveTo(px, py); });
+  x2.strokeStyle = T.line; x2.lineWidth = 2; x2.lineJoin = 'round'; x2.stroke();
+  // uç nokta vurgusu + doğrudan etiket
+  x2.beginPath(); x2.arc(lastX, lastY, 4, 0, 6.2832); x2.fillStyle = T.line; x2.fill();
+  x2.textAlign = lastX > cw - 46 ? 'right' : 'left'; x2.textBaseline = 'bottom';
+  x2.font = '600 11px ui-monospace,Menlo,monospace'; x2.fillStyle = T.ink;
+  x2.fillText('%' + nf0.format(curve[curve.length - 1]), lastX + (lastX > cw - 46 ? -7 : 7), lastY - 5);
+}
+
+// dokunma/işaretçi ile değer okuma
+(function chartHover() {
+  const cv = $('#thChart'), tt = $('#thTT');
+  function onMove(ev) {
+    const r = state.results.thermal; if (!r) return;
+    const rect = cv.getBoundingClientRect();
+    const x = ev.clientX - rect.left;
+    const pw = rect.width - PAD.l - PAD.r;
+    const n = Math.ceil(TH_SECS / TH_WIN) - 1;
+    const i = clamp(Math.round(((x - PAD.l) / pw) * n), 0, r.curve.length - 1);
+    tt.style.left = (PAD.l + (i / n) * pw) + 'px';
+    tt.style.top = '46px';
+    tt.style.display = 'block';
+    tt.textContent = (i * TH_WIN) + '–' + ((i + 1) * TH_WIN) + ' sn · hız %' + nf0.format(r.curve[i]);
+  }
+  cv.addEventListener('pointermove', onMove);
+  cv.addEventListener('pointerdown', onMove);
+  cv.addEventListener('pointerleave', () => { tt.style.display = 'none'; });
+})();
+
+/* ---------- teşhis ---------- */
+function findingHTML(f) {
+  const names = { crit: 'Kritik', warn: 'Dikkat', ok: 'İyi', info: 'Bilgi' };
+  return '<div class="finding sev-' + f.sev + '"><div class="fTitle"><span class="pill ' + f.sev + '">' + names[f.sev] + '</span>' + f.title + '</div>' +
+    '<p>' + f.body + '</p>' + (f.tips ? '<ul>' + f.tips.map((t) => '<li>' + t + '</li>').join('') + '</ul>' : '') + '</div>';
+}
+
+function computeFindings() {
+  const F = [];
+  const r = state.results;
+  if (r.thermal) {
+    const d = Math.round(r.thermal.drop * 100);
+    if (r.thermal.drop >= 0.25) F.push({ sev: 'crit', title: 'Isınınca belirgin hız kaybı: %' + d, body: 'Telefon yük altında ısındıkça işlemcisini ciddi biçimde yavaşlatıyor (termal kısma). “Sosyal medyada gezerken ısınıyor ve kasıyor” şikâyetinin tipik nedeni tam olarak budur.', tips: ['Pil sağlığını kontrol edin — yıpranmış pil hem ısınmayı hem kısmayı artırır (yol: aşağıdaki “Pil sağlığı” başlığı). Telefon 2+ yaşındaysa pil değişimi bu tabloyu çoğu kez düzeltir.', 'Kılıfı çıkarıp testi tekrarlayın; sonuç düzeliyorsa kılıf ısıyı hapsediyor.', 'Şarjda yoğun kullanmayın; arka plan yenilemeyi ve kullanılmayan uygulamaları kısıtlayın.', 'Durup dururken de ısınıyorsa Ayarlar → Pil listesinde aşırı tüketen tanımadık uygulama arayın.'] });
+    else if (r.thermal.drop >= 0.1) F.push({ sev: 'warn', title: 'Isınınca hafif hız kaybı: %' + d, body: 'Bir miktar termal kısma var; sınırda bir durum. Uzun kullanımda kasma hissettirebilir.', tips: ['Kılıfı çıkarıp ve telefon soğukken testi tekrarlayıp karşılaştırın.', 'Şarj sırasında ağır kullanımdan kaçının.', 'Pil 2 yaşından eskiyse sağlığını kontrol ettirin.'] });
+    else F.push({ sev: 'ok', title: 'Isınma altında hız dengeli (kayıp %' + d + ')', body: '60 saniyelik tam yükte hız kaybı düşük kaldı — belirgin bir termal kısma görünmüyor.' });
+    if (r.thermal.batteryDrop != null && r.thermal.batteryDrop >= 3) F.push({ sev: 'warn', title: '1 dakikalık testte pil %' + nf1.format(r.thermal.batteryDrop) + ' düştü', body: 'Yük altında bu kadar hızlı tükenme, pilin yıprandığına işaret edebilir. Yıpranmış pil ısınmayı da artırır.', tips: ['Pil sağlığını kontrol edin; %80 altındaysa değişimi düşünün.'] });
+  }
+  if (r.fps) {
+    const rr = state.refreshRate;
+    const worstFps = Math.min(r.fps.a.fps, r.fps.b.fps);
+    const ratio = worstFps / rr;
+    const worstDrop = Math.max(r.fps.a.droppedPct, r.fps.b.droppedPct);
+    if (ratio < 0.6 || worstDrop > 25) F.push({ sev: 'crit', title: 'Ekranda ciddi takılma (ortalama ' + nf0.format(worstFps) + ' fps, hedef ' + rr + ')', body: 'Kaydırma sırasında hissettiğiniz takılmanın ekrandaki karşılığı bu. Isınma testi de kötüyse neden ısınmadır; ısınma iyiyse arka plan yükü, dolu depolama veya düşük RAM olasıdır.', tips: ['Animasyonları azaltın (Android: Geliştirici seçenekleri → animasyon ölçeği 0,5x; iPhone: Erişilebilirlik → Hareketi Azalt).', 'Sosyal medya uygulamalarının önbelleğini temizleyin ve telefonu yeniden başlatın.', 'Depolamayı boşaltın; %15 boş alan bırakın.'] });
+    else if (ratio < 0.85 || worstDrop > 10) F.push({ sev: 'warn', title: 'Ekran akıcılığı dalgalı (ortalama ' + nf0.format(worstFps) + ' fps, hedef ' + rr + ')', body: 'Ara ara kare atlıyor; yoğun uygulamalarda takılma olarak hissedilir.', tips: ['Arka plandaki uygulamaları kapatıp yeniden test edin.', 'Önbellek temizliği ve yeniden başlatma çoğu kez yeterli olur.'] });
+    else F.push({ sev: 'ok', title: 'Ekran akıcılığı iyi (' + nf0.format(worstFps) + ' fps / hedef ' + rr + ')', body: 'Tarayıcı içinde belirgin takılma ölçülmedi. Kasma belirli uygulamalardaysa sorun o uygulamaların yükünde veya önbelleğinde olabilir.' });
+  }
+  const dm = navigator.deviceMemory;
+  if (dm && dm <= 3) F.push({ sev: 'warn', title: 'RAM düşük görünüyor (~' + dm + ' GB)', body: 'Instagram/TikTok gibi uygulamalar tek başına 1–2 GB kullanabilir. RAM dolunca telefon takılır, uygulamalar sürekli baştan yüklenir.', tips: ['Uygulamaların Lite sürümlerini ya da tarayıcı sürümlerini deneyin.', 'Aynı anda açık uygulama sayısını azaltın; telefonu düzenli yeniden başlatın.', 'Widget ve canlı duvar kağıdını azaltın.'] });
+  if (state.storage && state.storage.quota && state.storage.quota < 3 * GB) F.push({ sev: 'warn', title: 'Depolama dolu olabilir', body: 'Tarayıcıya ayrılabilen alan yalnızca ' + nf1.format(state.storage.quota / GB) + ' GB — bu genellikle telefonun genel depolamasının dolduğuna işarettir. %90 üzeri doluluk telefonu belirgin yavaşlatır.', tips: ['Ayarlar → Depolama’dan büyük dosyaları görün; %15 boş alan hedefleyin.', 'Sosyal medya önbelleklerini ve WhatsApp medyasını temizleyin.', 'Fotoğraf/videoları buluta taşıyın.'] });
+  if (state.net) {
+    if (['slow-2g', '2g', '3g'].includes(state.net.type) || (state.net.rtt && state.net.rtt > 300)) F.push({ sev: 'warn', title: 'İnternet bağlantısı yavaş görünüyor (' + state.net.type.toUpperCase() + (state.net.rtt ? ', ' + state.net.rtt + ' ms' : '') + ')', body: 'Videoların geç açılması ve akışın takılması telefondan değil bağlantıdan kaynaklanıyor olabilir. İyi bir Wi-Fi’da aynı kasma oluyor mu karşılaştırın.' });
+    if (state.net.save) F.push({ sev: 'info', title: 'Veri tasarrufu modu açık', body: 'Bu modda bazı uygulama ve siteler bilerek düşük kalite/hız kullanır; akış donuk hissedilebilir.' });
+  }
+  if (state.battery && state.battery.level < 0.2 && !state.battery.charging) F.push({ sev: 'info', title: 'Pil %' + Math.round(state.battery.level * 100) + ' — güç tasarrufu devrede olabilir', body: 'Çoğu telefon düşük pilde hızı otomatik kısar. Testi %50 üzeri pille tekrarlamak daha sağlıklı sonuç verir.' });
+  if (r.thermal && r.fps && !F.some((f) => f.sev === 'crit' || f.sev === 'warn')) F.push({ sev: 'ok', title: 'Donanım testleri temiz — sorun büyük olasılıkla yazılımsal', body: 'Isınma dayanımı ve akıcılık iyi ölçüldü. Günlük kasma; dolu önbellek, eski sürümler, arka plan uygulamaları ya da belirli bir uygulamanın kendisinden geliyor olabilir.', tips: ['“Kasma için yapılacaklar” listesini sırayla uygulayın.', 'Sorun tek uygulamadaysa onu silip yeniden kurun.', 'Kalıcıysa: yedek alın, fabrika ayarlarına dönün.'] });
+  const order = { crit: 0, warn: 1, info: 2, ok: 3 };
+  return F.sort((a, b) => order[a.sev] - order[b.sev]);
+}
+
+function computeScore() {
+  const r = state.results;
+  if (!r.thermal || !r.fps) return null;
+  const rr = state.refreshRate;
+  const ratio = clamp(Math.min(r.fps.a.fps, r.fps.b.fps) / rr, 0, 1);
+  let s = 100;
+  s -= clamp(r.thermal.drop * 160, 0, 45);
+  s -= clamp((1 - ratio) * 90, 0, 30);
+  const dm = navigator.deviceMemory;
+  if (dm && dm <= 2) s -= 10; else if (dm && dm <= 4) s -= 5;
+  if (state.storage && state.storage.quota && state.storage.quota < 3 * GB) s -= 8;
+  return Math.round(clamp(s, 3, 100));
+}
+
+function renderDiagnosis() {
+  const r = state.results;
+  if (!r.thermal && !r.fps && !r.cpu) return;
+  $('#diagCard').hidden = false;
+  const score = computeScore();
+  if (score != null) {
+    $('#gaugeRow').hidden = false;
+    const arc = $('#gaugeArc');
+    const C = 301.6;
+    arc.setAttribute('stroke-dashoffset', String(C * (1 - score / 100)));
+    const col = score >= 70 ? 'var(--good)' : score >= 50 ? 'var(--warn)' : 'var(--crit)';
+    arc.setAttribute('stroke', col);
+    $('#gaugeVal').textContent = String(score);
+    $('#gaugeLbl').textContent = score >= 85 ? 'Çok iyi' : score >= 70 ? 'İyi' : score >= 50 ? 'Orta' : 'Zayıf';
+    $('#diagNote').textContent = 'Sonuçlar bu cihazın kendi içindeki davranışını ölçer; farklı telefonlarla puan kıyaslamayın.';
+  } else {
+    $('#gaugeRow').hidden = true;
+    $('#diagNote').textContent = 'Kısmi sonuç: genel puan için Akıcılık ve Isınma testlerinin ikisi de gerekli. “Tüm Testleri Çalıştır” en sağlıklısı.';
+  }
+  $('#findings').innerHTML = computeFindings().map(findingHTML).join('');
+}
+
+/* ---------- geçmiş ---------- */
+const HKEY = 'telefon-testi-gecmis';
+function loadHist() { try { return JSON.parse(localStorage.getItem(HKEY)) || []; } catch (e) { return []; } }
+function saveHistEntry() {
+  const score = computeScore(); if (score == null) return;
+  const h = loadHist();
+  h.unshift({ t: Date.now(), score, drop: Math.round(state.results.thermal.drop * 100), fps: Math.round(Math.min(state.results.fps.a.fps, state.results.fps.b.fps)) });
+  localStorage.setItem(HKEY, JSON.stringify(h.slice(0, 8)));
+  renderHist();
+}
+function renderHist() {
+  const h = loadHist();
+  $('#histCard').hidden = h.length === 0;
+  $('#histList').innerHTML = h.map((e, i) => {
+    const prev = h[i + 1];
+    const d = prev ? e.score - prev.score : 0;
+    const delta = prev && d !== 0 ? '<span class="histDelta mono ' + (d > 0 ? 'up' : 'down') + '">' + (d > 0 ? '▲' : '▼') + Math.abs(d) + '</span>' : '';
+    return '<div class="histRow"><span class="histScore mono">' + e.score + '</span>' + delta +
+      '<span class="histDate">' + new Date(e.t).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + '</span>' +
+      '<span class="mono" style="color:var(--muted)">ısı kaybı %' + e.drop + ' · ' + e.fps + ' fps</span></div>';
+  }).join('');
+}
+$('#histClear').addEventListener('click', () => { localStorage.removeItem(HKEY); renderHist(); });
+
+/* ---------- akış: butonlar ---------- */
+function setStep(name, cls) {
+  document.querySelectorAll('#steps li').forEach((li) => {
+    if (name === null) li.className = '';
+    else if (li.dataset.step === name) li.className = cls;
+  });
+}
+
+$('#fpsBtn').addEventListener('click', () => withTestLock(null, fpsTest));
+$('#cpuBtn').addEventListener('click', () => withTestLock(null, cpuTest));
+$('#thBtn').addEventListener('click', () => withTestLock(null, thermalTest));
+$('#runAll').addEventListener('click', () => withTestLock(null, async () => {
+  try {
+    setStep(null);
+    setStep('fps', 'active'); await fpsTest(); setStep('fps', 'done');
+    setStep('cpu', 'active'); await cpuTest(); setStep('cpu', 'done');
+    setStep('thermal', 'active'); await thermalTest(); setStep('thermal', 'done');
+    saveHistEntry();
+    $('#diagCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (e) { setStep(null); throw e; }
+}));
+
+/* ---------- açılış ---------- */
+fillDeviceInfo();
+state.refreshReady = measureRefresh();
+renderHist();
+
+// Tema değişince grafiği jetonlarla yeniden çiz.
+try {
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (state.results.thermal) drawChart(state.results.thermal.curve, true);
+  });
+} catch (e) {}
+window.addEventListener('resize', () => { if (state.results.thermal) drawChart(state.results.thermal.curve, true); });
+
+// ?demo=1 → sahte veriyle görünümü doldurur (geliştirme/önizleme içindir, geçmişe yazmaz).
+if (new URLSearchParams(location.search).has('demo')) {
+  state.refreshRate = 60;
+  state.results.fps = {
+    a: { fps: 52, dropped: 22, droppedPct: 9, worst: 88 },
+    b: { fps: 38, dropped: 61, droppedPct: 24, worst: 190 },
+  };
+  state.results.cpu = { score: 1240 };
+  const demoCurve = [100, 98, 96, 91, 86, 83, 80, 78, 76, 75, 73, 72, 70, 69, 68, 67, 66, 66, 65, 64];
+  state.results.thermal = { curve: demoCurve, drop: 0.34, batteryDrop: 2.5, workers: 5 };
+  $('#cpuRes').hidden = false;
+  $('#cpuRes').innerHTML = '<div class="resBox"><div class="k">Hız puanı</div><div class="v mono">' + nf0.format(1240) + '</div><div class="s">tek çekirdek, göreli puan</div></div>';
+  $('#thChartBox').hidden = false;
+  renderFps(); renderThermal(); renderDiagnosis();
+  requestAnimationFrame(() => drawChart(demoCurve, true));
+}
+</script>
+<!-- ICERIK-BITIS -->
+</body>
+</html>
