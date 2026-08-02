@@ -1,0 +1,78 @@
+# Telefon Sağlık Testi — sonuç hasadı
+#
+# Test sayfası (telefon-testi.html) sonucu, çivi sayacının kullandığı ntfy
+# konusuna {"telefonTest": {...}} mesajı olarak yazar. Bu görev o mesajları
+# toplar, depodaki kalıcı dosyaya (data/telefon-testleri.json) biriktirir ve
+# yeni sonuç geldiyse Telegram'a kısa bir bildirim yollar (bot ayarlıysa).
+#
+# ntfy mesajları ~12 saat saklandığı için zamanlanmış çalışma 2 saatte birdir;
+# "test sonuçlarıma bak" dendiğinde Claude bu görevi elle (workflow_dispatch)
+# tetikleyip dosyayı hemen günceller ve okur.
+#
+# Gerekli gizli anahtar: RAPOR_KODU (çivi sayacı raporlarıyla ortak).
+# TELEGRAM_TOKEN + TELEGRAM_CHAT_ID varsa bildirim de gönderilir, yoksa atlanır.
+name: Telefon Testi Hasat
+
+on:
+  schedule:
+    - cron: '43 6,8,10,12,14,16,18,20,22 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  hasat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sonuçları topla ve işle
+        env:
+          TOPIC: ${{ secrets.RAPOR_KODU }}
+          TG_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TOPIC:-}" ]; then
+            echo "RAPOR_KODU secret tanımlı değil."
+            exit 1
+          fi
+
+          mkdir -p data
+          [ -s data/telefon-testleri.json ] || echo '{"tests":[]}' > data/telefon-testleri.json
+          OLD=$(cat data/telefon-testleri.json)
+
+          RAW=$(curl -s "https://ntfy.sh/${TOPIC}/json?poll=1&since=12h" || true)
+          NEW=$(printf '%s\n' "$RAW" | jq -c 'select(.message != null) | (.message | fromjson?) | select(.telefonTest != null) | .telefonTest' 2>/dev/null | jq -s . || echo '[]')
+
+          # Daha önce işlenmemiş sonuçları ayıkla (t = testin zaman damgası).
+          ADDED=$(jq -cn --argjson o "$OLD" --argjson n "$NEW" \
+            '(($o.tests // []) | map(.t)) as $seen | [$n[] | select(.t as $x | ($seen | index($x)) | not)]')
+          COUNT=$(echo "$ADDED" | jq 'length')
+          echo "Yeni sonuç sayısı: $COUNT"
+
+          if [ "$COUNT" -gt 0 ]; then
+            MERGED=$(jq -cn --argjson o "$OLD" --argjson a "$ADDED" \
+              '{tests: ((($o.tests // []) + $a) | unique_by(.t) | sort_by(-.t) | .[0:50])}')
+            echo "$MERGED" | jq . > data/telefon-testleri.json
+
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/telefon-testleri.json
+            git commit -m "Telefon testi sonuçları güncellendi [otomatik hasat]" >/dev/null
+            git pull --rebase origin main >/dev/null 2>&1 || true
+            git push >/dev/null
+            echo "Sonuçlar kalıcı dosyaya işlendi."
+
+            if [ -n "${TG_TOKEN:-}" ] && [ -n "${TG_CHAT:-}" ]; then
+              OZET=$(echo "$ADDED" | jq -r 'sort_by(-.t) | .[0] |
+                "Puan: \(.score // "—")/100 · ısı kaybı %\(.isinma.dusus // "—") · süre \((((.isinma.sure // 0) / 60 * 10) | round) / 10) dk"')
+              curl -sf -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+                --data-urlencode "chat_id=${TG_CHAT}" \
+                --data-urlencode "text=🩺 Telefon Sağlık Testi — yeni sonuç geldi. ${OZET}. Claude'a \"test sonuçlarıma bak\" yazıp yorumlatabilirsin." > /dev/null \
+                && echo "Telegram bildirimi gönderildi." || echo "Telegram bildirimi gönderilemedi (atlandı)."
+            fi
+          else
+            echo "Veri değişmedi, kayıt atlandı."
+          fi
