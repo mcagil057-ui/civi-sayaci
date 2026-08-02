@@ -42,6 +42,7 @@
   }
 
   *{box-sizing:border-box}
+  [hidden]{display:none !important} /* display:flex/grid tanımlı öğelerde hidden ezilmesin */
   body{
     margin:0; background:var(--bg); color:var(--ink);
     font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
@@ -166,6 +167,12 @@
   details.tip ul{margin:6px 0 0; padding-left:18px; font-size:.87rem}
   details.tip li{margin-top:7px}
 
+  /* Sonuç gönderimi */
+  .fieldRow{display:flex; gap:8px; margin-top:10px}
+  .txtIn{flex:1; padding:9px 12px; border:1px solid var(--line); border-radius:10px; background:var(--card2); color:var(--ink); font-family:inherit; font-size:.9rem; min-width:0}
+  .chkRow{display:flex; align-items:center; gap:9px; margin-top:12px; font-size:.9rem; cursor:pointer}
+  .chkRow input{width:18px; height:18px; accent-color:var(--btn); margin:0}
+
   /* Geçmiş */
   .hist{margin-top:6px}
   .histRow{display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--line); font-size:.86rem}
@@ -287,6 +294,26 @@
       </div>
     </div>
     <div id="findings"></div>
+  </section>
+
+  <section class="card" id="sendCard">
+    <h2 class="cardTitle">📤 Sonuçları Claude’a gönder</h2>
+    <p class="cardDesc">Test bitince sonuç, çivi sayacının kullandığı rapor kanalı üzerinden depoya işlenir.
+    Sonrasında Claude’a yalnızca <em>“test sonuçlarıma bak”</em> yazmanız yeterlidir — sayıları elle kopyalamanız gerekmez.
+    (Sonuçta yalnızca test ölçümleri ve cihaz bilgisi vardır.)</p>
+    <dl class="info">
+      <div class="row"><dt>Rapor Kodu</dt><dd class="mono" id="sendCode">—</dd></div>
+    </dl>
+    <div class="fieldRow" id="sendCodeEntry" hidden>
+      <input class="txtIn mono" id="sendCodeInput" inputmode="text" autocapitalize="off" autocomplete="off"
+        placeholder="civi-rapor-xxxxxxxx" aria-label="Rapor kodu">
+      <button class="btnSmall" id="sendCodeSave">Kaydet</button>
+    </div>
+    <label class="chkRow"><input type="checkbox" id="sendAuto" checked> Test bitince otomatik gönder</label>
+    <div class="fieldRow">
+      <button class="btnSmall" id="sendNow" disabled>Son sonucu şimdi gönder</button>
+    </div>
+    <p class="note" id="sendStatus">Kod, çivi sayacındaki Rapor Kodu ile aynı olmalıdır (aynı tarayıcıda otomatik alınır).</p>
   </section>
 
   <section class="card">
@@ -686,6 +713,7 @@ async function fpsTest() {
   state.results.fps = { a, b };
   renderFps();
   renderDiagnosis();
+  afterTest(false);
 }
 
 function fpsBox(k, r) {
@@ -716,6 +744,7 @@ async function cpuTest() {
   el.innerHTML = '<div class="resBox"><div class="k">Hız puanı</div><div class="v mono">' + nf0.format(state.results.cpu.score) + '</div><div class="s">tek çekirdek, göreli puan</div></div>' +
     '<div class="resBox"><div class="k">Ne işe yarar?</div><div class="s" style="margin-top:6px">Puanın kendisi değil, ısınınca <strong>ne kadar düştüğü</strong> önemli — onu ısınma testi ölçer.</div></div>';
   renderDiagnosis();
+  afterTest(false);
 }
 
 /* ---------- 3) ısınma testi ----------
@@ -833,6 +862,7 @@ async function thermalTest() {
   drawChart(curve, true, dur);
   renderThermal();
   renderDiagnosis();
+  afterTest(true);
 }
 
 function renderThermal() {
@@ -1029,6 +1059,83 @@ function renderDiagnosis() {
   $('#findings').innerHTML = computeFindings().map(findingHTML).join('');
 }
 
+/* ---------- sonuç gönderimi (ntfy → GitHub hasadı → Claude) ----------
+   Sayfa sonucu, çivi sayacının rapor kanalına {"telefonTest": ...} olarak yazar;
+   depodaki hasat görevi bunu data/telefon-testleri.json'a işler. Rapor Kodu aynı
+   tarayıcıda çivi sayacından otomatik devralınır. */
+const TOPIC_OWN_KEY = 'telefon-testi-konu', AUTO_KEY = 'telefon-testi-oto';
+function detectTopic() {
+  let own = null, civi = null;
+  try { own = localStorage.getItem(TOPIC_OWN_KEY); civi = localStorage.getItem('civiSayaciRaporKonu'); } catch (e) {}
+  return { topic: own || civi || '', fromCivi: !own && !!civi };
+}
+function autoSendOn() { try { return localStorage.getItem(AUTO_KEY) !== '0'; } catch (e) { return true; } }
+function renderSendCard() {
+  const d = detectTopic();
+  $('#sendCode').textContent = d.topic ? d.topic + (d.fromCivi ? ' · çivi sayacından alındı' : '') : 'kod bulunamadı — aşağıya girin';
+  $('#sendCodeEntry').hidden = !!d.topic;
+  $('#sendAuto').checked = autoSendOn();
+  $('#sendNow').disabled = !state.lastPayload || !d.topic;
+}
+function buildPayload() {
+  const r = state.results;
+  if (!r.thermal && !r.fps && !r.cpu) return null;
+  const p = { t: Date.now(), ver: 2, refresh: state.refreshRate, score: computeScore() };
+  if (r.cpu) p.cpuPuan = r.cpu.score;
+  if (r.fps) p.fps = {
+    grafik: Math.round(r.fps.a.fps), akis: Math.round(r.fps.b.fps),
+    kayipA: Math.round(r.fps.a.droppedPct), kayipB: Math.round(r.fps.b.droppedPct),
+    donmaMs: Math.round(Math.max(r.fps.a.worst, r.fps.b.worst)),
+  };
+  if (r.thermal) {
+    const t = r.thermal;
+    p.isinma = {
+      sure: t.dur, dusus: Math.round(t.drop * 100), cpuDusus: Math.round(t.cpuDrop * 100),
+      gpuDusus: t.gpu ? Math.round(t.gpu.drop * 100) : null,
+      gpuFps: t.gpu ? [Math.round(t.gpu.start), Math.round(t.gpu.end)] : null,
+      pil: t.batteryDrop != null ? Math.round(t.batteryDrop * 10) / 10 : null,
+      egri: t.curve.map((v) => Math.round(v)), mod: t.mode, is: t.threads,
+    };
+  }
+  const u = uaInfo();
+  const modelEl = $('#iModel');
+  p.cihaz = {
+    model: (modelEl && modelEl.textContent !== '—' ? modelEl.textContent : u.model) || null,
+    os: u.os, tarayici: u.br,
+    cekirdek: navigator.hardwareConcurrency || null, ram: navigator.deviceMemory || null,
+    depolamaGB: state.storage ? Math.round(state.storage.quota / GB * 10) / 10 : null,
+    ag: state.net ? state.net.type : null,
+  };
+  return p;
+}
+async function sendResults() {
+  const d = detectTopic(), st = $('#sendStatus');
+  if (!d.topic) { st.textContent = '⚠️ Gönderilemedi: Rapor Kodu yok. Çivi sayacının Notlar sekmesindeki kodu girin.'; return; }
+  if (!state.lastPayload) { st.textContent = 'Önce bir test çalıştırın.'; return; }
+  st.textContent = 'Gönderiliyor…';
+  try {
+    const res = await fetch('https://ntfy.sh/' + encodeURIComponent(d.topic), { method: 'POST', body: JSON.stringify({ telefonTest: state.lastPayload }) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    st.textContent = '✅ Gönderildi (' + new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) + '). Artık Claude’a “test sonuçlarıma bak” yazabilirsiniz.';
+  } catch (e) {
+    st.textContent = '⚠️ Gönderilemedi — internet yok ya da bu kopyada dış bağlantı engelli. Sonuç telefonda duruyor; sayfayı siteden açıp “Son sonucu şimdi gönder”e basabilirsiniz.';
+  }
+}
+function afterTest(auto) {
+  state.lastPayload = buildPayload();
+  renderSendCard();
+  if (auto && autoSendOn()) sendResults();
+}
+$('#sendCodeSave').addEventListener('click', () => {
+  const v = ($('#sendCodeInput').value || '').trim();
+  if (!/^[a-zA-Z0-9_-]{4,64}$/.test(v)) { $('#sendStatus').textContent = 'Kod geçersiz görünüyor; çivi sayacındaki kodu birebir girin.'; return; }
+  try { localStorage.setItem(TOPIC_OWN_KEY, v); } catch (e) {}
+  renderSendCard();
+  $('#sendStatus').textContent = 'Kod kaydedildi.';
+});
+$('#sendAuto').addEventListener('change', (e) => { try { localStorage.setItem(AUTO_KEY, e.target.checked ? '1' : '0'); } catch (err) {} });
+$('#sendNow').addEventListener('click', () => sendResults());
+
 /* ---------- geçmiş ---------- */
 const HKEY = 'telefon-testi-gecmis';
 function loadHist() { try { return JSON.parse(localStorage.getItem(HKEY)) || []; } catch (e) { return []; } }
@@ -1095,6 +1202,7 @@ fillDeviceInfo();
 state.refreshReady = measureRefresh();
 renderHist();
 updateDurUI();
+renderSendCard();
 
 // Tema değişince grafiği jetonlarla yeniden çiz.
 try {
@@ -1120,6 +1228,7 @@ if (new URLSearchParams(location.search).has('demo')) {
   $('#cpuRes').innerHTML = '<div class="resBox"><div class="k">Hız puanı</div><div class="v mono">' + nf0.format(1240) + '</div><div class="s">tek çekirdek, göreli puan</div></div>';
   $('#thChartBox').hidden = false;
   renderFps(); renderThermal(); renderDiagnosis();
+  state.lastPayload = buildPayload(); renderSendCard();
   requestAnimationFrame(() => drawChart(demoCurve, true, 180));
 }
 </script>
