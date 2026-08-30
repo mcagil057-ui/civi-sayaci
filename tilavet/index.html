@@ -362,6 +362,25 @@ main > section { animation: gir .22s ease; }
 .nabiz.uyari { background: var(--turuncu); }
 .nabiz.hata { background: var(--kirmizi); }
 @keyframes nabiz { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.8); } }
+.ses-olcek { height: 6px; background: var(--yuzey-2); border-radius: 999px; overflow: hidden; margin-top: 10px; }
+.ses-olcek i {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--yesil), var(--altin));
+  transition: width .07s linear;
+}
+.duyulan {
+  margin-top: 9px; font-size: .8rem; color: var(--sonuk);
+  direction: rtl; text-align: right; word-break: break-word; line-height: 1.5;
+}
+.duyulan.bos { color: var(--turuncu); direction: ltr; text-align: left; }
+.tani-satir {
+  padding: 10px 12px; border-radius: var(--r-m); background: var(--yuzey);
+  border: 1px solid var(--cizgi); margin-bottom: 6px;
+}
+.tani-satir .ham { direction: rtl; text-align: right; font-size: .95rem; }
+.tani-satir .not { font-size: .72rem; color: var(--silik); margin-top: 4px; }
+.tani-satir.iyi { border-color: color-mix(in srgb, var(--yesil) 40%, transparent); }
+.tani-satir.kotu { border-color: color-mix(in srgb, var(--turuncu) 40%, transparent); }
 .olcek { height: 4px; background: var(--yuzey-2); border-radius: 999px; overflow: hidden; margin-top: 10px; }
 .olcek i { display: block; height: 100%; background: var(--altin); border-radius: 999px; transition: width .3s; }
 .ipucu {

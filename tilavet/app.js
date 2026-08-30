@@ -254,6 +254,7 @@
   function ciz() {
     var kap = $('#ekran');
     takipDurdurSessiz();
+    miktestDurdur();
     sesDurdur();
     fabKaldir();
     ayetSecimiTemizle();
@@ -487,6 +488,10 @@
     kart3.appendChild(anahtar('Okurken kendiliğinden kaydır', null, D.ayar.otoKaydir, function (v) { D.ayar.otoKaydir = v; kaydet(); }));
     kart3.appendChild(anahtar('Takılınca ipucu ver', 'Dört saniye ilerleme olmazsa sonraki kelimeyi gösterir', D.ayar.sesliIpucu,
       function (v) { D.ayar.sesliIpucu = v; kaydet(); }));
+    kart3.appendChild(el('button', {
+      sinif: 'dugme', style: 'margin-top:10px', metin: '🎙 Mikrofon testi',
+      onclick: function () { git({ ad: 'miktest' }); }
+    }));
     kart3.appendChild(el('div', { sinif: 'minik silik', style: 'margin-top:8px', metin: 'Ses tanıma tarayıcının kendi hizmetiyle çalışır ve internet ister. Kaydınız bu uygulamada saklanmaz.' }));
     k.appendChild(kart3);
 
@@ -937,80 +942,279 @@
 
   function takipDurdurSessiz() {
     if (!takip) return;
-    try { takip.tanima.stop(); } catch (e) {}
-    takip.tanima.onend = null;
-    clearInterval(takip.saat);
-    takip = null;
+    var t = takip;
+    takip = null;                       // önce sıfırla: geri çağrılar sussun
+    if (t.oturum) t.oturum.dur();
+    if (t.kapi) t.kapi.kapat();
+    if (t.kilit) t.kilit.birak();
+    if (t.cerceve) cancelAnimationFrame(t.cerceve);
+    if (t.gorunluk) document.removeEventListener('visibilitychange', t.gorunluk);
+    clearInterval(t.saat);
   }
 
   function kelimeOgesi(s, a, w) {
     return $('.k[data-s="' + s + '"][data-a="' + a + '"][data-w="' + w + '"]');
   }
 
-  function takipBaslat(g, kapsam) {
-    var Tanima = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Tanima) { bildir('Ses tanıma desteklenmiyor'); return; }
+  /* ---------------- mikrofon: erişim ve ses seviyesi ----------------
+   * Tanıyıcının kendi izin akışına güvenmek yetmiyor: izin verilmediğinde
+   * ya da mikrofon başka bir uygulamadaysa hiçbir belirti çıkmıyordu.
+   * Akışı kendimiz açıp seviyeyi ölçüyoruz; böylece kullanıcı hiç değilse
+   * "sesim gidiyor mu" sorusunun cevabını görüyor. */
+  function SesKapisi() { this.akis = null; this.ctx = null; this.analiz = null; this.tampon = null; }
 
-    var tepe = el('div', { sinif: 'takip-tepe' });
+  SesKapisi.prototype.ac = function () {
+    var ben = this;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return Promise.reject(new Error('Bu tarayıcı mikrofona erişemiyor. Sayfanın https adresinde açık olduğundan emin ol.'));
+    }
+    return navigator.mediaDevices.getUserMedia({ audio: true }).then(function (akis) {
+      ben.akis = akis;
+      try {
+        var Ctx = window.AudioContext || window.webkitAudioContext;
+        ben.ctx = new Ctx();
+        if (ben.ctx.state === 'suspended') ben.ctx.resume();
+        ben.analiz = ben.ctx.createAnalyser();
+        ben.analiz.fftSize = 512;
+        ben.tampon = new Uint8Array(ben.analiz.fftSize);
+        ben.ctx.createMediaStreamSource(akis).connect(ben.analiz);
+      } catch (e) { ben.analiz = null; }   // seviye ölçülemese de tanıma sürsün
+    }).catch(function (e) {
+      var ad = e && e.name;
+      if (ad === 'NotAllowedError' || ad === 'SecurityError') {
+        throw new Error('Mikrofon izni verilmedi. Adres çubuğundaki kilit simgesinden bu siteye mikrofon izni ver.');
+      }
+      if (ad === 'NotFoundError' || ad === 'DevicesNotFoundError') throw new Error('Cihazda mikrofon bulunamadı.');
+      if (ad === 'NotReadableError' || ad === 'TrackStartError') throw new Error('Mikrofon başka bir uygulamada açık. Onu kapatıp yeniden dene.');
+      throw new Error(e.message || 'Mikrofon açılamadı.');
+    });
+  };
+  /** 0–1 arası anlık ses düzeyi. */
+  SesKapisi.prototype.seviye = function () {
+    if (!this.analiz) return 0;
+    this.analiz.getByteTimeDomainData(this.tampon);
+    var toplam = 0;
+    for (var i = 0; i < this.tampon.length; i++) {
+      var d = (this.tampon[i] - 128) / 128;
+      toplam += d * d;
+    }
+    return Math.min(1, Math.sqrt(toplam / this.tampon.length) * 4);
+  };
+  SesKapisi.prototype.kapat = function () {
+    if (this.akis) this.akis.getTracks().forEach(function (t) { t.stop(); });
+    if (this.ctx && this.ctx.close) { try { this.ctx.close(); } catch (e) {} }
+    this.akis = null; this.ctx = null; this.analiz = null;
+  };
+
+  /* ---------------- tanıyıcı oturumu ----------------
+   * Web Speech API sürekli dinlemez: her cümleden sonra kendiliğinden kapanır.
+   * Bu yüzden yeniden açmak zorunludur, ama iki tuzağı var:
+   *   1. Hemen start() çağırmak InvalidStateError verir; kısa bir gecikme şart.
+   *   2. Her yeni oturumda results listesi baştan başlar. Kaç kelime
+   *      işlediğimizi oturumlar arası taşırsak, yeniden başlamadan sonra gelen
+   *      kelimeleri "zaten işledik" sanıp atarız — mikrofon çalışıyorken bile
+   *      hiçbir şey algılanmamış gibi görünür.
+   */
+  var TANIMA_HATA = {
+    'not-allowed': 'Mikrofon izni verilmedi.',
+    'service-not-allowed': 'Cihazın ses tanıma hizmeti bu sayfaya izin vermedi.',
+    'audio-capture': 'Mikrofona ulaşılamadı.',
+    'network': 'Ses tanıma internet ister; bağlantı kurulamadı.',
+    'language-not-supported': 'Cihazın ses tanıması bu dili desteklemiyor. Ayarlardan başka bir Arapça lehçesi dene.',
+    'bad-grammar': 'Tanıma dilbilgisi reddedildi.'
+  };
+  var OLUMCUL = { 'not-allowed': 1, 'service-not-allowed': 1, 'audio-capture': 1, 'language-not-supported': 1 };
+
+  function TanimaOturumu(dil, geri) {
+    var Tanima = window.SpeechRecognition || window.webkitSpeechRecognition;
+    this.geri = geri;
+    this.calisiyor = false;      // kullanıcının niyeti
+    this.acik = false;           // tanıyıcı gerçekten açık mı
+    this.gecikme = 250;          // yeniden açmadan önce beklenecek süre
+    this.kisaSayaci = 0;         // arka arkaya hemen kapanan oturum sayısı
+    this.zaman = null;
+    this.sayac = {};             // OTURUMA ÖZEL: her açılışta sıfırlanır
+    this.duyulan = '';
+    var t = this.t = new Tanima();
+    t.lang = dil;
+    t.continuous = true;
+    t.interimResults = true;
+    t.maxAlternatives = 1;
+    var ben = this;
+
+    t.onstart = function () {
+      ben.acik = true;
+      ben.acildi = Date.now();
+      ben.sayac = {};                          // yeni oturum, sayaç sıfır
+      ben.gecikme = 250; ben.kisaSayaci = 0;
+      geri.durum('canli', 'Dinliyorum — oku');
+    };
+
+    t.onresult = function (e) {
+      var yeni = [], ham = '';
+      for (var i = e.resultIndex; i < e.results.length; i++) {
+        var metin = e.results[i][0].transcript;
+        ham = metin;
+        var jetonlar = T.tokens(metin);
+        var onceki = ben.sayac[i] || 0;
+        if (jetonlar.length > onceki) {
+          yeni = yeni.concat(jetonlar.slice(onceki));
+          ben.sayac[i] = jetonlar.length;
+        }
+      }
+      if (ham) { ben.duyulan = ham; geri.duyuldu(ham, T.tokens(ham)); }
+      if (yeni.length) geri.kelimeler(yeni);
+    };
+
+    t.onerror = function (e) {
+      if (e.error === 'no-speech' || e.error === 'aborted') return;
+      var mesaj = TANIMA_HATA[e.error] || ('Tanıma hatası: ' + e.error);
+      if (OLUMCUL[e.error]) { ben.calisiyor = false; geri.oldu(mesaj); }
+      else geri.durum('uyari', mesaj);
+    };
+
+    t.onend = function () {
+      ben.acik = false;
+      if (!ben.calisiyor) return;
+      // Oturum hemen kapandıysa bir sorun var; aralığı kademeli aç.
+      var omur = Date.now() - (ben.acildi || 0);
+      if (omur < 600) {
+        ben.kisaSayaci++;
+        ben.gecikme = Math.min(4000, ben.gecikme * 2);
+      } else { ben.kisaSayaci = 0; ben.gecikme = 250; }
+      if (ben.kisaSayaci >= 6) {
+        ben.calisiyor = false;
+        geri.oldu('Ses tanıma açılır açılmaz kapanıyor. Tarayıcının mikrofon iznini ve internet bağlantısını kontrol et.');
+        return;
+      }
+      ben.zaman = setTimeout(function () { ben._ac(); }, ben.gecikme);
+    };
+  }
+  TanimaOturumu.prototype._ac = function () {
+    if (!this.calisiyor || this.acik) return;
+    try { this.t.start(); }
+    catch (e) {
+      // Zaten açıksa görmezden gel; başka bir hata ise biraz sonra yeniden dene.
+      var ben = this;
+      this.zaman = setTimeout(function () { ben._ac(); }, 600);
+    }
+  };
+  TanimaOturumu.prototype.basla = function () { this.calisiyor = true; this._ac(); };
+  TanimaOturumu.prototype.duraklat = function () {
+    this.calisiyor = false;
+    clearTimeout(this.zaman);
+    try { this.t.stop(); } catch (e) {}
+  };
+  TanimaOturumu.prototype.dur = function () {
+    this.calisiyor = false;
+    clearTimeout(this.zaman);
+    this.t.onend = null; this.t.onresult = null; this.t.onerror = null; this.t.onstart = null;
+    try { this.t.abort(); } catch (e) {}
+  };
+
+  /** Okurken ekran sönmesin. */
+  function EkranKilidi() { this.kilit = null; }
+  EkranKilidi.prototype.al = function () {
+    var ben = this;
+    if (!navigator.wakeLock || this.kilit) return;
+    navigator.wakeLock.request('screen').then(function (k) { ben.kilit = k; }).catch(function () {});
+  };
+  EkranKilidi.prototype.birak = function () {
+    if (this.kilit) { try { this.kilit.release(); } catch (e) {} this.kilit = null; }
+  };
+
+  function takipBaslat(g, kapsam) {
+    if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) {
+      bildir('Bu tarayıcı canlı ses tanımayı desteklemiyor'); fabDurum(false); return;
+    }
+
     var nabiz = el('i', { sinif: 'nabiz' });
-    var durumMetin = el('div', { sinif: 'kucuk buyu', metin: 'Dizin hazırlanıyor…' });
+    var durumMetin = el('div', { sinif: 'kucuk buyu', metin: 'Mikrofon isteniyor…' });
+    var sesDolgu = el('i', { style: 'width:0%' });
     var olcekIc = el('i', { style: 'width:0%' });
-    tepe.appendChild(el('div', { sinif: 'durum' }, nabiz, durumMetin));
-    tepe.appendChild(el('div', { sinif: 'olcek' }, olcekIc));
+    var duyulanKutu = el('div', { sinif: 'duyulan', hidden: 'hidden' });
     var ipucuKutu = el('div', { sinif: 'ipucu', hidden: 'hidden' });
-    tepe.appendChild(ipucuKutu);
+    var tepe = el('div', { sinif: 'takip-tepe' },
+      el('div', { sinif: 'durum' }, nabiz, durumMetin),
+      el('div', { sinif: 'ses-olcek' }, sesDolgu),
+      el('div', { sinif: 'olcek' }, olcekIc),
+      duyulanKutu, ipucuKutu);
     var ekran = $('#ekran section');
     ekran.insertBefore(tepe, ekran.firstChild);
     fabDurum(true);
 
-    dizinGetir().then(function (ix) {
+    var kapi = new SesKapisi(), kilit = new EkranKilidi();
+    var ogeler = { nabiz: nabiz, durum: durumMetin, olcek: olcekIc, ses: sesDolgu, duyulan: duyulanKutu, ipucu: ipucuKutu };
+
+    function durumBildirDis(sinif, metin) {
+      ogeler.nabiz.className = 'nabiz ' + sinif;
+      ogeler.durum.textContent = metin;
+    }
+    function olumcul(mesaj) {
+      durumBildirDis('hata', mesaj);
+      fabDurum(false);
+      if (takip) { takip.aktif = false; }
+      tepe.appendChild(el('button', {
+        sinif: 'dugme ince', style: 'margin-top:10px',
+        metin: 'Yeniden dene',
+        onclick: function () { takipDurdurSessiz(); takipBaslat(g, kapsam); }
+      }));
+    }
+
+    // Önce mikrofon, sonra dizin: izin verilmezse boşuna 744 KB indirmeyelim.
+    kapi.ac().then(function () {
+      durumBildirDis('canli', 'Dizin hazırlanıyor…');
+      return dizinGetir();
+    }).then(function (ix) {
       var aralik = kapsamKelimeAralik(kapsam);
       var baslangic = Math.max(aralik[0], ix.ayahStart[ayetDizini(g.bas.s, g.bas.a)]);
       var izleyici = new T.Tracker(ix, { range: aralik, cursor: baslangic, now: Date.now() });
 
-      var tanima = new Tanima();
-      tanima.lang = D.ayar.tanimaDili;
-      tanima.continuous = true;
-      tanima.interimResults = true;
-      tanima.maxAlternatives = 1;
+      var oturum = new TanimaOturumu(D.ayar.tanimaDili, {
+        durum: function (sinif, metin) { if (takip) durumBildirDis(sinif, metin); },
+        oldu: function (mesaj) { olumcul(mesaj); },
+        kelimeler: function (liste) { takipIsle(liste); },
+        duyuldu: function (ham, jetonlar) {
+          if (!takip) return;
+          ogeler.duyulan.hidden = false;
+          ogeler.duyulan.textContent = jetonlar.length
+            ? 'duyulan: ' + ham
+            : 'duyulan: ' + ham + '  — Arapça harf çıkmadı, tanıma dili cihazda desteklenmiyor olabilir';
+          ogeler.duyulan.classList.toggle('bos', !jetonlar.length);
+        }
+      });
 
       takip = {
-        tanima: tanima, izleyici: izleyici, g: g, kapsam: kapsam, ix: ix,
-        basladi: Date.now(), sayac: {}, saat: null, sonKaydirma: 0, aktif: true,
-        ogeler: { nabiz: nabiz, durum: durumMetin, olcek: olcekIc, ipucu: ipucuKutu }
+        oturum: oturum, kapi: kapi, kilit: kilit, izleyici: izleyici,
+        g: g, kapsam: kapsam, ix: ix, basladi: Date.now(),
+        saat: null, cerceve: null, sonKaydirma: 0, aktif: true, ogeler: ogeler,
+        gorunluk: null, tepe: tepe
       };
-
-      // Tanıyıcı ara sonuçları büyüterek yollar; yalnız yeni eklenen kelimeleri al.
-      tanima.onresult = function (e) {
-        var yeni = [];
-        for (var i = e.resultIndex; i < e.results.length; i++) {
-          var jetonlar = T.tokens(e.results[i][0].transcript);
-          var onceki = takip.sayac[i] || 0;
-          if (jetonlar.length > onceki) {
-            yeni = yeni.concat(jetonlar.slice(onceki));
-            takip.sayac[i] = jetonlar.length;
-          }
-        }
-        if (yeni.length) takipIsle(yeni);
-      };
-      tanima.onstart = function () { durumBildir('canli', 'Dinliyorum — oku'); };
-      tanima.onerror = function (e) {
-        if (e.error === 'no-speech' || e.error === 'aborted') return;
-        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-          durumBildir('hata', 'Mikrofon izni verilmedi'); takipBitir(true);
-        } else if (e.error === 'network') {
-          durumBildir('hata', 'Ses tanıma için internet gerekiyor');
-        } else {
-          durumBildir('uyari', 'Tanıma hatası: ' + e.error);
-        }
-      };
-      tanima.onend = function () {
-        // Tarayıcı sessizlikte kendiliğinden durur; oturum sürüyorsa yeniden başlat.
-        if (takip && takip.aktif) { try { tanima.start(); } catch (e) {} }
-      };
-
       takip.bitir = function () { takipBitir(false); };
-      try { tanima.start(); } catch (e) { durumBildir('hata', 'Mikrofon başlatılamadı'); }
+
+      oturum.basla();
+      kilit.al();
+
+      // Ses düzeyi: tanıyıcı sussa bile mikrofonun çalıştığı görünsün.
+      (function cerceve() {
+        if (!takip) return;
+        var d = kapi.seviye();
+        ogeler.ses.style.width = Math.round(d * 100) + '%';
+        takip.cerceve = requestAnimationFrame(cerceve);
+      })();
+
+      // Sayfa arkaya alınınca tarayıcı tanımayı zaten kesiyor; sessizce
+      // ölmek yerine duraklatıp geri dönünce kendiliğinden sürdürüyoruz.
+      takip.gorunluk = function () {
+        if (!takip) return;
+        if (document.hidden) {
+          oturum.duraklat();
+          durumBildirDis('uyari', 'Duraklatıldı — ekrana dönünce sürer');
+        } else {
+          oturum.basla(); kilit.al();
+        }
+      };
+      document.addEventListener('visibilitychange', takip.gorunluk);
 
       takip.saat = setInterval(function () {
         if (!takip) return;
@@ -1019,23 +1223,20 @@
           var yer = ix.locate(Math.min(izleyici.cursor, izleyici.range[1] - 1));
           var konum = yer && dizindenKonum(yer.ayah);
           var oge = konum && kelimeOgesi(konum.s, konum.a, yer.word);
-          takip.ogeler.ipucu.textContent = oge ? oge.textContent : (st.ipucu[0] || '');
-          takip.ogeler.ipucu.hidden = false;
-          durumBildir('uyari', 'Takıldın mı? İpucu yukarıda');
+          ogeler.ipucu.textContent = oge ? oge.textContent : (st.ipucu[0] || '');
+          ogeler.ipucu.hidden = false;
+          durumBildirDis('uyari', 'Takıldın mı? İpucu yukarıda');
           if (oge) oge.classList.remove('gizli');     // takılınca o tek kelimeyi aç
         }
       }, 1000);
 
       imleciGoster();
     }).catch(function (e) {
-      durumMetin.textContent = 'Dizin yüklenemedi: ' + e.message;
-      nabiz.className = 'nabiz hata';
+      olumcul(e.message || 'Mikrofon başlatılamadı.');
     });
 
     function durumBildir(sinif, metin) {
-      if (!takip) return;
-      takip.ogeler.nabiz.className = 'nabiz ' + sinif;
-      takip.ogeler.durum.textContent = metin;
+      if (takip) durumBildirDis(sinif, metin);
     }
 
     function imleciGoster() {
@@ -1098,6 +1299,7 @@
       var izleyici = takip.izleyici, g2 = takip.g, kapsam2 = takip.kapsam;
       var sure = (Date.now() - takip.basladi) / 60000;
       takip.aktif = false;
+      if (takip.oturum) takip.oturum.duraklat();
       var rapor = izleyici.report();
       takipDurdurSessiz();
       fabDurum(false);
@@ -1268,6 +1470,111 @@
     }
     return k;
   };
+
+  /* ================= ekran: Mikrofon testi =================
+   * Takip çalışmadığında sorunun hangi halkada olduğunu görmek için:
+   * mikrofon açılıyor mu, ses gidiyor mu, tanıyıcı ne duyuyor, duyduğu
+   * Kur'an'da bir yere oturuyor mu. */
+  var miktest = null;
+
+  function miktestDurdur() {
+    if (!miktest) return;
+    var m = miktest; miktest = null;
+    if (m.oturum) m.oturum.dur();
+    if (m.kapi) m.kapi.kapat();
+    if (m.cerceve) cancelAnimationFrame(m.cerceve);
+  }
+
+  CIZERLER.miktest = function () {
+    $('#baslik').textContent = 'Mikrofon testi';
+    var k = el('section');
+
+    var guvenli = window.isSecureContext;
+    var destek = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+    k.appendChild(el('div', { sinif: 'kart' },
+      el('div', { sinif: 'kart-baslik', style: 'margin-top:0', metin: 'Cihaz' }),
+      satirBilgi('Ses tanıma desteği', destek ? 'var' : 'YOK', destek),
+      satirBilgi('Güvenli bağlam (https)', guvenli ? 'evet' : 'HAYIR', guvenli),
+      satirBilgi('Mikrofon erişimi', navigator.mediaDevices ? 'kullanılabilir' : 'YOK', !!navigator.mediaDevices),
+      satirBilgi('Tanıma dili', D.ayar.tanimaDili, true),
+      satirBilgi('Tarayıcı', (navigator.userAgent.match(/(Chrome|Firefox|Safari|Edg)\/[\d.]+/) || ['bilinmiyor'])[0], true)
+    ));
+
+    if (!destek) {
+      k.appendChild(el('div', { sinif: 'uyari-kutu' },
+        'Bu tarayıcı canlı ses tanımayı desteklemiyor. Android’de Chrome, masaüstünde Chrome veya Edge kullan. Firefox ve iOS Safari desteklemiyor.'));
+      return k;
+    }
+
+    var durumMetin = el('div', { sinif: 'kucuk buyu', metin: 'Başlat’a bas ve bir şeyler oku' });
+    var nabiz = el('i', { sinif: 'nabiz' });
+    var sesDolgu = el('i', { style: 'width:0%' });
+    var kayitlar = el('div', { style: 'margin-top:12px' });
+    var dugme = el('button', { sinif: 'dugme ana', metin: 'Başlat' });
+
+    k.appendChild(el('div', { sinif: 'kart' },
+      el('div', { sinif: 'durum' }, nabiz, durumMetin),
+      el('div', { sinif: 'ses-olcek' }, sesDolgu),
+      el('div', { sinif: 'minik silik', style: 'margin-top:8px', metin: 'Çubuk konuşurken hareket ediyorsa mikrofon çalışıyor demektir. Hareket ediyor ama aşağıya yazı düşmüyorsa sorun tanıma hizmetindedir.' })
+    ));
+    k.appendChild(dugme);
+    k.appendChild(kayitlar);
+
+    function bilgi(sinif, metin) { nabiz.className = 'nabiz ' + sinif; durumMetin.textContent = metin; }
+    function ekle(ham, jetonlar, ix) {
+      var sonuc = null;
+      if (ix && jetonlar.length) {
+        var r = ix.find(jetonlar, { limit: 1 });
+        if (r.length && r[0].score >= 0.5) sonuc = r[0];
+      }
+      var not;
+      if (!jetonlar.length) not = 'Arapça harf çıkmadı — tanıma dili cihazda desteklenmiyor olabilir';
+      else if (sonuc) {
+        var yer = dizindenKonum(sonuc.ayah);
+        not = 'eşleşti: ' + sureBilgi(yer.s).ad + ' ' + yer.s + ':' + yer.a +
+              ' · %' + Math.round(sonuc.score * 100);
+      } else not = jetonlar.length + ' kelime duyuldu ama Kur’an’da bir yere oturmadı';
+      kayitlar.insertBefore(el('div', { sinif: 'tani-satir ' + (sonuc ? 'iyi' : 'kotu') },
+        el('div', { sinif: 'ham', metin: ham }),
+        el('div', { sinif: 'not', metin: not })), kayitlar.firstChild);
+      while (kayitlar.children.length > 12) kayitlar.removeChild(kayitlar.lastChild);
+    }
+
+    dugme.addEventListener('click', function () {
+      if (miktest) { miktestDurdur(); dugme.textContent = 'Başlat'; bilgi('', 'Durduruldu'); return; }
+      dugme.textContent = 'Durdur';
+      bilgi('', 'Mikrofon isteniyor…');
+      var kapi = new SesKapisi();
+      miktest = { kapi: kapi };
+      var dizin = null;
+      kapi.ac().then(function () {
+        bilgi('canli', 'Dinliyorum — bir ayet oku');
+        (function cerceve() {
+          if (!miktest) return;
+          sesDolgu.style.width = Math.round(kapi.seviye() * 100) + '%';
+          miktest.cerceve = requestAnimationFrame(cerceve);
+        })();
+        dizinGetir().then(function (ix) { dizin = ix; }).catch(function () {});
+        miktest.oturum = new TanimaOturumu(D.ayar.tanimaDili, {
+          durum: function (sinif, metin) { if (miktest) bilgi(sinif, metin); },
+          oldu: function (mesaj) { if (miktest) { bilgi('hata', mesaj); miktestDurdur(); dugme.textContent = 'Başlat'; } },
+          kelimeler: function () {},
+          duyuldu: function (ham, jetonlar) { if (miktest) ekle(ham, jetonlar, dizin); }
+        });
+        miktest.oturum.basla();
+      }).catch(function (e) {
+        bilgi('hata', e.message);
+        miktestDurdur(); dugme.textContent = 'Başlat';
+      });
+    });
+    return k;
+  };
+
+  function satirBilgi(ad, deger, iyi) {
+    return el('div', { sinif: 'ayar' },
+      el('div', { sinif: 'buyu kucuk', metin: ad }),
+      el('span', { sinif: 'rozet ' + (iyi ? 'yesil' : 'kirmizi'), metin: deger }));
+  }
 
   /* ================= ekran: Durum ================= */
   CIZERLER.istatistik = function () {

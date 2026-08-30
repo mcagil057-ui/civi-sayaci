@@ -78,6 +78,29 @@ CHROME=/yol/chrome node tilavet/test/arayuz.test.js
 
 Veri paketi `tools/veri-uret.py` ile üretilir.
 
+## Mikrofon
+
+Web Speech API sürekli dinlemez: her cümleden sonra kendiliğinden kapanır, biz
+yeniden açarız. Bunun iki tuzağı vardır ve ikisi de burada çözülür:
+
+1. Kapanır kapanmaz `start()` çağırmak `InvalidStateError` verir — kısa bir
+   gecikme ve kademeli geri çekilme gerekir.
+2. **Her yeni oturumda `results` listesi baştan başlar.** Kaç kelime
+   işlediğimizi oturumlar arası taşırsak, yeniden açılıştan sonra gelen
+   kelimeleri "zaten işledik" sanıp atarız: mikrofon pekâlâ çalışırken hiçbir
+   şey algılanmıyormuş gibi görünür. Sayaç bu yüzden her `onstart` ile
+   sıfırlanır (`test/arayuz.test.js` bunu ayrıca sınar).
+
+Tanıyıcının kendi izin akışına güvenilmez: mikrofon `getUserMedia` ile ayrıca
+açılır, ses düzeyi ölçülüp ekranda gösterilir ve duyulan ham metin yazılır.
+Böylece "mikrofon mu, tanıma mı, eşleştirme mi" sorusu bakarak yanıtlanır.
+Ayarlar → **Mikrofon testi** aynı zinciri tek başına çalıştırır.
+
+Okurken ekran kilidi (Wake Lock) alınır. Sayfa arkaya alınınca tarayıcı
+tanımayı zaten keser; oturum duraklatılır ve geri dönülünce kendiliğinden
+sürer — **bir web uygulaması ekran kapalıyken arka planda dinleyemez**, bu
+platform sınırıdır.
+
 ## Bilinmesi gerekenler
 
 - **Ses tanıma tarayıcının hizmetidir**, internet ister ve Kur'an tilaveti için
