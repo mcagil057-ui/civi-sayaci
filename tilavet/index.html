@@ -170,6 +170,9 @@ main > section { animation: gir .22s ease; }
 .oge .ad { font-weight: 650; font-size: .95rem; }
 .oge .alt { font-size: .74rem; color: var(--silik); margin-top: 2px; }
 .oge .sag { text-align: right; font-size: .75rem; color: var(--sonuk); flex: none; }
+.oge-ac { flex: 1; min-width: 0; text-align: left; padding: 0; }
+.oge-kaldir { flex: none; width: 30px; height: 30px; border-radius: 8px; color: var(--silik); font-size: .8rem; }
+.oge-kaldir:active { background: var(--yuzey-2); color: var(--kirmizi); }
 .oge .ar { font-family: var(--arapca); font-size: 1.15rem; color: var(--sonuk); }
 
 .sekmeler { display: flex; gap: 6px; background: var(--yuzey); padding: 4px; border-radius: var(--r-m); margin-bottom: 14px; }
@@ -231,6 +234,66 @@ main > section { animation: gir .22s ease; }
   position: sticky; bottom: 0; display: flex; gap: 8px; padding: 10px 0 4px;
   background: linear-gradient(180deg, transparent, var(--bg) 30%);
 }
+
+/* ---------- mushaf sayfası ---------- */
+/* Sayfa sınırları basılı mushafla birebir aynıdır (604 sayfa); satır
+   kırılımları değildir — satır düzeyinde mushaf verisi çevrimdışı bir
+   kaynakta bulunmuyor. */
+.mushaf {
+  font-family: var(--arapca); direction: rtl;
+  text-align: justify; text-align-last: center;
+  font-size: var(--hat-boy, 1.75rem); line-height: 2.5;
+  padding: 22px 16px; margin-top: 4px;
+  border: 1px solid var(--cizgi); border-radius: var(--r-l);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--altin) 4%, transparent), transparent 40%);
+}
+.mushaf-ayet { border-radius: 6px; transition: background .15s; }
+.mushaf-ayet.secili, .mushaf-ayet.etkin { background: color-mix(in srgb, var(--altin) 15%, transparent); }
+.nisan { color: var(--altin); font-size: .8em; padding: 0 3px; }
+.sure-ayrac {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  margin: 16px 0 8px; padding: 10px 14px; direction: rtl;
+  border: 1px solid color-mix(in srgb, var(--altin) 28%, transparent);
+  border-radius: var(--r-m);
+  background: color-mix(in srgb, var(--altin) 8%, transparent);
+}
+.sure-ayrac .ar { font-family: var(--arapca); font-size: 1.35rem; color: var(--altin); }
+.sure-ayrac .tr { font-size: .8rem; color: var(--sonuk); font-weight: 600; }
+.sayfa-altlik {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 6px 4px; font-size: .72rem; color: var(--silik);
+}
+.sayfa-altlik .sayfa-no {
+  font-family: var(--arapca); font-size: 1.15rem; color: var(--altin);
+  border: 1px solid color-mix(in srgb, var(--altin) 30%, transparent);
+  border-radius: 999px; padding: 1px 12px;
+}
+.sayfa-gezinme { display: flex; gap: 8px; justify-content: center; margin-top: 12px; }
+.duzen-secim { display: flex; gap: 6px; background: var(--yuzey); padding: 3px; border-radius: var(--r-m); margin: 10px 0 4px; }
+.duzen-secim button { flex: 1; padding: 7px; border-radius: var(--r-s); font-size: .78rem; font-weight: 650; color: var(--silik); }
+.duzen-secim button[aria-selected="true"] { background: var(--yuzey-2); color: var(--metin); }
+
+/* ---------- alt tabaka ve işlem çubuğu ---------- */
+.tabaka {
+  position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-end;
+  background: rgba(0,0,0,.55); backdrop-filter: blur(2px); animation: gir .18s ease;
+}
+.sayfa-alt-tabaka {
+  width: 100%; max-height: 82vh; overflow-y: auto;
+  background: var(--bg-2); border-top: 1px solid var(--cizgi);
+  border-radius: 22px 22px 0 0; padding: 12px 18px calc(var(--alt) + 26px);
+}
+.tutamak { width: 40px; height: 4px; border-radius: 999px; background: var(--cizgi); margin: 0 auto 12px; }
+.ayar select.genis { max-width: 62%; }
+.ayet-islem {
+  position: fixed; left: 12px; right: 12px; bottom: calc(var(--alt) + 14px); z-index: 30;
+  display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  background: var(--bg-2); border: 1px solid var(--cizgi);
+  border-radius: var(--r-l); padding: 10px 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.4); animation: gir .18s ease;
+}
+.ayet-islem .dugme { flex: 1 1 auto; }
+.ayet-islem .kapat { flex: 0 0 auto; padding: 9px 12px; color: var(--silik); }
 
 /* ---------- takip ---------- */
 .takip-tepe { position: sticky; top: 0; z-index: 3; padding: 10px 0; background: var(--bg); }

@@ -7,6 +7,21 @@ atladığın ya da yanlış okuduğun yerleri gösterir.
 Sunucu yoktur: metin statik dosyalardan gelir, ses tanıma tarayıcıda çalışır,
 ilerleme yalnız cihazda saklanır. GitHub Pages'te olduğu gibi çalışır.
 
+## Kapsam
+
+Okuyucu, kâri sesi ve mikrofon takibi tek bir kavram üzerinden çalışır:
+**kapsam**. Bir kapsam ya bir sûre, ya bir mushaf sayfası, ya da seçilmiş bir
+ayet aralığıdır. Üçü de aynı kod yolunu kullanır; "sayfayı ezberle" ile "şu üç
+ayeti beş kez tekrar et" ayrı birer özellik olmak zorunda kalmaz. Aralık,
+sûre+ayet yerine genel ayet sırasıyla tutulur, böylece iki sûreye taşan bir
+sayfadan da aralık seçilebilir.
+
+İki okuma düzeni vardır: **ayet ayet** (meal ve araçlarla) ve **mushaf**
+(sürekli, iki yana yaslı hat, ayet madalyonları, sûre ayraçları, sayfa
+altlığı). Sayfa sınırları basılı mushafla birebir aynıdır — 604 sayfa — ama
+**satır kırılımları aynı değildir**: satır düzeyinde mushaf düzeni verisi
+çevrimdışı erişilebilir bir kaynakta bulunmuyor.
+
 ## Nasıl çalışır
 
 Zor olan kısım ses tanıma değil, **tanınanı metne oturtmak**. Boru hattı:
@@ -49,8 +64,17 @@ Zor olan kısım ses tanıma değil, **tanınanı metne oturtmak**. Boru hattı:
 | `data/match.json` | 6236 ayetin eşleştirme metni (77.433 kelime) |
 | `sw.js` | çevrimdışı önbellek |
 | `test/engine.test.js` | motor testleri (gerçek Kur'an verisiyle) |
+| `test/arayuz.test.js` | arayüz testleri (gerçek tarayıcıda, sahte mikrofonla) |
 
-Testler: `node tilavet/test/engine.test.js`
+Testler:
+
+```sh
+node tilavet/test/engine.test.js
+
+npm i playwright-core
+python3 -m http.server 8765 &        # deponun kökünde
+CHROME=/yol/chrome node tilavet/test/arayuz.test.js
+```
 
 Veri paketi `tools/veri-uret.py` ile üretilir.
 
@@ -61,7 +85,8 @@ Veri paketi `tools/veri-uret.py` ile üretilir.
   hata eşikleriyle telafi eder ama kusursuz değildir. Chrome ve Edge destekler;
   Firefox desteklemez.
 - **Metin ve meal çevrimdışı çalışır**, kâri sesi çalışmaz (everyayah.com'dan
-  akar).
+  akar). Tekrar sayısı yalnız sesli dinlemede geçerlidir.
+- **Mushaf düzeni sayfa doğru, satır değil** (yukarıya bakınız).
 - İlerleme, ezber planı ve yer imleri yalnız tarayıcının deposunda durur;
   hiçbir yere gönderilmez.
 
