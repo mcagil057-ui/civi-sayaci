@@ -357,8 +357,12 @@
     for (var p = lo; p <= hi; p++) {
       var sim = wordSim(spokenWord, this.ix.words[p]);
       if (sim < this.o.threshold) continue;
-      // Eşit güçteki adaylarda imlece yakın olanı tercih et.
-      var adj = sim - Math.abs(p - this.cursor) * 0.015;
+      // Eşit güçteki adaylarda imlece yakın olanı tercih et; geriye gitmek
+      // ileri gitmekten daha pahalıdır. Aksi hâlde metinde iki kez geçen bir
+      // kelime ("الله", "ولم") atlanınca takipçi geriye eşleşiyor ve tek bir
+      // atlamayı iki hata olarak yazıyordu.
+      var uzaklik = p < this.cursor ? (this.cursor - p) * 0.06 : (p - this.cursor) * 0.015;
+      var adj = sim - uzaklik;
       if (!best || adj > best.adj) best = { p: p, sim: sim, adj: adj, span: 1 };
     }
     // Tanıyıcı iki kelimeyi birleştirmiş olabilir (ör. "وقال" -> "و قال").

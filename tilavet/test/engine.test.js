@@ -126,6 +126,17 @@ const yutulmus = kisa.slice(0, 2).concat(kisa.slice(3));
 tr = takip(1, yutulmus);
 ok('doğrulanmamış bulgu rapora girmez', tr.report().hatalar.length === 0 || tr.pending.length >= 0);
 
+// Metinde daha önce de geçen bir kelimeyi atlamak tek hata sayılmalı.
+// (İhlâs'ta "الله" hem 1. hem 2. ayette geçiyor; takipçi geriye eşleşince
+// tek atlama iki hata olarak yazılıyordu.)
+let ihlas = [];
+for (let v = 1; v <= 4; v++) ihlas = ihlas.concat(kelimeler(112, v));
+const tekrarEden = ihlas.slice(0, 3).concat(ihlas.slice(4));   // 4. kelimeyi (احد) atla
+tr = takip(112, tekrarEden);
+rap = tr.report();
+ok('yinelenen kelime çevresinde atlama şişmiyor', rap.sayim.atlama === 1,
+   JSON.stringify(rap.sayim) + ' — hatalar: ' + JSON.stringify(rap.hatalar.map(h => h.beklenen)));
+
 baslik('Takip: müteşabih ayete sıçrama');
 // Bakara 2'yi okurken Bakara 5'e atlayan bir okuyucu
 const b = araligi(2);
