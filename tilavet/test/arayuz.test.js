@@ -33,7 +33,8 @@ function baslik(s) { console.log('\n' + s); }
 const sahteTanima = () => {
   class SahteTanima {
     constructor() { this.lang = ''; this.continuous = false; this.interimResults = false; this._s = []; }
-    start() { window.__tanima = this; if (this.onstart) setTimeout(() => this.onstart(), 0); }
+    // Gerçek tanıyıcı gibi: her açılış yeni bir oturumdur, sonuç listesi sıfırlanır.
+    start() { this._s = []; window.__tanima = this; if (this.onstart) setTimeout(() => this.onstart(), 0); }
     stop() { if (this.onend) this.onend(); }
     abort() { this.stop(); }
     soyle(metin) {
@@ -50,9 +51,13 @@ const sahteTanima = () => {
   const tarayici = await chromium.launch({
     executablePath: CHROME,
     args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-background-networking',
-           '--disable-component-update', '--disable-sync', '--no-first-run']
+           '--disable-component-update', '--disable-sync', '--no-first-run',
+           '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream']
   });
-  const ctx = await tarayici.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'tr-TR' });
+  const ctx = await tarayici.newContext({
+    viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'tr-TR',
+    permissions: ['microphone']
+  });
   const s = await ctx.newPage();
   const konsolHatalari = [];
   s.on('pageerror', e => konsolHatalari.push('sayfa: ' + e.message));
@@ -246,6 +251,52 @@ const sahteTanima = () => {
   const plan = await s.evaluate(() => JSON.parse(localStorage.getItem('tilavet.v1')).ezber);
   ok('sayfa ezberi sınır aşarak tamamlandı ve tekrar planı ilerledi',
      plan['sayfa:604'] && plan['sayfa:604'].aralik >= 3, JSON.stringify(plan['sayfa:604']));
+
+  /* ---------------------------------------------------------------- */
+  baslik('Mikrofon zinciri');
+  await sureAc('felak');
+  const felak = await s.locator('.k').allTextContents();
+  await s.click('.mik-fab');
+  await takipHazir();
+  ok('mikrofon akışı açıldı (ses düzeyi göstergesi var)', (await s.locator('.ses-olcek').count()) === 1);
+  await oku(felak.slice(0, 4));
+  await s.waitForTimeout(300);
+  ok('duyulan metin ekranda gösteriliyor', !(await s.locator('.duyulan').isHidden()));
+  ok('ilk kelimeler işlendi', (await s.locator('.k.okundu').count()) === 4);
+
+  // Asıl kusur: tanıyıcı her cümleden sonra kapanıp yeniden açılır. Yeni
+  // oturumda sonuç listesi sıfırdan başlar; sayaç taşınırsa sonraki kelimeler
+  // "zaten işlendi" sanılıp atılır ve mikrofon hiç algılamıyor gibi görünür.
+  await s.evaluate(() => window.__tanima.stop());
+  await s.waitForTimeout(900);
+  ok('kapanan tanıyıcı kendiliğinden yeniden açıldı',
+     await s.evaluate(() => !!window.__tanima));
+  await oku(felak.slice(4, 9));
+  await s.waitForTimeout(300);
+  ok('yeniden başladıktan sonra da kelimeler işleniyor',
+     (await s.locator('.k.okundu').count()) === 9,
+     'işlenen: ' + (await s.locator('.k.okundu').count()) + ' / 9');
+  await s.click('.mik-fab');
+  await s.waitForSelector('.kutu');
+  ok('kesintili oturum yine de temiz rapor veriyor',
+     (await s.locator('.kart div').first().textContent()) === '%100');
+
+  baslik('Mikrofon testi ekranı');
+  await koke();
+  await s.click('#ayarlar-ac');
+  await s.waitForSelector('.ayar');
+  await s.click('button:has-text("Mikrofon testi")');
+  await s.waitForSelector('.rozet');
+  const tani = await s.locator('.ayar .rozet').allTextContents();
+  ok('cihaz bilgileri raporlanıyor', tani.length >= 4, tani.join(' | '));
+  await s.click('button:has-text("Başlat")');
+  await s.waitForFunction(() => /Dinliyorum/.test(document.querySelector('.durum .kucuk').textContent), { timeout: 30000 });
+  await s.evaluate(() => window.__tanima.soyle('قل اعوذ برب الفلق'));
+  await s.waitForSelector('.tani-satir');
+  ok('duyulan söz Kur\'an\'da eşleştiriliyor',
+     (await s.locator('.tani-satir .not').first().textContent()).indexOf('Felak') > 0,
+     await s.locator('.tani-satir .not').first().textContent());
+  await resim('09-miktest');
 
   /* ---------------------------------------------------------------- */
   baslik('Durum ve ayarlar');
