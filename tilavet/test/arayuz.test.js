@@ -113,29 +113,63 @@ const sahteTanima = () => {
   ok('30 cüz listelendi', (await s.locator('.oge').count()) === 30);
 
   /* ---------------------------------------------------------------- */
-  baslik('Okuyucu');
+  baslik('Okuma yüzeyi sade mi');
   await sureAc('yasin');
-  ok('Yâsîn 83 ayet', (await s.locator('.ayet').count()) === 83);
-  ok('meal ayete özel', (await s.locator('.ayet[data-a="3"] .meal').textContent()).indexOf('peygamber') >= 0);
-  ok('hat doğru birleşiyor',
-     (await s.locator('.ayet[data-a="2"] .hat .k').allTextContents()).length === 2);
+  ok('mushaf düzeniyle açılıyor', (await s.locator('.mushaf').count()) === 1);
+  ok('ayet altında meal yok', (await s.locator('.meal').count()) === 0);
+  ok('ayet başına düğme satırı yok', (await s.locator('.ayet-arac').count()) === 0);
+  ok('altta düğme çubuğu yok', (await s.locator('.alt-cubuk').count()) === 0);
+  ok('tek bir mikrofon düğmesi var', (await s.locator('.mik-fab').count()) === 1);
+  ok('83 ayet ve 83 madalyon', (await s.locator('.mushaf-ayet').count()) === 83 &&
+     (await s.locator('.nisan').count()) === 83);
   ok('mushaf yazı tipi yüklendi', await s.evaluate(() => document.fonts.check('16px "Amiri Quran"')));
   await resim('02-okuyucu');
+
+  baslik('Ayete dokunma ve üst menü');
+  await s.locator('.mushaf-ayet').nth(2).click();
+  await s.waitForSelector('.ayet-islem');
+  ok('ayet işlem çubuğu açıldı', (await s.locator('.ayet-islem .minik').textContent()).indexOf('36:3') > 0);
+  await s.click('.ayet-islem button:has-text("Meal")');
+  await s.waitForSelector('.tabaka .meal');
+  ok('meal ayete dokununca geliyor',
+     (await s.locator('.tabaka .meal').textContent()).indexOf('peygamber') >= 0);
+  await s.click('.tabaka', { position: { x: 195, y: 60 } });
+  await s.waitForTimeout(200);
+
+  await s.click('#menu-ac');
+  await s.waitForSelector('.menu-oge');
+  const menuOgeleri = await s.locator('.menu-oge').allTextContents();
+  ok('üst menüde okuma dışı işlemler var',
+     menuOgeleri.some(x => /dinle/i.test(x)) && menuOgeleri.some(x => /Aralık/.test(x)) &&
+     menuOgeleri.some(x => /Ezbere/.test(x)) && menuOgeleri.some(x => /Meali/.test(x)),
+     menuOgeleri.join(' | '));
+  await s.click('.menu-oge:has-text("Ayet ayet")');
+  await s.waitForSelector('.ayet');
+  ok('ayet ayet düzenine geçildi', (await s.locator('.ayet').count()) === 83);
+  ok('ayet ayet düzeninde de meal yapışık değil', (await s.locator('.meal').count()) === 0);
+  await s.click('#menu-ac');
+  await s.click('.menu-oge:has-text("Meali göster")');
+  await s.waitForTimeout(300);
+  ok('meal menüden açılabiliyor', (await s.locator('.meal').count()) > 0);
+  await s.click('#menu-ac');
+  await s.click('.menu-oge:has-text("Meali gizle")');
+  await s.waitForTimeout(300);
+  ok('meal menüden kapanabiliyor', (await s.locator('.meal').count()) === 0);
 
   /* ---------------------------------------------------------------- */
   baslik('Mikrofonla takip');
   await sureAc('ihlas');
-  const ihlas = await s.locator('.hat .k').allTextContents();
-  await s.click('#mik-dugme');
+  const ihlas = await s.locator('.k').allTextContents();
+  await s.click('.mik-fab');
   await takipHazir();
-  ok('takip başladı ve dizin kuruldu', true);
+  ok('mikrofon düğmesi durdurmaya döndü', (await s.getAttribute('.mik-fab', 'data-durum')) === 'dinliyor');
   await oku(ihlas.slice(0, 9));
   await s.waitForTimeout(350);
   ok('okunan kelimeler işaretlendi', (await s.locator('.k.okundu').count()) === 9);
   ok('imleç sonraki kelimede', (await s.locator('.k.simdi').textContent()) === ihlas[9]);
   ok('ilerleme çubuğu hareket etti', /width: [1-9]/.test(await s.getAttribute('.olcek i', 'style')));
   await resim('03-takip');
-  await s.click('button:has-text("Bitir")');
+  await s.click('.mik-fab');
   await s.waitForSelector('.kutu');
   ok('temiz okumada isabet %100', (await s.locator('.kart div').first().textContent()) === '%100');
   ok('hata listesi boş', (await s.locator('.liste .oge').count()) === 0);
@@ -146,10 +180,10 @@ const sahteTanima = () => {
   await s.waitForSelector('.kutu', { timeout: 15000 });
   const kutular = await s.locator('.kutu .buyuk').allTextContents();
   ok('iki atlama tam olarak iki hata sayıldı', kutular[2] === '2' && kutular[3] === '0', kutular.join('/'));
-  ok('sûre bitince oturum kendiliğinden kapandı', true);
   await resim('04-rapor');
   await s.click('#geri'); await s.waitForTimeout(400);
   ok('rapordan geri dönünce mikrofon yeniden açılmıyor', (await s.locator('.durum').count()) === 0);
+  ok('mikrofon düğmesi yeniden hazır', (await s.getAttribute('.mik-fab', 'data-durum')) !== 'dinliyor');
 
   /* ---------------------------------------------------------------- */
   baslik('Mushaf sayfası');
@@ -159,19 +193,16 @@ const sahteTanima = () => {
      (await s.locator('.nisan').count()) === 15);
   ok('sayfa altlığı var', (await s.locator('.sayfa-altlik').textContent()).indexOf('604') >= 0);
   await resim('05-mushaf');
-  await s.click('.duzen-secim button:nth-child(1)');
-  await s.waitForSelector('.ayet');
-  ok('ayet ayet düzenine geçildi', (await s.locator('.meal').count()) === 15);
-  await s.click('.duzen-secim button:nth-child(2)');
-  await s.waitForSelector('.mushaf');
-  await s.click('.sayfa-gezinme button:has-text("Önceki")');
+  await s.click('.sayfa-oklar button >> nth=0');
   await s.waitForSelector('.mushaf');
   ok('önceki sayfaya geçildi', (await s.textContent('#baslik')) === '603. sayfa');
+  ok('sayfa sayacı doğru', (await s.locator('.sayfa-oklar .orta').textContent()) === '603 / 604');
 
   /* ---------------------------------------------------------------- */
   baslik('Aralık ve tekrar');
   await sayfaAc(604);
-  await s.click('button:has-text("Aralık ve tekrar")');
+  await s.click('#menu-ac');
+  await s.click('.menu-oge:has-text("Aralık ve tekrar")');
   await s.waitForSelector('.tabaka select');
   ok('aralık paneli sayfanın tüm ayetlerini sunuyor',
      (await s.locator('.tabaka select').first().locator('option').count()) === 15);
@@ -189,10 +220,10 @@ const sahteTanima = () => {
   baslik('Ezber');
   await s.click('button:has-text("Metne dön")');
   await s.waitForSelector('.mushaf, .ayet');
-  await s.click('button:has-text("Ezbere ekle")');
+  await s.click('#menu-ac'); await s.click('.menu-oge:has-text("Ezbere ekle")');
   await s.waitForTimeout(250);
   await sayfaAc(604);
-  await s.click('button:has-text("Ezbere ekle")');
+  await s.click('#menu-ac'); await s.click('.menu-oge:has-text("Ezbere ekle")');
   await s.waitForTimeout(250);
   await koke();
   await s.click('#serit button[data-sekme="ezber"]');
@@ -223,6 +254,7 @@ const sahteTanima = () => {
   await s.waitForSelector('.takvim');
   ok('takvim 35 gün gösteriyor', (await s.locator('.takvim i').count()) === 35);
   ok('oturumlar kaydedildi', (await s.locator('.liste .oge').count()) > 0);
+  ok('kök ekranlarda mikrofon düğmesi yok', (await s.locator('.mik-fab').count()) === 0);
   await s.click('#ayarlar-ac');
   await s.waitForSelector('.ayar');
   await s.selectOption('.ayar select:has(option[value="acik"])', 'acik');
