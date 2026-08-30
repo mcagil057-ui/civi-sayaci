@@ -57,7 +57,7 @@
   var ANAHTAR = 'tilavet.v1';
   var VARSAYILAN = {
     ayar: {
-      kari: 'Alafasy_128kbps', hatBoyu: 1.75, meal: true, okunus: false,
+      kari: 'Alafasy_128kbps', hatBoyu: 1.75, meal: false, okunus: false,
       tema: 'koyu', tanimaDili: 'ar-SA', otoKaydir: true, sesliIpucu: true
     },
     sonKonum: null,            // {s, a}
@@ -71,6 +71,9 @@
       var ham = JSON.parse(localStorage.getItem(ANAHTAR) || '{}');
       var d = Object.assign({}, VARSAYILAN, ham);
       d.ayar = Object.assign({}, VARSAYILAN.ayar, ham.ayar || {});
+      // Okuma yüzeyi sadeleşti: meal ve okunuş artık ayete yapışık değil,
+      // ayete dokununca çıkıyor. Eski kurulumlarda bir kez kapatılır.
+      if (d.ayarSurum !== 2) { d.ayar.meal = false; d.ayar.okunus = false; d.ayarSurum = 2; }
       return d;
     } catch (e) { return JSON.parse(JSON.stringify(VARSAYILAN)); }
   })();
@@ -252,12 +255,16 @@
     var kap = $('#ekran');
     takipDurdurSessiz();
     sesDurdur();
+    fabKaldir();
+    ayetSecimiTemizle();
     kap.innerHTML = '';
     var f = CIZERLER[gorunum.ad] || CIZERLER.bugun;
     kap.appendChild(f(gorunum));
     kap.scrollTop = 0;
 
     var kokEkran = ['bugun', 'kuran', 'ezber', 'istatistik'].indexOf(gorunum.ad) >= 0;
+    kap.classList.toggle('okuma', gorunum.ad === 'okuyucu');
+    $('#menu-ac').hidden = gorunum.ad !== 'okuyucu';
     $('#geri').hidden = kokEkran;
     $('#marka').hidden = !kokEkran;
     $('#serit').hidden = !kokEkran && ['ayarlar', 'rapor'].indexOf(gorunum.ad) < 0;
@@ -549,12 +556,16 @@
     ayetVurgu(null);
     sesDurumGuncelle();
   }
+  /** Ses çalarken mikrofon düğmesinin üstünde beliren küçük şerit. */
   function sesDurumGuncelle() {
-    var d = $('#cal-dugme');
-    if (!d) return;
-    if (!ses.aktif) { d.textContent = '▶  Dinle'; return; }
-    var ek = ses.hedef === 0 ? ' ∞' : (ses.hedef > 1 ? '  ' + (ses.tur + 1) + '/' + ses.hedef : '');
-    d.textContent = '■  Durdur' + ek;
+    var eski = $('.calma-pili'); if (eski) eski.remove();
+    if (!ses.aktif) return;
+    var y = ses.kuyruk[ses.indis];
+    if (!y) return;
+    var ek = ses.hedef === 0 ? ' · ∞' : (ses.hedef > 1 ? ' · ' + (ses.tur + 1) + '/' + ses.hedef : '');
+    document.body.appendChild(el('div', { sinif: 'calma-pili' },
+      el('span', { metin: sureBilgi(y.s).ad + ' ' + y.s + ':' + y.a + ek }),
+      el('button', { metin: '■', 'aria-label': 'Dinlemeyi durdur', onclick: sesDurdur })));
   }
   function ayetVurgu(s, a) {
     hepsi('.ayet, .mushaf-ayet').forEach(function (e) {
@@ -577,9 +588,11 @@
 
   var seciliAyet = null;      // mushaf düzeninde dokunulan ayet
 
+  var okuyucuBaglam = null;      // üstteki ⋯ menüsünün ihtiyaç duyduğu bağlam
+
   CIZERLER.okuyucu = function (g) {
     var kapsam = g.kapsam;
-    var duzen = g.duzen || (kapsam.tur === 'sayfa' ? 'mushaf' : 'liste');
+    var duzen = g.duzen || 'mushaf';       // okuma yüzeyi mushaf ile başlar
     $('#baslik').textContent = kapsamAdi(kapsam) + (g.gizli ? ' · ezber' : '');
     seciliAyet = null;
 
@@ -589,13 +602,14 @@
     ilerlemeYaz(g.bas);
 
     kapsamAyetleri(kapsam).then(function (ayetler) {
+      okuyucuBaglam = { g: g, kapsam: kapsam, duzen: duzen, ayetler: ayetler };
       govde.innerHTML = '';
-      govde.appendChild(okuyucuTepe(g, kapsam, duzen));
+      govde.appendChild(okuyucuBasi(g, kapsam));
       govde.appendChild(duzen === 'mushaf'
         ? mushafDuzeni(g, kapsam, ayetler)
         : listeDuzeni(g, ayetler));
       if (kapsam.tur === 'sayfa') govde.appendChild(sayfaAltligi(kapsam, ayetler));
-      govde.appendChild(altCubuk(g, kapsam, ayetler));
+      mikrofonDugmesi(g);
 
       var hedef = $('[data-s="' + g.bas.s + '"][data-a="' + g.bas.a + '"]');
       if (hedef && hedef !== govde.querySelector('.ayet, .mushaf-ayet')) {
@@ -609,51 +623,100 @@
     return k;
   };
 
-  function okuyucuTepe(g, kapsam, duzen) {
+  function okuyucuBasi(g, kapsam) {
     var ilk = kapsamIlkAyet(kapsam);
-    var alt;
+    var bas = el('div', { sinif: 'okuyucu-basi' });
     if (kapsam.tur === 'sayfa') {
-      alt = ayetCuzu(ilk.s, ilk.a) + '. cüz · ' + sureBilgi(ilk.s).ad + ' ' + ilk.a + '. ayetten';
-    } else if (kapsam.tur === 'aralik') {
-      alt = (kapsam.son - kapsam.ilk + 1) + ' ayet · ' + ayetSayfasi(ilk.s, ilk.a) + '. sayfa · '
-          + ayetCuzu(ilk.s, ilk.a) + '. cüz';
+      bas.appendChild(el('div', { sinif: 'alt', metin: ayetCuzu(ilk.s, ilk.a) + '. cüz · ' + sureBilgi(ilk.s).ad }));
     } else {
-      var s = sureBilgi(kapsam.s);
-      alt = s.anlam + ' · ' + s.ayet + ' ayet · ' + s.inis + ' · ' + s.cuz + '. cüz';
+      bas.appendChild(el('div', { sinif: 'ad-ar', metin: sureBilgi(ilk.s).ar }));
+      var s = sureBilgi(ilk.s);
+      bas.appendChild(el('div', {
+        sinif: 'alt',
+        metin: kapsam.tur === 'aralik'
+          ? (kapsam.son - kapsam.ilk + 1) + ' ayet · ' + ayetSayfasi(ilk.s, ilk.a) + '. sayfa'
+          : s.anlam + ' · ' + s.ayet + ' ayet · ' + s.inis
+      }));
     }
-    var tepe = el('div', { sinif: 'sure-basi' });
-    if (kapsam.tur === 'sayfa') {
-      tepe.appendChild(el('div', { sinif: 'ad-tr', metin: kapsam.p + '. sayfa' }));
-    } else {
-      tepe.appendChild(el('div', { sinif: 'ad-ar', metin: sureBilgi(ilk.s).ar }));
-      tepe.appendChild(el('div', { sinif: 'ad-tr', metin: kapsamAdi(kapsam) }));
-    }
-    tepe.appendChild(el('div', { sinif: 'minik silik', metin: alt }));
+    if (kapsam.tur !== 'sayfa') return bas;
 
-    var arac = el('div', { sinif: 'duzen-secim' },
+    var oklar = el('div', { sinif: 'sayfa-oklar' },
       el('button', {
-        'aria-selected': duzen === 'liste' ? 'true' : 'false', metin: 'Ayet ayet',
-        onclick: function () { git(Object.assign({}, g, { duzen: 'liste' }), false); }
+        'aria-label': 'Önceki sayfa', metin: '‹', disabled: kapsam.p <= 1 ? 'disabled' : null,
+        onclick: function () { okuyucuAc({ tur: 'sayfa', p: kapsam.p - 1 }); }
       }),
+      el('div', { sinif: 'orta', metin: kapsam.p + ' / ' + META.sayfa.length }),
       el('button', {
-        'aria-selected': duzen === 'mushaf' ? 'true' : 'false', metin: 'Mushaf',
-        onclick: function () { git(Object.assign({}, g, { duzen: 'mushaf' }), false); }
-      })
-    );
-    if (kapsam.tur === 'sayfa') {
-      var gezinme = el('div', { sinif: 'sayfa-gezinme' },
-        el('button', {
-          sinif: 'dugme ince', metin: '‹ Önceki', disabled: kapsam.p <= 1 ? 'disabled' : null,
-          onclick: function () { okuyucuAc({ tur: 'sayfa', p: kapsam.p - 1 }); }
-        }),
-        el('button', {
-          sinif: 'dugme ince', metin: 'Sonraki ›', disabled: kapsam.p >= META.sayfa.length ? 'disabled' : null,
-          onclick: function () { okuyucuAc({ tur: 'sayfa', p: kapsam.p + 1 }); }
-        })
-      );
-      tepe.appendChild(gezinme);
+        'aria-label': 'Sonraki sayfa', metin: '›', disabled: kapsam.p >= META.sayfa.length ? 'disabled' : null,
+        onclick: function () { okuyucuAc({ tur: 'sayfa', p: kapsam.p + 1 }); }
+      }));
+    return el('div', {}, oklar, bas);
+  }
+
+  var MIK_SVG = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/>' +
+    '<line x1="12" y1="17" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/></svg>';
+  var DUR_SVG = '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+    '<rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>';
+
+  /** Ekranın altındaki tek düğme. Takip sürerken durdurma düğmesine döner. */
+  function mikrofonDugmesi(g) {
+    var eski = $('.mik-fab'); if (eski) eski.remove();
+    var mikrofonVar = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+    var fab = el('button', {
+      sinif: 'mik-fab', id: 'mik-fab', html: MIK_SVG,
+      'aria-label': 'Mikrofonla oku', disabled: mikrofonVar ? null : 'disabled',
+      onclick: function () {
+        if (!mikrofonVar) { bildir('Bu tarayıcı canlı ses tanımayı desteklemiyor'); return; }
+        if (takip) { takip.bitir(); return; }
+        git(Object.assign({}, okuyucuBaglam.g, { takip: true, duzen: okuyucuBaglam.duzen }));
+      }
+    });
+    document.body.appendChild(el('div', { sinif: 'okuma-perde' }));
+    document.body.appendChild(fab);
+    return fab;
+  }
+  function fabDurum(dinliyor) {
+    var f = $('.mik-fab');
+    if (!f) return;
+    f.dataset.durum = dinliyor ? 'dinliyor' : '';
+    f.innerHTML = dinliyor ? DUR_SVG : MIK_SVG;
+    f.setAttribute('aria-label', dinliyor ? 'Okumayı bitir' : 'Mikrofonla oku');
+  }
+  function fabKaldir() {
+    var f = $('.mik-fab'); if (f) f.remove();
+    var p = $('.okuma-perde'); if (p) p.remove();
+  }
+
+  /* --- üstteki ⋯ menüsü: okuma dışındaki her şey burada --- */
+  function okuyucuMenusu() {
+    if (!okuyucuBaglam) return;
+    var b = okuyucuBaglam, eski = $('.tabaka'); if (eski) eski.remove();
+    function oge(im, ad, sag, tikla) {
+      return el('button', { sinif: 'menu-oge', onclick: function () { tabaka.remove(); tikla(); } },
+        el('span', { sinif: 'im', metin: im }), el('span', { metin: ad }),
+        sag ? el('span', { sinif: 'sag', metin: sag }) : null);
     }
-    return el('div', {}, tepe, arac);
+    var tabaka = el('div', { sinif: 'tabaka', onclick: function (e) { if (e.target === tabaka) tabaka.remove(); } },
+      el('div', { sinif: 'sayfa-alt-tabaka' },
+        el('div', { sinif: 'tutamak' }),
+        oge('▷', ses.aktif ? 'Dinlemeyi durdur' : 'Baştan dinle', KARILER.filter(function (x) { return x.id === D.ayar.kari; })[0].ad,
+          function () {
+            if (ses.aktif) sesDurdur();
+            else kuyrukCal(b.ayetler.map(function (x) { return { s: x.s, a: x.a }; }), 1);
+          }),
+        oge('⟲', 'Aralık ve tekrar', null, function () { aralikPaneli(b.g, b.kapsam, b.ayetler); }),
+        oge('✦', 'Ezbere ekle', kapsamAdi(b.kapsam), function () { ezberEkle(b.kapsam); }),
+        oge('۩', b.duzen === 'mushaf' ? 'Ayet ayet göster' : 'Mushaf düzenine geç', null,
+          function () { git(Object.assign({}, b.g, { duzen: b.duzen === 'mushaf' ? 'liste' : 'mushaf' }), false); }),
+        oge('¶', D.ayar.meal ? 'Meali gizle' : 'Meali göster', 'Diyanet Vakfı',
+          function () { D.ayar.meal = !D.ayar.meal; kaydet(); git(Object.assign({}, b.g, { duzen: b.duzen }), false); }),
+        b.kapsam.tur === 'sure' && b.kapsam.s < 114
+          ? oge('↓', 'Sonraki sûre', sureBilgi(b.kapsam.s + 1).ad, function () { okuyucuAc({ tur: 'sure', s: b.kapsam.s + 1 }, 1); })
+          : null
+      ));
+    document.body.appendChild(tabaka);
   }
 
   function besmeleGerekli(s, a) { return a === 1 && s !== 1 && s !== 9; }
@@ -697,36 +760,21 @@
   }
 
   function ayetKutusu(g, ayet) {
-    var anahtar = ayet.s + ':' + ayet.a;
-    var yerImi = D.yerImleri.indexOf(anahtar) >= 0;
     var kutu = el('div', { sinif: 'ayet', 'data-s': ayet.s, 'data-a': ayet.a });
-
-    var araclar = el('div', { sinif: 'ayet-arac' },
-      el('button', { 'aria-label': 'Bu ayeti dinle', metin: '▷', onclick: function () { kuyrukCal([{ s: ayet.s, a: ayet.a }], 1); } }),
-      el('button', {
-        'aria-label': 'Buradan itibaren mikrofonla oku', metin: '🎙',
-        onclick: function () { git(Object.assign({}, g, { bas: { s: ayet.s, a: ayet.a }, takip: true })); }
-      }),
-      el('button', {
-        'aria-label': 'Yer imi', metin: yerImi ? '★' : '☆', sinif: yerImi ? 'acik' : '',
-        onclick: function (e) {
-          var i = D.yerImleri.indexOf(anahtar);
-          if (i >= 0) { D.yerImleri.splice(i, 1); e.target.textContent = '☆'; e.target.classList.remove('acik'); }
-          else { D.yerImleri.push(anahtar); e.target.textContent = '★'; e.target.classList.add('acik'); }
-          kaydet();
-        }
-      })
-    );
     kutu.appendChild(el('div', { sinif: 'ayet-ust' },
-      el('span', { sinif: 'ayet-no', metin: ayet.s + ':' + ayet.a }), araclar));
+      el('span', { sinif: 'ayet-no', metin: ayet.s + ':' + ayet.a })));
 
     var hat = el('div', { sinif: 'hat' });
     if (g.gizli) hat.dataset.gizli = '1';
     hat.appendChild(kelimeler(g, ayet));
     kutu.appendChild(hat);
 
-    if (D.ayar.okunus) kutu.appendChild(el('div', { sinif: 'okunus', metin: ayet.l }));
+    // Meal ve okunuş okuma yüzeyine yapışmaz; ayarla açılabilir ya da
+    // ayete dokununca çıkan çubuktan görülür.
+    if (D.ayar.okunus && !g.gizli) kutu.appendChild(el('div', { sinif: 'okunus', metin: ayet.l }));
     if (D.ayar.meal && !g.gizli) kutu.appendChild(el('div', { sinif: 'meal', metin: ayet.m }));
+
+    kutu.addEventListener('click', function () { ayetSec(g, ayet); });
     return kutu;
   }
 
@@ -765,7 +813,8 @@
     ayetSecimiTemizle();
     if (ayni) return;                    // aynı ayete ikinci dokunuş seçimi kaldırır
     seciliAyet = { s: ayet.s, a: ayet.a };
-    var parca = $('.mushaf-ayet[data-s="' + ayet.s + '"][data-a="' + ayet.a + '"]');
+    var parca = $('.mushaf-ayet[data-s="' + ayet.s + '"][data-a="' + ayet.a + '"]')
+             || $('.ayet[data-s="' + ayet.s + '"][data-a="' + ayet.a + '"]');
     if (parca) parca.classList.add('secili');
 
     var anahtar = ayet.s + ':' + ayet.a;
@@ -793,7 +842,7 @@
 
   function ayetSecimiTemizle() {
     var c = $('.ayet-islem'); if (c) c.remove();
-    hepsi('.mushaf-ayet.secili').forEach(function (x) { x.classList.remove('secili'); });
+    hepsi('.secili').forEach(function (x) { x.classList.remove('secili'); });
     seciliAyet = null;
   }
 
@@ -818,49 +867,7 @@
       el('span', { metin: kapsam.p + '. sayfa' }));
   }
 
-  /* ================= alt çubuk ve aralık/tekrar paneli ================= */
-  function altCubuk(g, kapsam, ayetler) {
-    var mikrofonVar = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-    var cubuk = el('div', { sinif: 'alt-cubuk' },
-      el('button', {
-        sinif: 'dugme', id: 'cal-dugme', metin: '▶  Dinle',
-        onclick: function () {
-          if (ses.aktif) sesDurdur();
-          else kuyrukCal(ayetler.map(function (x) { return { s: x.s, a: x.a }; }), 1);
-        }
-      }),
-      el('button', {
-        sinif: 'dugme ana', id: 'mik-dugme', metin: '🎙  Mikrofonla oku',
-        disabled: mikrofonVar ? null : 'disabled',
-        onclick: function () {
-          if (!mikrofonVar) { bildir('Tarayıcın ses tanımayı desteklemiyor'); return; }
-          git(Object.assign({}, g, { takip: true }));
-        }
-      })
-    );
-    var ek = el('div', { sinif: 'satir', style: 'gap:8px;margin-top:8px' },
-      el('button', {
-        sinif: 'dugme ince buyu', metin: '⟲ Aralık ve tekrar',
-        onclick: function () { aralikPaneli(g, kapsam, ayetler); }
-      }),
-      el('button', {
-        sinif: 'dugme ince buyu', metin: '✦ Ezbere ekle',
-        onclick: function () { ezberEkle(kapsam); }
-      })
-    );
-    var sar = el('div', {}, cubuk, ek);
-    if (kapsam.tur === 'sure' && kapsam.s < 114) {
-      sar.appendChild(el('button', {
-        sinif: 'dugme ince', style: 'margin-top:8px;width:100%', metin: '↓ Sonraki sûre',
-        onclick: function () { okuyucuAc({ tur: 'sure', s: kapsam.s + 1 }, 1); }
-      }));
-    }
-    if (!mikrofonVar) {
-      sar.appendChild(el('div', { sinif: 'uyari-kutu', style: 'margin-top:10px' },
-        'Bu tarayıcı canlı ses tanımayı desteklemiyor. Mikrofonla takip için Android’de Chrome, masaüstünde Chrome veya Edge kullan.'));
-    }
-    return sar;
-  }
+  /* ================= aralık ve tekrar paneli ================= */
 
   /** "Şu ayetten şu ayete, şu kadar kez" — hem sesle hem mikrofonla. */
   function aralikPaneli(g, kapsam, ayetler) {
@@ -948,15 +955,13 @@
     var nabiz = el('i', { sinif: 'nabiz' });
     var durumMetin = el('div', { sinif: 'kucuk buyu', metin: 'Dizin hazırlanıyor…' });
     var olcekIc = el('i', { style: 'width:0%' });
-    var bitir = el('button', { sinif: 'dugme ince', metin: 'Bitir' });
-    tepe.appendChild(el('div', { sinif: 'durum' }, nabiz, durumMetin, bitir));
+    tepe.appendChild(el('div', { sinif: 'durum' }, nabiz, durumMetin));
     tepe.appendChild(el('div', { sinif: 'olcek' }, olcekIc));
     var ipucuKutu = el('div', { sinif: 'ipucu', hidden: 'hidden' });
     tepe.appendChild(ipucuKutu);
     var ekran = $('#ekran section');
     ekran.insertBefore(tepe, ekran.firstChild);
-    var altSar = $('.alt-cubuk');
-    if (altSar) altSar.parentElement.hidden = true;
+    fabDurum(true);
 
     dizinGetir().then(function (ix) {
       var aralik = kapsamKelimeAralik(kapsam);
@@ -1004,7 +1009,7 @@
         if (takip && takip.aktif) { try { tanima.start(); } catch (e) {} }
       };
 
-      bitir.addEventListener('click', function () { takipBitir(false); });
+      takip.bitir = function () { takipBitir(false); };
       try { tanima.start(); } catch (e) { durumBildir('hata', 'Mikrofon başlatılamadı'); }
 
       takip.saat = setInterval(function () {
@@ -1095,6 +1100,7 @@
       takip.aktif = false;
       var rapor = izleyici.report();
       takipDurdurSessiz();
+      fabDurum(false);
       if (sessiz) return;
       oturumKaydet(g2, kapsam2, rapor, sure);
       // Rapordan geriye dönünce mikrofon yeniden açılmasın.
@@ -1328,12 +1334,14 @@
 
     $('#geri').addEventListener('click', geriGit);
     $('#ayarlar-ac').addEventListener('click', function () { git({ ad: 'ayarlar' }); });
+    $('#menu-ac').addEventListener('click', okuyucuMenusu);
     hepsi('#serit button').forEach(function (b) {
       b.addEventListener('click', function () { gecmis = []; git({ ad: b.dataset.sekme }, false); });
     });
     // Açık bir tabaka ya da işlem çubuğu varsa ekrana dokunulunca kapansın.
     document.addEventListener('click', function (e) {
-      if (e.target.closest('.ayet-islem') || e.target.closest('.mushaf-ayet')) return;
+      if (e.target.closest('.ayet-islem') || e.target.closest('.mushaf-ayet') ||
+          e.target.closest('.ayet') || e.target.closest('.mik-fab')) return;
       ayetSecimiTemizle();
     });
 
