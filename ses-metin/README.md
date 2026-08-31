@@ -253,11 +253,12 @@ alan olmalı.
 ./test-et.sh
 ```
 
-55 test; model, ağ ya da ses dosyası gerektirmez — saf Python mantığını
+56 test; model, ağ ya da ses dosyası gerektirmez — saf Python mantığını
 sınarlar. Kapsam: iki dilin normalizasyonu, depo kurallarıyla eşitlik,
 hizalamanın üç yolunun birbiriyle tutarlılığı, sınır durumları, ayar
 öncelikleri, sağlayıcı seçimi, sahte Ollama ile LLM yolu, şablona düşme ve
-sahte Whisper modeliyle ses çevirme mantığı.
+sahte Whisper modeliyle ses çevirme mantığı ve BOM'lu ayar dosyasının
+okunması (Windows PowerShell 5.1 böyle yazıyor).
 
 Başarım ölçümü (dizüstünde gerçek rakamlar için):
 
