@@ -1,0 +1,68 @@
+# Ses–Metin Uyuşma Kontrolü — tüm model ayarları
+#
+# Uygulama kodunda hiçbir model adı, adres ya da port yazmaz; hepsi burada.
+# Bir modülü başka makineye taşımak için tek yapılacak şey ilgili bölümdeki
+# "adres" satırını değiştirmektir — kod değişmez.
+#
+# Her ayar ortam değişkeniyle de geçilebilir:
+#   SESMETIN_SES_MODEL=base  SESMETIN_METIN_ADRES=http://192.168.1.20:11434
+# Öncelik: ortam değişkeni > bu dosya > koddaki varsayılan.
+
+# --- Ses → metin (ASR) ---------------------------------------------------
+[ses]
+# "yerel" : faster-whisper bu makinede, aynı süreç içinde çalışır.
+# "uzak"  : aşağıdaki adreste çalışan sunucu.py'ye HTTP ile sorulur.
+saglayici = "yerel"
+
+# saglayici = "uzak" olduğunda kullanılır. Whisper'ı başka bir makineye
+# taşımak için: oraya sunucu.py'yi kur, burada saglayici'yi "uzak" yap ve
+# adresi yaz. Uygulama kodunda tek satır değişmez.
+adres = "http://127.0.0.1:8020"
+
+# tiny / base / small / medium / large-v3
+# Türkçe için small altı belirgin zayıf; gerekçe README'de.
+model = "small"
+
+# int8 : yaşlı makinede en makul denge (küçük RAM, kabul edilebilir kalite)
+# int8_float16 / float16 : GPU varsa
+# float32 : en yavaş, en çok RAM
+hesap_tipi = "int8"
+
+# 0 = mevcut çekirdek sayısını kullan. Makine zorlanıyorsa 2 yap.
+is_parcacigi = 0
+
+# Boş bırakılırsa dil otomatik sezilir. Referans metnin dili biliniyorsa
+# yazmak hem hızlandırır hem doğruluğu artırır: "tr" / "ar"
+dil = ""
+
+# Modelin indiği yer. Boşsa faster-whisper'ın varsayılanı (~/.cache) kullanılır.
+model_dizini = ""
+
+
+# --- Değerlendirme cümlesini yazan yerel LLM -----------------------------
+[metin]
+# "ollama"  : aşağıdaki adresteki Ollama'ya sorulur.
+# "sablon"  : model hiç kullanılmaz, cümle şablondan kurulur.
+#             Ollama kurulu değilse ya da makine yorulduysa buraya alın —
+#             uygulama çalışmaya devam eder, sadece cümle sadeleşir.
+saglayici = "ollama"
+
+# LLM'i başka makineye taşımak için yalnızca burası değişir.
+adres = "http://127.0.0.1:11434"
+
+model = "qwen2.5:3b-instruct-q4_K_M"
+
+# Yaşlı makine için önemli: iş bitince modeli bellekten at. Ollama'nın
+# varsayılanı 5 dakika bellekte tutmaktır; "0s" yazınca hemen bırakır,
+# böylece Whisper ile LLM aynı anda RAM işgal etmez.
+bellekte_tut = "0s"
+
+# Saniye. Yaşlı makinede ilk çağrı model yüklemesi yüzünden uzun sürer.
+zaman_asimi = 120
+
+# 0'a yakın = tutarlı ve sıkıcı, 1'e yakın = değişken. Değerlendirme
+# cümlesinin uydurmaması gerektiği için düşük tutuluyor.
+sicaklik = 0.2
+
+# Cümle kısa olacak; üretimi baştan sınırlamak yaşlı makinede zaman kazandırır.
+azami_belirtec = 120
