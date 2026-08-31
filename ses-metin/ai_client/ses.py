@@ -101,10 +101,14 @@ class YerelSes(SesIstemcisi):
                 beam_size=5)
             liste, butun = [], []
             for p in parcalar:                        # üretici: burada işler
+                # Whisper parçaları baştaki boşlukla gelir (" Bugün hava");
+                # ham haliyle birleştirilirse araya çift boşluk girer.
+                metin = p.text.strip()
                 liste.append({"bas": round(p.start, 2),
                               "son": round(p.end, 2),
-                              "metin": p.text.strip()})
-                butun.append(p.text)
+                              "metin": metin})
+                if metin:
+                    butun.append(metin)
         except SesHatasi:
             raise
         except Exception as e:
