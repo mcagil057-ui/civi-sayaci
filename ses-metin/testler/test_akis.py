@@ -39,6 +39,20 @@ class AyarTest(unittest.TestCase):
         finally:
             os.unlink(yol)
 
+    def test_bom_lu_dosya_okunur(self):
+        """Windows PowerShell 5.1'in Set-Content -Encoding UTF8 komutu
+        dosyanın başına BOM koyar. Düz utf-8 ile okunursa tomllib ilk
+        satırda çöker ve uygulama Windows'ta hiç açılmaz."""
+        with tempfile.NamedTemporaryFile("wb", suffix=".toml",
+                                         delete=False) as f:
+            f.write(b"\xef\xbb\xbf" + b'[ses]\nmodel = "tiny"\n')
+            yol = f.name
+        try:
+            ayar = Ayar.yukle(yol)
+            self.assertEqual(ayar.ses.model, "tiny")
+        finally:
+            os.unlink(yol)
+
     def test_ortam_degiskeni_dosyayi_ezer(self):
         os.environ["SESMETIN_SES_MODEL"] = "base"
         os.environ["SESMETIN_METIN_ZAMAN_ASIMI"] = "7"

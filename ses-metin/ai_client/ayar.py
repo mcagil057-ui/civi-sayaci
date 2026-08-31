@@ -133,7 +133,11 @@ class Ayar:
 
         yol = yol or os.environ.get(ONEK + "_AYAR") or _varsayilan_yol()
         if os.path.exists(yol):
-            with open(yol, encoding="utf-8") as f:
+            # utf-8-sig: Windows PowerShell 5.1'in Set-Content -Encoding UTF8
+            # komutu dosyanın başına BOM koyar. Düz "utf-8" ile okunursa
+            # tomllib ilk satırda çöker ve uygulama hiç açılmaz. BOM yoksa
+            # utf-8-sig zaten utf-8 gibi davranır.
+            with open(yol, encoding="utf-8-sig") as f:
                 dosya = _toml_oku(f.read())
             for bolum, degerler in dosya.items():
                 veri.setdefault(bolum, {})

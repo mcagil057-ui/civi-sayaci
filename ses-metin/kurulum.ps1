@@ -49,11 +49,32 @@ if ($diskGB -lt 8) { Kirmizi "  UYARI: bos disk 8 GB'in altinda." }
 
 # --------------------------------------------------------------- python
 Baslik "2/6  Python"
-$py = Get-Command python -ErrorAction SilentlyContinue
-if (-not $py) { $py = Get-Command python3 -ErrorAction SilentlyContinue }
-if (-not $py) { Kirmizi "  Python bulunamadi. https://python.org adresinden 3.9+ kur."; exit 1 }
-$surum = & $py.Source -c "import sys;print('%d.%d'%sys.version_info[:2])"
-Write-Host "  python $surum"
+# Windows'ta Python kurulu degilken "python" komutu Microsoft Store'un sahte
+# python.exe'sini bulur; calistirinca Store acilir, surum bilgisi gelmez.
+# Bu yuzden bulunan her adayi gercekten calistirip siniyoruz.
+$py = $null
+foreach ($aday in @("python", "python3", "py")) {
+  $bulunan = Get-Command $aday -ErrorAction SilentlyContinue
+  if (-not $bulunan) { continue }
+  if ($bulunan.Source -like "*WindowsApps*") { continue }   # Store kisayolu
+  $cikti = & $bulunan.Source -c "import sys;print('%d.%d'%sys.version_info[:2])" 2>$null
+  if ($LASTEXITCODE -eq 0 -and $cikti) {
+    $py = $bulunan; $surum = ($cikti | Select-Object -Last 1).ToString().Trim(); break
+  }
+}
+if (-not $py) {
+  Kirmizi "  Calisan bir Python bulunamadi."
+  Kirmizi "  https://www.python.org/downloads/ adresinden 3.9+ kur."
+  Kirmizi "  Kurulum sirasinda 'Add python.exe to PATH' kutusunu ISARETLE."
+  Kirmizi "  Sonra PowerShell'i KAPATIP yeniden ac ve bu betigi tekrar calistir."
+  exit 1
+}
+Write-Host "  python $surum  ($($py.Source))"
+
+$parcalar = $surum.Split(".")
+if ([int]$parcalar[0] -lt 3 -or ([int]$parcalar[0] -eq 3 -and [int]$parcalar[1] -lt 9)) {
+  Kirmizi "  Python 3.9 veya ustu gerekli (bulunan: $surum)."; exit 1
+}
 
 if (-not (Test-Path "$Kok\.venv")) {
   Write-Host "  sanal ortam kuruluyor (.venv)"
@@ -98,6 +119,15 @@ if (Get-Command ollama -ErrorAction SilentlyContinue) {
 } elseif (Sor "Ollama (yerel model calistirici)" "~1.5 GB") {
   if (Get-Command winget -ErrorAction SilentlyContinue) {
     winget install --id Ollama.Ollama -e --accept-source-agreements --accept-package-agreements
+    # winget kurulumdan sonra PATH'i BU oturumda guncellemez; ollama komutu
+    # burada hala bulunamaz. Makine genelindeki PATH'i elle tazeliyoruz.
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") +
+                ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+    if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
+      Sari "  Ollama kuruldu ama bu oturumda henuz gorunmuyor."
+      Sari "  PowerShell'i KAPATIP yeniden ac ve bu betigi tekrar calistir;"
+      Sari "  kalan adimlar kaldigi yerden devam eder."
+    }
   } else {
     Sari "  https://ollama.com/download adresinden indir, sonra bu betigi tekrar calistir."
   }
@@ -132,7 +162,10 @@ if (Test-Path "$Kok\ayarlar.toml") {
   $m = Get-Content "$Kok\ayarlar.toml" -Raw -Encoding UTF8
   $m = $m -replace '(?m)^model = "small"$', "model = `"$Whisper`""
   $m = $m -replace '(?m)^model = "qwen2\.5:3b-instruct-q4_K_M"$', "model = `"$Llm`""
-  Set-Content "$Kok\ayarlar.toml" -Value $m -Encoding UTF8 -NoNewline
+  # BOM'suz yaz: Set-Content -Encoding UTF8, Windows PowerShell 5.1'de
+  # dosyanin basina BOM koyar ve Python tarafinda TOML okunamaz hale gelir.
+  [System.IO.File]::WriteAllText("$Kok\ayarlar.toml", $m,
+    (New-Object System.Text.UTF8Encoding $false))
   Write-Host "  ayarlar.toml guncellendi: whisper=$Whisper, llm=$Llm"
 }
 
