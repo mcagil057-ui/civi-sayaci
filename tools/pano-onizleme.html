@@ -5,7 +5,7 @@
 // Panoyu bütün parçaları takılı hâlde gösterir (z-tamponlu yazılımsal çizici).
 // Sunucu gerekir:  python3 -m http.server  →  /tools/pano-onizleme.html
 import { Mesh } from '../assets/mesh.js';
-import { PANO_PARCALARI, SOKETLER, P } from '../assets/fotosentez-pano.js';
+import { PANO_PARCALARI, OKLAR, okParcasi, SOKETLER, P } from '../assets/fotosentez-pano.js';
 
 const soket = ad => SOKETLER.find(s => s[2] === ad);
 const RENK = {
@@ -14,11 +14,19 @@ const RENK = {
   'parca-nadp-arti':[236,240,246], 'parca-su':[92,150,232], 'parca-karbondioksit':[92,150,232],
   'parca-oksijen':[214,86,86], 'parca-glikoz':[214,86,86], 'parca-isik':[246,182,44],
 };
+const OK_RENK = {
+  'ok-h2o':[86,96,190], 'ok-co2':[110,118,70], 'ok-o2':[86,96,190],
+  'ok-glikoz':[110,118,70], 'ok-isik':[240,170,40], 'ok-dongu':[70,70,78],
+};
 const dz = P.panoH + P.soketH;
 const gruplar = PANO_PARCALARI.map(p => {
   const s = p.soket ? soket(p.soket) : null;
   return { m: s ? p.yap().translate(s[0], s[1], dz) : p.yap(), renk: RENK[p.id] || [200,200,200] };
 });
+
+for (const o of OKLAR) {
+  gruplar.push({ m: okParcasi(o.id).translate(0, 0, P.panoH + P.kabartma), renk: OK_RENK[o.id] });
+}
 
 const c = document.getElementById('c'), ctx = c.getContext('2d');
 const tum = new Mesh(); for (const g of gruplar) tum.add(g.m);
