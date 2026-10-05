@@ -2,7 +2,7 @@
 // Hem tarayıcı arayüzü (modelleyici.html) hem de tools/fotosentez-uret.mjs bunu kullanır.
 import {
   Mesh, lensPts, circlePts, roundedRectPts, arrowPts,
-  extrude, extrudeRing, cylinder, pill, hemisphere, revolve
+  extrude, extrudeRing, extrudeRingVar, cylinder, pill, hemisphere, revolve
 } from './mesh.js';
 
 /* ---- ana ölçüler (mm) ---- */
@@ -12,6 +12,14 @@ const H = 22;               // toplam yükseklik
 const MEM = 1.8;            // zar kalınlığı
 const GAP = 1.6;            // zarlar arası boşluk
 const GR_R = 9;             // granum yarıçapı
+const ON_H = 7;             // kesit tarafındaki alçak duvar
+
+// Duvar yüksekliği: arkada tam, önde alçak. Böylece granumlar önden görünür.
+const duvarUst = (tam, alcak) => (x, y) => {
+  const u = Math.max(0, Math.min(1, (y / (W / 2) + 0.12) / 0.62));
+  const s = u * u * (3 - 2 * u);               // yumuşak geçiş
+  return alcak + (tam - alcak) * s;
+};
 
 // İç konturlar: mercek biçimini küçülterek üretilir (ofset, sivri uçlarda bozulur).
 const SEG = 96;
@@ -28,8 +36,8 @@ const GRANA = [[-44, 0, 4], [-21, 9, 5], [1, -7, 6], [23, 8, 4], [45, 0, 3]];
 function govde() {
   const m = new Mesh();
   m.add(extrude(kontur(MEM * 0.6), 0, FLOOR));           // stroma tabanı (zarların içine gömülür)
-  m.add(extrudeRing(outer, memIn, 0, H));                // dış zar
-  m.add(extrudeRing(inner2Out, inner2In, 0, H - 3));     // iç zar
+  m.add(extrudeRingVar(outer, memIn, 0, duvarUst(H, ON_H)));                  // dış zar
+  m.add(extrudeRingVar(inner2Out, inner2In, 0, duvarUst(H - 3, ON_H - 1.6)));  // iç zar
   // granum yuvaları: 1 mm yükseltilmiş konum halkaları
   for (const [x, y] of GRANA) {
     m.add(extrudeRing(circlePts(GR_R + 1.2, 48), circlePts(GR_R + 0.4, 48), 0, FLOOR + 1)

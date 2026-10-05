@@ -305,6 +305,27 @@ function extrudeRing(outer, inner, z0, z1) {
   return m;
 }
 
+
+// Değişken yükseklikli halka ekstrüzyon: tepe kotu her kontur noktasında ayrı.
+// Kesit (cutaway) görünümü için ön duvarı alçaltmakta kullanılır.
+function extrudeRingVar(outer, inner, z0, ustFn) {
+  const m = new Mesh();
+  const o = area2(outer) < 0 ? [...outer].reverse() : outer;
+  const iv = area2(inner) < 0 ? [...inner].reverse() : inner;
+  const n = o.length;
+  const h = o.map((p, k) => ustFn(p[0], p[1], k));
+  for (let k = 0; k < n; k++) {
+    const i = k, j = (k + 1) % n;
+    const oi = [o[i][0], o[i][1]], oj = [o[j][0], o[j][1]];
+    const ii = [iv[i][0], iv[i][1]], ij = [iv[j][0], iv[j][1]];
+    m.quad([...oi, h[i]], [...oj, h[j]], [...ij, h[j]], [...ii, h[i]]);      // üst yüz
+    m.quad([...ii, z0], [...ij, z0], [...oj, z0], [...oi, z0]);              // alt yüz
+    m.quad([...oi, z0], [...oj, z0], [...oj, h[j]], [...oi, h[i]]);          // dış duvar
+    m.quad([...ij, z0], [...ii, z0], [...ii, h[i]], [...ij, h[j]]);          // iç duvar
+  }
+  return m;
+}
+
 const box = (w, d, h) => extrude(roundedRectPts(w, d, 0.001, 1), 0, h);
 const cylinder = (r, h, seg = 48) => extrude(circlePts(r, seg), 0, h);
 const tube = (ro, ri, h, seg = 48) => extrudeRing(circlePts(ro, seg), circlePts(ri, seg), 0, h);
@@ -447,6 +468,14 @@ const H = 22;               // toplam yükseklik
 const MEM = 1.8;            // zar kalınlığı
 const GAP = 1.6;            // zarlar arası boşluk
 const GR_R = 9;             // granum yarıçapı
+const ON_H = 7;             // kesit tarafındaki alçak duvar
+
+// Duvar yüksekliği: arkada tam, önde alçak. Böylece granumlar önden görünür.
+const duvarUst = (tam, alcak) => (x, y) => {
+  const u = Math.max(0, Math.min(1, (y / (W / 2) + 0.12) / 0.62));
+  const s = u * u * (3 - 2 * u);               // yumuşak geçiş
+  return alcak + (tam - alcak) * s;
+};
 
 // İç konturlar: mercek biçimini küçülterek üretilir (ofset, sivri uçlarda bozulur).
 const SEG = 96;
@@ -463,8 +492,8 @@ const GRANA = [[-44, 0, 4], [-21, 9, 5], [1, -7, 6], [23, 8, 4], [45, 0, 3]];
 function govde() {
   const m = new Mesh();
   m.add(extrude(kontur(MEM * 0.6), 0, FLOOR));           // stroma tabanı (zarların içine gömülür)
-  m.add(extrudeRing(outer, memIn, 0, H));                // dış zar
-  m.add(extrudeRing(inner2Out, inner2In, 0, H - 3));     // iç zar
+  m.add(extrudeRingVar(outer, memIn, 0, duvarUst(H, ON_H)));                  // dış zar
+  m.add(extrudeRingVar(inner2Out, inner2In, 0, duvarUst(H - 3, ON_H - 1.6)));  // iç zar
   // granum yuvaları: 1 mm yükseltilmiş konum halkaları
   for (const [x, y] of GRANA) {
     m.add(extrudeRing(circlePts(GR_R + 1.2, 48), circlePts(GR_R + 0.4, 48), 0, FLOOR + 1)

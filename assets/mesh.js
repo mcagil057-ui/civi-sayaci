@@ -195,6 +195,27 @@ export function extrudeRing(outer, inner, z0, z1) {
   return m;
 }
 
+
+// Değişken yükseklikli halka ekstrüzyon: tepe kotu her kontur noktasında ayrı.
+// Kesit (cutaway) görünümü için ön duvarı alçaltmakta kullanılır.
+export function extrudeRingVar(outer, inner, z0, ustFn) {
+  const m = new Mesh();
+  const o = area2(outer) < 0 ? [...outer].reverse() : outer;
+  const iv = area2(inner) < 0 ? [...inner].reverse() : inner;
+  const n = o.length;
+  const h = o.map((p, k) => ustFn(p[0], p[1], k));
+  for (let k = 0; k < n; k++) {
+    const i = k, j = (k + 1) % n;
+    const oi = [o[i][0], o[i][1]], oj = [o[j][0], o[j][1]];
+    const ii = [iv[i][0], iv[i][1]], ij = [iv[j][0], iv[j][1]];
+    m.quad([...oi, h[i]], [...oj, h[j]], [...ij, h[j]], [...ii, h[i]]);      // üst yüz
+    m.quad([...ii, z0], [...ij, z0], [...oj, z0], [...oi, z0]);              // alt yüz
+    m.quad([...oi, z0], [...oj, z0], [...oj, h[j]], [...oi, h[i]]);          // dış duvar
+    m.quad([...ij, z0], [...ii, z0], [...ii, h[i]], [...ij, h[j]]);          // iç duvar
+  }
+  return m;
+}
+
 export const box = (w, d, h) => extrude(roundedRectPts(w, d, 0.001, 1), 0, h);
 export const cylinder = (r, h, seg = 48) => extrude(circlePts(r, seg), 0, h);
 export const tube = (ro, ri, h, seg = 48) => extrudeRing(circlePts(ro, seg), circlePts(ri, seg), 0, h);
