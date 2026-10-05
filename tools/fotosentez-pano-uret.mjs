@@ -24,7 +24,9 @@ const soket = ad => SOKETLER.find(s => s[2] === ad);
 const montaj = new Mesh();
 for (const p of PANO_PARCALARI) {
   const s = p.soket ? soket(p.soket) : null;
-  montaj.add(s ? p.yap().translate(s[0], s[1], P.panoH - P.oyukDerin) : p.yap());
+  const yer = p.konum ?? (s ? [s[0], s[1]] : null);
+  const z = p.konum ? P.panoH : P.panoH - P.oyukDerin;
+  montaj.add(yer ? p.yap().translate(yer[0], yer[1], z) : p.yap());
 }
 for (const o of OKLAR) montaj.add(okParcasi(o.id).translate(0, 0, P.panoH + P.kabartma));
 console.log('');
@@ -47,8 +49,9 @@ function tablaya(parcalar, genislik = 210, bosluk = 6) {
 }
 console.log('');
 yaz('baski-1-pano', PANO_PARCALARI[0].yap().center());
-yaz('baski-2-parcalar', tablaya(PANO_PARCALARI.slice(1).map(p => p.yap())));
-yaz('baski-3-renkli-oklar', tablaya(OK_PARCALARI.map(p => p.yap())));
+yaz('baski-2-kloroplast-zari', PANO_PARCALARI[1].yap().center());
+yaz('baski-3-parcalar', tablaya(PANO_PARCALARI.slice(2).map(p => p.yap()), 250));
+yaz('baski-4-renkli-oklar', tablaya(OK_PARCALARI.map(p => p.yap()), 250));
 
 console.log(`\n${PANO_PARCALARI.length + OK_PARCALARI.length} tekil parça + 1 montaj + 3 baskı tablası`
   + ` · kaba filament ≈ ${(toplam * 0.25 * 1.24).toFixed(0)} g`);

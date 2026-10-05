@@ -35,18 +35,17 @@ for (const o of panoOgeleri()) {
 }
 // takılı parçaların ayak izleri
 for (const p of PANO_PARCALARI) {
-  if (!p.soket) continue;
-  const s = SOKETLER.find(q => q[2] === p.soket);
-  oge.push({ ad: 'parça: ' + p.ad, tur: 'parça', mask: ayakIzi(p.yap().translate(s[0], s[1], 0)) });
+  if (!p.soket && !p.konum) continue;
+  const [x, y] = p.konum ?? SOKETLER.find(q => q[2] === p.soket).slice(0, 2);
+  oge.push({ ad: 'parça: ' + p.ad, tur: 'parça', mask: ayakIzi(p.yap().translate(x, y, 0)) });
 }
 // soket halkaları ayrı: parçanın altında kalır, kendi çakışması sayılmaz
 for (const [x, y, ad] of SOKETLER) {
   // soket çapı kadar daire
 }
 
-// TEK kasıtlı kesişme: oklar zarı geçer (madde zardan girip çıkar).
-// Parçalar zarın üstüne BİNEMEZ — bu daha önce yanlışlıkla muaf tutulmuştu.
-const serbest = (a, b) => (a.tur === 'ok' && b.tur === 'zar') || (a.tur === 'zar' && b.tur === 'ok');
+// Hiçbir muafiyet yok: oklar da zarın (artık ayrı parça) üstüne binemez.
+const serbest = () => false;
 
 let sorun = 0;
 for (let i = 0; i < oge.length; i++) for (let j = i + 1; j < oge.length; j++) {

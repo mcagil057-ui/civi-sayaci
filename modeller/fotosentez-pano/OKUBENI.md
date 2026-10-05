@@ -1,38 +1,39 @@
 # Fotosentez Panosu — ders kitabı şemasının 3D hâli
 
-Pano **280 × 220 mm**, 300 × 300 tablaya rahat sığar.
-Parçalar panodaki **kendi biçimindeki oyuklara** oturur: her malzemenin
-tek bir yeri var, oraya tam girer, elle çıkar.
+Pano **290 × 240 mm**, dış kenarında **1 cm yüksekliğinde çerçeve** var:
+parçalar panodan kaymaz. 300 × 300 tablaya sığar.
+
+**Kloroplast zarının kendisi de çıkarılabilir bir parça.** Çift çizgili oval
+halka, dört pimiyle panodaki oyuklara oturur; kaldırınca elinde kalır.
 
 ## ÖNCE BUNU OKU — hangi dosyayı açacaksın
 
-Klasörde üç tür dosya var. **Hepsini birden açma**: her STL kendi merkezine
-hizalıdır, aynı sahneye atılınca hepsi aynı noktaya gelir ve üst üste görünür.
+Her STL kendi merkezine hizalı. **Hepsini birden açarsan üst üste görünürler.**
 
 | Ne yapacaksın | Hangi dosya |
 |---|---|
-| **Nasıl göründüğüne bakmak** | `00-MONTAJ-sadece-goruntuleme.stl` — tek dosya, her şey takılı. Basmak için değil. |
-| **Basmak** | `baski-1-pano.stl` · `baski-2-parcalar.stl` · `baski-3-renkli-oklar.stl` — üçünü ayrı ayrı dilimle. |
-| **Tek tek renkli basmak** | `parca-*.stl`, `renkli-ok-*.stl` — her seferinde bir dosya. |
+| **Nasıl göründüğüne bakmak** | `00-MONTAJ-sadece-goruntuleme.stl` — tek dosya, her şey takılı |
+| **Basmak** | `baski-1-pano` · `baski-2-kloroplast-zari` · `baski-3-parcalar` · `baski-4-renkli-oklar` — dördünü ayrı ayrı dilimle |
+| **Tek tek renkli basmak** | `parca-*.stl`, `renkli-ok-*.stl` — her seferinde bir dosya |
 
-## Oyuklar nasıl çalışıyor
+## Parçalar nasıl oturuyor
 
-- Oyuk derinliği **2,5 mm**, parça kalınlığı **5,3 mm** → parça 2,8 mm dışarıda
+Evet — **her parçanın panoda kendi biçiminde bir oyuğu var.** Yıldızın yıldız
+oyuğu, karonun karo oyuğu, granumun daire oyuğu. Yanlış yere girmez.
+
+- Oyuk derinliği **2,5 mm**, parça kalınlığı **5,3 mm** → 2,8 mm dışarıda
   kalır, parmakla rahat çıkar.
-- Oyuk ile parça arasında her kenarda **0,4 mm** pay var. Sıkı olursa zımpara;
-  gevşek olursa `assets/fotosentez-pano.js` içindeki `bosluk: 0.4` değerini
-  0,25 yapıp yeniden üret.
-- Granum ve Kalvin dahil 12 parçanın hepsinin kendi oyuğu var.
+- Her kenarda **0,4 mm** pay var.
+- Kloroplast zarı farklı: pano yüzeyine oturur, **dört pimi** oyuklara girer.
 
-## Yazılar siyah nasıl olur
+## Oklar
 
-Yazılar **1 mm kabartma**. Baskı bitince siyah keçeli kalemi panonun üstünden
-düz sür: boya sadece harflerin üst yüzüne değer. Taşarsa ıslak mendille sil.
+İnceltildi (gövde 10 → 5,5 mm). **Hiçbir ok zarın üstüne gelmiyor:**
+giren/çıkan oklar zarın dışında durup içeriyi gösterir, döngü okları
+tamamen zarın içinde kalır. Denetleyicide artık hiçbir muafiyet yok.
 
-## Oklar renkli nasıl olur
-
-Panoda oklar 3,5 mm kabartma olarak zaten var. İstersen `renkli-ok-*.stl`
-dosyalarını ayrı renkte basıp kabartmanın üstüne yapıştır — birebir oturur.
+Renkli istersen `renkli-ok-*.stl` dosyalarını ayrı renkte basıp panodaki
+kabartmanın üstüne yapıştır — birebir oturur.
 
 | Dosya | Kitaptaki rengi |
 |---|---|
@@ -41,55 +42,53 @@ dosyalarını ayrı renkte basıp kabartmanın üstüne yapıştır — birebir 
 | `renkli-ok-isik` (3 ok tek parça) | turuncu |
 | `renkli-ok-dongu` (4 ok tek parça) | siyah/gri |
 
+## Yazılar siyah nasıl olur
+
+Yazılar 1 mm kabartma. Baskı bitince siyah keçeli kalemi panonun üstünden
+düz sür — boya sadece harflerin üst yüzüne değer. Taşarsa ıslak mendille sil.
+
 ## Parça listesi
 
 | Dosya | Parça | Ölçü (mm) |
 |---|---|---|
-| `pano-zemin.stl` | Pano, 12 oyuk | 280 × 220 × 9,5 |
+| `pano-zemin.stl` | Pano, 1 cm çerçeveli, 12 oyuk + 4 zar pimi oyuğu | 290 × 240 × 16 |
+| `parca-kloroplast-zari.stl` | **Kloroplast zarı** — çıkarılabilir çift zar halkası | 250 × 170 × 7 |
 | `parca-granum.stl` | Granum — 7 tilakoit, üzerinde yazı yok | 32 × 32 × 38 |
-| `parca-kalvin.stl` | Kalvin döngüsü, içinde `IŞIĞIN KULLANILMADIĞI TEPKİMELER` | 64 × 68 × 6 |
+| `parca-kalvin.stl` | Kalvin döngüsü | 64 × 68 × 6 |
 | `parca-isik.stl` | Işık (güneş) | 34 × 34 × 5 |
 | `parca-su.stl` | H₂O | 27 × 17 × 5 |
 | `parca-karbondioksit.stl` | CO₂ | 27 × 17 × 5 |
 | `parca-oksijen.stl` | O₂ | 20 × 17 × 5 |
 | `parca-glikoz.stl` | C₆H₁₂O₆ | 43 × 16 × 5 |
-| `parca-atp.stl` | ATP | 32 × 34 × 5 |
-| `parca-adp.stl` | ADP | 31 × 32 × 5 |
+| `parca-atp.stl` | ATP | 31 × 33 × 5 |
+| `parca-adp.stl` | ADP | 30 × 31 × 5 |
 | `parca-fosfat.stl` | P | 16 × 16 × 5 |
-| `parca-nadph.stl` | NADPH | 38 × 16 × 5 |
-| `parca-nadp-arti.stl` | NADP⁺ | 36 × 16 × 5 |
+| `parca-nadph.stl` | NADPH | 33 × 13 × 5 |
+| `parca-nadp-arti.stl` | NADP⁺ | 32 × 13 × 5 |
 
-Toplam ≈ 134 g filament. Pano ~5 saat, parçalar ~2 saat, oklar ~1 saat.
+Toplam ≈ 174 g filament. Pano ~6 saat, zar ~2 saat, parçalar ~2 saat.
 
 ## Baskı ayarları
 
 PLA · katman **0,2 mm** · dolgu %12 · duvar 3 hat · **destek gerekmez**.
 0,3 mm katman kullanma, yazılar okunmaz.
+Zar halkası uzun ve ince — **brim kullan**, köşeler kalkmasın.
 
 ### Renk önerisi
-pano beyaz · granum yeşil · Kalvin mavi · ATP ve P sarı · ADP açık yeşil ·
-NADPH ve NADP⁺ beyaz · H₂O ve CO₂ mavi · O₂ ve glikoz kırmızı · güneş sarı
-
-## Zar ve parçalar
-
-Çift zar 4 mm kalınlığında iki şerit, araları 5 mm. **Hiçbir parça zarın
-üstüne binmiyor**: bütün parçalar iç zarın içinde, giren/çıkan maddeler
-(H₂O, CO₂, O₂, glikoz, ışık) dışında. Yalnızca oklar zarı geçiyor — kitapta
-da öyle, madde zardan girip çıkıyor.
-
-Döngü okları artık iki parçayı birbirine bağlıyor:
-granum → ATP → Kalvin → NADP⁺/P → ADP → granum.
+pano beyaz · zar açık mavi · granum yeşil · Kalvin mavi · ATP ve P sarı ·
+ADP açık yeşil · NADPH ve NADP⁺ beyaz · H₂O ve CO₂ mavi · O₂ ve glikoz
+kırmızı · güneş sarı
 
 ## Denetim
 
-- `node tools/yerlesim-denetle.mjs` → üstten görünüşte çakışma ölçer
-  ("Çakışma yok ✓" demeli). Tek muafiyet: okların zarı geçmesi.
+- `node tools/yerlesim-denetle.mjs` → üstten görünüşte çakışma ölçer.
+  **Hiçbir muafiyet yok**; "Çakışma yok ✓" demeli.
 - `node tools/yer-ara.mjs STROMA --ic` → bir yazı için çakışmasız konum arar
 - Bütün STL'ler kapalı yüzey (manifold) olarak doğrulandı
 
 ## Anlatım sırası
 
-1. Boş panoyu göster: çift zar, stroma, oyuklar.
+1. **Kloroplast zarını** tak: "Hücrede fotosentez burada olur, çift zarlı."
 2. **Granum** → "ışığa bağımlı tepkimeler burada."
 3. **Işık** + **H₂O** → "su parçalanır."
 4. **O₂** → "açığa çıkar."

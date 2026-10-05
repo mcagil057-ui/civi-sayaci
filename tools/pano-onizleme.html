@@ -9,7 +9,7 @@ import { PANO_PARCALARI, OKLAR, okParcasi, SOKETLER, P } from '../assets/fotosen
 
 const soket = ad => SOKETLER.find(s => s[2] === ad);
 const RENK = {
-  'pano-zemin':[226,228,234], 'parca-granum':[46,138,76], 'parca-kalvin':[60,110,200],
+  'pano-zemin':[226,228,234], 'parca-kloroplast-zari':[150,196,232], 'parca-granum':[46,138,76], 'parca-kalvin':[60,110,200],
   'parca-atp':[240,206,60], 'parca-adp':[120,206,170], 'parca-fosfat':[240,206,60], 'parca-nadph':[236,240,246],
   'parca-nadp-arti':[236,240,246], 'parca-su':[92,150,232], 'parca-karbondioksit':[92,150,232],
   'parca-oksijen':[214,86,86], 'parca-glikoz':[214,86,86], 'parca-isik':[246,182,44],
@@ -21,7 +21,9 @@ const OK_RENK = {
 const dz = P.panoH - P.oyukDerin;
 const gruplar = PANO_PARCALARI.map(p => {
   const s = p.soket ? soket(p.soket) : null;
-  return { m: s ? p.yap().translate(s[0], s[1], dz) : p.yap(), renk: RENK[p.id] || [200,200,200] };
+  const yer = p.konum ?? (s ? [s[0], s[1]] : null);
+  const z = p.konum ? P.panoH : dz;   // zar halkası pano yüzeyine oturur, pimleri oyuğa girer
+  return { m: yer ? p.yap().translate(yer[0], yer[1], z) : p.yap(), renk: RENK[p.id] || [200,200,200] };
 });
 
 for (const o of OKLAR) {
