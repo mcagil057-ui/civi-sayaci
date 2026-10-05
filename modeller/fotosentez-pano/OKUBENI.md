@@ -13,8 +13,8 @@ Her STL kendi merkezine hizalı. **Hepsini birden açarsan üst üste görünür
 | Ne yapacaksın | Hangi dosya |
 |---|---|
 | **Nasıl göründüğüne bakmak** | `00-MONTAJ-sadece-goruntuleme.stl` — tek dosya, her şey takılı |
-| **Basmak** | `baski-1-pano` · `baski-2-kloroplast-zari` · `baski-3-parcalar` · `baski-4-renkli-oklar` — dördünü ayrı ayrı dilimle |
-| **Tek tek renkli basmak** | `parca-*.stl`, `renkli-ok-*.stl` — her seferinde bir dosya |
+| **Basmak** | `baski-1-pano` · `baski-2-kloroplast-zari` · `baski-3-parcalar` · `baski-4-oklar` — dördünü ayrı ayrı dilimle |
+| **Tek tek renkli basmak** | `parca-*.stl` — her seferinde bir dosya |
 
 ## Parçalar nasıl oturuyor
 
@@ -28,45 +28,55 @@ oyuğu, karonun karo oyuğu, granumun daire oyuğu. Yanlış yere girmez.
 
 ## Oklar
 
-İnceltildi (gövde 10 → 5,5 mm). **Hiçbir ok zarın üstüne gelmiyor:**
-giren/çıkan oklar zarın dışında durup içeriyi gösterir, döngü okları
-tamamen zarın içinde kalır. Denetleyicide artık hiçbir muafiyet yok.
+İnceltildi (gövde 10 → 5,5 mm; döngü ve ışık okları 4,5 mm) ve **hepsi
+çıkarılabilir parça oldu.** Her okun panoda kendi biçiminde oyuğu var.
 
-Renkli istersen `renkli-ok-*.stl` dosyalarını ayrı renkte basıp panodaki
-kabartmanın üstüne yapıştır — birebir oturur.
-
-| Dosya | Kitaptaki rengi |
-|---|---|
-| `renkli-ok-h2o`, `renkli-ok-o2` | mor/mavi |
-| `renkli-ok-co2`, `renkli-ok-glikoz` | koyu yeşil |
-| `renkli-ok-isik` (3 ok tek parça) | turuncu |
-| `renkli-ok-dongu` (4 ok tek parça) | siyah/gri |
+Hiçbir ok zara değmiyor: giren/çıkan oklar zarın dışında durup içeriyi
+gösterir, döngü okları tamamen zarın içinde kalır.
 
 ## Yazılar siyah nasıl olur
 
 Yazılar 1 mm kabartma. Baskı bitince siyah keçeli kalemi panonun üstünden
 düz sür — boya sadece harflerin üst yüzüne değer. Taşarsa ıslak mendille sil.
 
-## Parça listesi
+## Parça listesi — 24 parçanın hepsi çıkarılabilir
 
-| Dosya | Parça | Ölçü (mm) |
+**Yapılar ve moleküller (13)**
+
+| Dosya | Parça |
+|---|---|
+| `parca-kloroplast-zari.stl` | Kloroplast zarı (çift zar halkası, 250 × 170) |
+| `parca-granum.stl` | Granum — 7 tilakoit |
+| `parca-kalvin.stl` | Kalvin döngüsü |
+| `parca-isik.stl` | Işık (güneş) |
+| `parca-su.stl` | H₂O |
+| `parca-karbondioksit.stl` | CO₂ |
+| `parca-oksijen.stl` | O₂ |
+| `parca-glikoz.stl` | C₆H₁₂O₆ |
+| `parca-atp.stl` | ATP |
+| `parca-adp.stl` | ADP |
+| `parca-fosfat.stl` | P |
+| `parca-nadph.stl` | NADPH |
+| `parca-nadp-arti.stl` | NADP⁺ |
+
+**Oklar (11) — bunlar da çıkarılabilir**
+
+| Dosya | Ok | Önerilen renk |
 |---|---|---|
-| `pano-zemin.stl` | Pano, 1 cm çerçeveli, 12 oyuk + 4 zar pimi oyuğu | 290 × 240 × 16 |
-| `parca-kloroplast-zari.stl` | **Kloroplast zarı** — çıkarılabilir çift zar halkası | 250 × 170 × 7 |
-| `parca-granum.stl` | Granum — 7 tilakoit, üzerinde yazı yok | 32 × 32 × 38 |
-| `parca-kalvin.stl` | Kalvin döngüsü | 64 × 68 × 6 |
-| `parca-isik.stl` | Işık (güneş) | 34 × 34 × 5 |
-| `parca-su.stl` | H₂O | 27 × 17 × 5 |
-| `parca-karbondioksit.stl` | CO₂ | 27 × 17 × 5 |
-| `parca-oksijen.stl` | O₂ | 20 × 17 × 5 |
-| `parca-glikoz.stl` | C₆H₁₂O₆ | 43 × 16 × 5 |
-| `parca-atp.stl` | ATP | 31 × 33 × 5 |
-| `parca-adp.stl` | ADP | 30 × 31 × 5 |
-| `parca-fosfat.stl` | P | 16 × 16 × 5 |
-| `parca-nadph.stl` | NADPH | 33 × 13 × 5 |
-| `parca-nadp-arti.stl` | NADP⁺ | 32 × 13 × 5 |
+| `parca-ok-h2o.stl` | H₂O girer | mor/mavi |
+| `parca-ok-o2.stl` | O₂ çıkar | mor/mavi |
+| `parca-ok-co2.stl` | CO₂ girer | koyu yeşil |
+| `parca-ok-glikoz.stl` | Glikoz çıkar | koyu yeşil |
+| `parca-ok-isik-1/2/3.stl` | Işık ışınları (3 ayrı ok) | turuncu |
+| `parca-ok-granum-atp.stl` | Granum → ATP | siyah/gri |
+| `parca-ok-atp-kalvin.stl` | ATP → Kalvin | siyah/gri |
+| `parca-ok-kalvin-nadp.stl` | Kalvin → NADP⁺ | siyah/gri |
+| `parca-ok-adp-granum.stl` | ADP+P → granum | siyah/gri |
 
-Toplam ≈ 174 g filament. Pano ~6 saat, zar ~2 saat, parçalar ~2 saat.
+Panoda sabit kalan tek şey: `GRANUM`, `STROMA`, `KLOROPLAST` kabartma yazıları
+ve 1 cm'lik dış çerçeve.
+
+Toplam ≈ 172 g filament.
 
 ## Baskı ayarları
 

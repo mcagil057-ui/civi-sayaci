@@ -5,6 +5,7 @@ import {
   extrude, extrudeRing, cylinder, pill,
   radyalOrnekle, ringFace, rectFace, wall, fanFace, offsetPts,
 } from './mesh.js';
+import { giyotin } from './bolme.js';
 import { yazi, yaziGenisligi } from './yazi.js';
 
 /* ---- ortak ölçüler (mm) ---- */
@@ -27,26 +28,17 @@ const OV = { cx: 8, cy: -3, rx: 125, ry: 85 };     // zarın dış konturu
 const ZAR_KAL = 13;                                // zar şeridinin genişliği
 const ZAR_ORTA = { rx: OV.rx - ZAR_KAL / 2, ry: OV.ry - ZAR_KAL / 2 };
 
-/* ---- yerleşim: dilimlenmiş ızgara. Her hücrede en çok bir oyuk. ---- */
-const KOLON_X = [-136, -96, -52, -20, 16, 52, 118, 136];
-// her kolonun satır sınırları ve hangi satırda hangi parça var
-// parca: { satırNo: [ad, x, y] }  — konum hücre içinde serbest
-const KOLONLAR = [
-  { satir: [-111, 40, 84, 111], parca: { 0: ['ZAR-SOL', -110.5, -3], 2: ['IŞIK', -116, 94] } },
-  { satir: [-111, -82, -20, 30, 111], parca: { 0: ['O2', -74, -100], 2: ['GRANUM', -71, 5] } },
-  { satir: [-111, 82, 111], parca: { 1: ['H2O', -36, 100] } },
-  { satir: [-111, -90, -66, -30, 24, 60, 90, 111],
-    parca: { 1: ['ZAR-ALT', 8, -81.5], 2: ['ADP', -2, -48], 4: ['ATP', -2, 42], 5: ['ZAR-UST', 8, 75.5] } },
-  { satir: [-111, -62, -38, -10, 2, 30, 111],
-    parca: { 1: ['P', 34, -50], 2: ['NADP+', 34, -24], 4: ['NADPH', 34, 16] } },
-  { satir: [-111, -90, -36, 32, 111],
-    parca: { 0: ['GLİKOZ', 85, -100], 2: ['KALVİN', 84, -2], 3: ['CO2', 85, 100] } },
-  { satir: [-111, 111], parca: { 0: ['ZAR-SAG', 126.5, -3] } },
+/* ---- yerleşim: bütün oyuklar tek listede ----
+   Panodaki gözler bu listeden otomatik hesaplanır (assets/bolme.js). */
+export const YERLER = [
+  ['ZAR-SOL',  -110.5,  -3], ['ZAR-SAG', 126.5,  -3],
+  ['ZAR-UST',     8,  75.5], ['ZAR-ALT',     8, -81.5],
+  ['IŞIK',     -114,    91], ['H2O',       -36,  100], ['CO2',      85,   99],
+  ['O2',        -74, -100.5], ['GLİKOZ',     85, -101],
+  ['GRANUM',    -71,     5], ['KALVİN',     84,   -2],
+  ['ATP',        -2,    42], ['NADPH',      34,   16],
+  ['NADP+',      34,   -24], ['ADP',        -2,  -48], ['P',       34,  -50],
 ];
-
-// Soket konumu = hücrenin merkezi
-export const SOKETLER = KOLONLAR.flatMap(k =>
-  Object.values(k.parca).map(([ad, x, y]) => [x, y, ad]));
 
 // Pano üzerindeki sabit yazılar: [metin, merkez x, alt kenar y, harf boyu]
 export const YAZILAR = [
@@ -86,6 +78,42 @@ const karoPts = (metin, boy, pad = P.pad) =>
   roundedRectPts(yaziGenisligi(metin, boy) + 2 * pad, boy + 2 * pad, 5, 10);
 
 // Her parçanın adı → { kontur, govde }
+/* ---- 2B dönüşüm yardımcıları ---- */
+const don2 = (pts, deg) => {
+  const a = deg * Math.PI / 180, c = Math.cos(a), si = Math.sin(a);
+  return pts.map(p => [p[0] * c - p[1] * si, p[0] * si + p[1] * c]);
+};
+const tasi2 = (pts, dx, dy) => pts.map(p => [p[0] + dx, p[1] + dy]);
+
+export const OK_TANIM = [
+  { id: 'ok-h2o',     ad: 'H₂O oku',        kuyruk: [-36, 89],   aci: -90, uzun: 11, kal: 5.5, basW: 13, basL: 7 },
+  { id: 'ok-co2',     ad: 'CO₂ oku',        kuyruk: [85, 85],    aci: -90, uzun: 19, kal: 5.5, basW: 13, basL: 7 },
+  { id: 'ok-o2',      ad: 'O₂ oku',         kuyruk: [-74, -71],  aci: -90, uzun: 16, kal: 5.5, basW: 13, basL: 7 },
+  { id: 'ok-glikoz',  ad: 'Glikoz oku',     kuyruk: [85, -73],   aci: -90, uzun: 15, kal: 5.5, basW: 13, basL: 7 },
+  { id: 'ok-isik-1',  ad: 'Işık oku 1',     kuyruk: [-126, 66],  aci: -40, uzun: 14, kal: 4.5, basW: 11, basL: 7 },
+  { id: 'ok-isik-2',  ad: 'Işık oku 2',     kuyruk: [-126, 47],  aci: -40, uzun: 14, kal: 4.5, basW: 11, basL: 7 },
+  { id: 'ok-isik-3',  ad: 'Işık oku 3',     kuyruk: [-126, 28],  aci: -40, uzun: 14, kal: 4.5, basW: 11, basL: 7 },
+  { id: 'ok-granum-atp',  ad: 'Granum → ATP oku',   kuyruk: [-48, 14],  aci: 38,  uzun: 30, kal: 4.5, basW: 11, basL: 7 },
+  { id: 'ok-atp-kalvin',  ad: 'ATP → Kalvin oku',   kuyruk: [22, 54],   aci: -25, uzun: 44, kal: 4.5, basW: 11, basL: 7 },
+  { id: 'ok-kalvin-nadp', ad: 'Kalvin → NADP⁺ oku', kuyruk: [71, -42],  aci: 190, uzun: 22, kal: 4.5, basW: 11, basL: 7 },
+  { id: 'ok-adp-granum',  ad: 'ADP+P → granum oku', kuyruk: [-26, -56], aci: 125, uzun: 40, kal: 4.5, basW: 11, basL: 7 },
+];
+
+// Okun gövde-uç birleşim noktası: oyuğun ışın merkezi burasıdır.
+// Okun konturu bu noktaya göre yıldız-biçimlidir, oyuk doğru çıkar.
+export const okMerkezi = o => {
+  const a = o.aci * Math.PI / 180;
+  return [o.kuyruk[0] + (o.uzun - o.basL) * Math.cos(a),
+          o.kuyruk[1] + (o.uzun - o.basL) * Math.sin(a)];
+};
+// Okun konturu, merkezi orijinde olacak şekilde
+export const okKonturu = o => {
+  const m = okMerkezi(o);
+  return tasi2(don2(arrowPts(o.uzun, o.kal, o.basW, o.basL), o.aci),
+               o.kuyruk[0] - m[0], o.kuyruk[1] - m[1]);
+};
+
+// Bütün oyuklar: parçalar + zar pimleri + oklar
 export const PARCA_TANIM = {
   'IŞIK':   { boy: 5.6, metin: 'IŞIK',        kontur: () => gunesPts(12, 5) },
   'H2O':    { boy: 7,   metin: 'H_2O',        kontur: () => karoPts('H_2O', 7) },
@@ -106,55 +134,49 @@ export const PARCA_TANIM = {
   'ZAR-ALT':{ boy: 0,   metin: '',            kontur: () => circlePts(3.2, 36) },
 };
 
+for (const o of OK_TANIM) PARCA_TANIM[o.id] = { boy: 0, metin: '', kontur: () => okKonturu(o) };
+
 // Oyuk konturu: parça konturunun her yönde eşit mesafede dışa ötelenmişi.
 // Ölçekleme yapılırsa uzun kenarda bol, kısa kenarda sıkı olur; öteleme
 // her kenarda aynı payı bırakır.
 const oyukKonturu = ad => offsetPts(PARCA_TANIM[ad].kontur(), P.bosluk);
 
 /* ---- oklar: tek 2B tanımdan hem panoya kabartılır hem renkli parça olur ---- */
-const don2 = (pts, deg) => {
-  const a = deg * Math.PI / 180, c = Math.cos(a), si = Math.sin(a);
-  return pts.map(p => [p[0] * c - p[1] * si, p[0] * si + p[1] * c]);
-};
-const tasi2 = (pts, dx, dy) => pts.map(p => [p[0] + dx, p[1] + dy]);
 const dikOkPts = (x, y0, uzun) => tasi2(don2(arrowPts(uzun, 5.5, 13, 9), -90), x, y0);
 const egikOk = (x, y, aci, uzun, kal, basW, basL) =>
   tasi2(don2(arrowPts(uzun, kal, basW, basL), aci), x, y);
 
+// Ok tanımları: kuyruk konumu + açı. Hepsi çıkarılabilir parça.
 // Oklar zara DEĞMEZ: giren/çıkanlar zarın dışında durup içeriyi gösterir,
 // döngü okları tamamen zarın içinde kalır.
-export const OKLAR = [
-  { id: 'ok-h2o',    ad: 'ok H2O',    poly: [dikOkPts(-36, 90, 12)] },
-  { id: 'ok-co2',    ad: 'ok CO2',    poly: [dikOkPts(85, 90, 22)] },
-  { id: 'ok-o2',     ad: 'ok O2',     poly: [dikOkPts(-74, -70, 19)] },
-  { id: 'ok-glikoz', ad: 'ok glikoz', poly: [dikOkPts(85, -72, 18)] },
-  { id: 'ok-isik',   ad: 'ışık okları',
-    // kaydırma okun DİK yönünde olmalı; yoksa oklar üst üste biner.
-    poly: [0, 1, 2].map(i => egikOk(-110 - i * 10, 72 - i * 12, -40, 16, 4.5, 11, 7)) },
-  { id: 'ok-dongu',  ad: 'döngü okları',
-    // her ok iki parçayı BİRBİRİNE bağlar: granum→ATP→Kalvin→NADP⁺→granum
-    poly: [
-      egikOk(-48, 14, 38, 30, 4.5, 11, 7),     // granum → ATP
-      egikOk(20, 46, -25, 44, 4.5, 11, 7),     // ATP → Kalvin
-      egikOk(66, -38, 190, 22, 4.5, 11, 7),    // Kalvin → NADP⁺
-      egikOk(-20, -56, 125, 40, 4.5, 11, 7),   // ADP+P → granum
-    ] },
+export const SOKETLER = [
+  ...YERLER.map(([ad, x, y]) => [x, y, ad]),
+  ...OK_TANIM.map(o => { const m = okMerkezi(o); return [m[0], m[1], o.id]; }),
 ];
 
 export const okParcasi = id => {
-  const o = OKLAR.find(q => q.id === id);
-  const m = new Mesh();
-  for (const p of o.poly) m.add(extrude(p, 0, P.okKalinlik));
-  return m;
+  const o = OK_TANIM.find(q => q.id === id);
+  return new Mesh().add(extrude(okKonturu(o), 0, P.tileH));
 };
 
 /* ================= PANO ================= */
 
-// Komşu hücrelerin ortak kenarda AYNI noktaları üretmesi şart; yoksa
-// T-bağlantısı oluşur ve yüzey kapanmaz. Bunun için bütün kolon ve satır
-// sınırları genel bir "kesim listesi" olarak her kenara uygulanır.
-const X_KESIM = [...new Set(KOLON_X)].sort((a, b) => a - b);
-const Y_KESIM = [...new Set(KOLONLAR.flatMap(k => k.satir))].sort((a, b) => a - b);
+// Oyukların konumlarından panonun gözleri otomatik hesaplanır.
+const OYUKLAR = SOKETLER.map(([x, y, ad]) => {
+  const k = tasi2(oyukKonturu(ad), x, y);
+  const xs = k.map(p => p[0]), ys = k.map(p => p[1]);
+  return { ad, x, y, kontur: k,
+    // 0,8 mm pay: oyuk göz kenarına değmesin, halka yüzeyi dejenere olmasın
+    kutu: { x0: Math.min(...xs) - 0.8, y0: Math.min(...ys) - 0.8,
+            x1: Math.max(...xs) + 0.8, y1: Math.max(...ys) + 0.8 } };
+});
+const BOLME = giyotin(-P.icX, -P.icY, P.icX, P.icY, OYUKLAR);
+
+// Komşu gözlerin ortak kenarda AYNI noktaları üretmesi şart; yoksa
+// T-bağlantısı oluşur ve yüzey kapanmaz. Bütün kesik çizgileri genel bir
+// listeye alınır, kenarlar da adım'ın katlarına oturtulur.
+const X_KESIM = BOLME.xKesim;
+const Y_KESIM = BOLME.yKesim;
 
 function kenarOrnek(ax, ay, bx, by, kesim, adim) {
   const yatay = Math.abs(by - ay) < 1e-9;
@@ -162,8 +184,6 @@ function kenarOrnek(ax, ay, bx, by, kesim, adim) {
   const yon = Math.sign(t1 - t0);
   const degerler = new Set([t0]);
   for (const k of kesim) if ((k - t0) * yon > 1e-9 && (t1 - k) * yon > 1e-9) degerler.add(k);
-  // GENEL kafes: adım'ın katları. Eşit bölme yapılırsa komşu hücreler
-  // farklı noktalar üretir ve yüzeyde T-bağlantısı kalır.
   const alt = Math.min(t0, t1), ust = Math.max(t0, t1);
   for (let k = Math.ceil(alt / adim); k * adim < ust - 1e-9; k++) {
     const v = k * adim;
@@ -191,9 +211,9 @@ function boyaGoreOrnek(pts, N) {
     uz.push(d); top += d;
   }
   const out = [];
-  let hedef = 0, i = 0, gecen = 0;
+  let i = 0, gecen = 0;
   for (let k = 0; k < N; k++) {
-    hedef = top * k / N;
+    const hedef = top * k / N;
     while (gecen + uz[i] < hedef) { gecen += uz[i]; i = (i + 1) % n; }
     const t = uz[i] < 1e-9 ? 0 : (hedef - gecen) / uz[i];
     const a = pts[i], b = pts[(i + 1) % n];
@@ -202,7 +222,8 @@ function boyaGoreOrnek(pts, N) {
   return out;
 }
 
-// Verilen açılarda konturun yarıçapını bulur (yıldız-biçimli kontur gerekir).
+// Verilen açılarda konturun yarıçapını bulur (ışın merkezine göre
+// yıldız-biçimli kontur gerekir; oklarda merkez gövde-uç birleşimidir).
 function acilardaKontur(pts, c, acilar) {
   return acilar.map(a => {
     const dx = Math.cos(a), dy = Math.sin(a);
@@ -225,7 +246,7 @@ function zeminPlakasi() {
   const m = new Mesh();
   const H = P.panoH, D = P.oyukDerin;
   const disHam = roundedRectPts(P.panoW, P.panoD, 8, 12);
-  const ic = cerceveOrnek(-P.icX, -P.icY, P.icX, P.icY, 3);
+  const ic = cerceveOrnek(-P.icX, -P.icY, P.icX, P.icY, 4);
   const dis = boyaGoreOrnek(disHam, ic.length);
 
   m.add(fanFace(dis, [0, 0], 0, false));        // alt yüz
@@ -235,28 +256,21 @@ function zeminPlakasi() {
   // dış kenarda 1 cm yükselti: parçalar panodan kaymaz
   const cIc = boyaGoreOrnek(
     roundedRectPts(P.panoW - 2 * P.cerceveW, P.panoD - 2 * P.cerceveW, 6, 12), dis.length);
-  m.add(ringFace(dis, cIc, H, false));          // çerçevenin alt yüzü
+  m.add(ringFace(dis, cIc, H, false));
   m.add(wall(dis, H, H + P.cerceveH, true));
   m.add(wall(cIc, H, H + P.cerceveH, false));
   m.add(ringFace(dis, cIc, H + P.cerceveH, true));
 
-  KOLONLAR.forEach((k, ci) => {
-    const x0 = KOLON_X[ci], x1 = KOLON_X[ci + 1];
-    for (let ri = 0; ri < k.satir.length - 1; ri++) {
-      const y0 = k.satir[ri], y1 = k.satir[ri + 1];
-      const cevre = cerceveOrnek(x0, y0, x1, y1, 3);
-      const t = k.parca[ri];
-      if (!t) { m.add(fanFace(cevre, [(x0 + x1) / 2, (y0 + y1) / 2], H, true)); continue; }
-      const [ad, sx, sy] = t;
-      const c = [sx, sy];
-      const oyuk = tasi2(oyukKonturu(ad), c[0], c[1]);
-      const acilar = cevre.map(p => Math.atan2(p[1] - c[1], p[0] - c[0]));
-      const ickontur = acilardaKontur(oyuk, c, acilar);
-      m.add(ringFace(cevre, ickontur, H, true));          // üst yüz, oyuk kadar boş
-      m.add(wall(ickontur, H - D, H, false));             // oyuk duvarı
-      m.add(fanFace(ickontur, c, H - D, true));           // oyuk tabanı
-    }
-  });
+  for (const h of BOLME.hucreler) {
+    const cevre = cerceveOrnek(h.x0, h.y0, h.x1, h.y1, 4);
+    if (!h.oyuk) { m.add(fanFace(cevre, [(h.x0 + h.x1) / 2, (h.y0 + h.y1) / 2], H, true)); continue; }
+    const c = [h.oyuk.x, h.oyuk.y];
+    const acilar = cevre.map(p => Math.atan2(p[1] - c[1], p[0] - c[0]));
+    const ickontur = acilardaKontur(h.oyuk.kontur, c, acilar);
+    m.add(ringFace(cevre, ickontur, H, true));          // üst yüz, oyuk kadar boş
+    m.add(wall(ickontur, H - D, H, false));             // oyuk duvarı
+    m.add(fanFace(ickontur, c, H - D, true));           // oyuk tabanı
+  }
   return m;
 }
 
@@ -267,11 +281,6 @@ export function panoOgeleri() {
 
   const z = P.panoH, kz = z + P.kabartma;
 
-  for (const ok of OKLAR) {
-    const m = new Mesh();
-    for (const p of ok.poly) m.add(extrude(p, z, kz));
-    ekle(ok.ad, m, 'ok');
-  }
   for (const [t, x, yy, boy] of YAZILAR) {
     ekle('yazı: ' + t, yazi(t, { boy, kal: P.yaziKal, h: P.yaziH, z0: z })
       .translate(x - yaziGenisligi(t, boy) / 2, yy, 0), 'yazı');
@@ -389,6 +398,8 @@ export const PANO_PARCALARI = [
   { id: 'parca-nadp-arti', ad: 'NADP⁺', soket: 'NADP+', yap: () => duzParca('NADP+') },
 ];
 
-export const OK_PARCALARI = OKLAR.map(o => ({
-  id: 'renkli-' + o.id, ad: 'Renkli ' + o.ad, yap: () => okParcasi(o.id),
+// Oklar artık çıkarılabilir parça; her biri kendi oyuğuna oturur.
+export const OK_PARCALARI = OK_TANIM.map(o => ({
+  id: 'parca-' + o.id, ad: o.ad, soket: o.id, yap: () => okParcasi(o.id),
 }));
+PANO_PARCALARI.push(...OK_PARCALARI);

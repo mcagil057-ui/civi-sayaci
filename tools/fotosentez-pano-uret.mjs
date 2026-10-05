@@ -2,7 +2,7 @@
 // Çalıştır: node tools/fotosentez-pano-uret.mjs
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { Mesh, toBinarySTL, checkWatertight, volume } from '../assets/mesh.js';
-import { PANO_PARCALARI, OK_PARCALARI, OKLAR, okParcasi, SOKETLER, P } from '../assets/fotosentez-pano.js';
+import { PANO_PARCALARI, SOKETLER, P } from '../assets/fotosentez-pano.js';
 
 const OUT = new URL('../modeller/fotosentez-pano/', import.meta.url);
 mkdirSync(OUT, { recursive: true });
@@ -17,7 +17,7 @@ const yaz = (ad, mesh) => {
 
 /* ---- 1) Tek tek parçalar (renk değiştirmek isteyen için) ---- */
 let toplam = 0;
-for (const p of [...PANO_PARCALARI, ...OK_PARCALARI]) toplam += yaz(p.id, p.yap().center());
+for (const p of PANO_PARCALARI) toplam += yaz(p.id, p.yap().center());
 
 /* ---- 2) Montaj: hepsi takılı hâlde tek dosya. Sadece görüntülemek için. ---- */
 const soket = ad => SOKETLER.find(s => s[2] === ad);
@@ -28,7 +28,6 @@ for (const p of PANO_PARCALARI) {
   const z = p.konum ? P.panoH : P.panoH - P.oyukDerin;
   montaj.add(yer ? p.yap().translate(yer[0], yer[1], z) : p.yap());
 }
-for (const o of OKLAR) montaj.add(okParcasi(o.id).translate(0, 0, P.panoH + P.kabartma));
 console.log('');
 yaz('00-MONTAJ-sadece-goruntuleme', montaj.center());
 
@@ -50,8 +49,9 @@ function tablaya(parcalar, genislik = 210, bosluk = 6) {
 console.log('');
 yaz('baski-1-pano', PANO_PARCALARI[0].yap().center());
 yaz('baski-2-kloroplast-zari', PANO_PARCALARI[1].yap().center());
-yaz('baski-3-parcalar', tablaya(PANO_PARCALARI.slice(2).map(p => p.yap()), 250));
-yaz('baski-4-renkli-oklar', tablaya(OK_PARCALARI.map(p => p.yap()), 250));
+const kalan = PANO_PARCALARI.slice(2).map(p => p.yap());
+yaz('baski-3-parcalar', tablaya(kalan.slice(0, 11), 250));
+yaz('baski-4-oklar', tablaya(kalan.slice(11), 250));
 
-console.log(`\n${PANO_PARCALARI.length + OK_PARCALARI.length} tekil parça + 1 montaj + 3 baskı tablası`
+console.log(`\n${PANO_PARCALARI.length} dosya + 1 montaj + 4 baskı tablası`
   + ` · kaba filament ≈ ${(toplam * 0.25 * 1.24).toFixed(0)} g`);
