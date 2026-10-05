@@ -380,3 +380,75 @@ export function volume(mesh) {
   }
   return Math.abs(v);
 }
+
+/* ---------- yüzeyde oyuk açmak ---------- */
+
+// Çokgeni, merkezinden eşit açılarla N noktaya yeniden örnekler.
+// Merkeze göre yıldız-biçimli (star-shaped) çokgenlerde kusursuz çalışır:
+// dikdörtgen, daire, yuvarlatılmış kutu, yıldız, güneş — hepsi öyledir.
+export function radyalOrnekle(pts, c, N = 96) {
+  const out = [];
+  for (let k = 0; k < N; k++) {
+    const a = 2 * Math.PI * k / N;
+    const dx = Math.cos(a), dy = Math.sin(a);
+    let enUzak = -1;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i], q = pts[(i + 1) % pts.length];
+      const ex = q[0] - p[0], ey = q[1] - p[1];
+      const payda = dx * ey - dy * ex;
+      if (Math.abs(payda) < 1e-12) continue;
+      const s = ((p[0] - c[0]) * ey - (p[1] - c[1]) * ex) / payda;   // ışın parametresi
+      const u = ((p[0] - c[0]) * dy - (p[1] - c[1]) * dx) / payda;   // kenar parametresi
+      if (s > 0 && u >= -1e-9 && u <= 1 + 1e-9 && s > enUzak) enUzak = s;
+    }
+    if (enUzak < 0) enUzak = 1e-6;
+    out.push([c[0] + dx * enUzak, c[1] + dy * enUzak]);
+  }
+  return out;
+}
+
+// İki kapalı halka arasındaki DÜZ yüzey (eşit nokta sayısı gerekir).
+// Kulak kırpma kullanmaz: delikli yüzeyler bununla kurulur, hep doğru çıkar.
+export function ringFace(dis, ic, z, yukari = true) {
+  const m = new Mesh();
+  const n = dis.length;
+  for (let k = 0; k < n; k++) {
+    const i = k, j = (k + 1) % n;
+    const a = [dis[i][0], dis[i][1], z], b = [dis[j][0], dis[j][1], z];
+    const c = [ic[j][0], ic[j][1], z], d = [ic[i][0], ic[i][1], z];
+    yukari ? m.quad(a, b, c, d) : m.quad(d, c, b, a);
+  }
+  return m;
+}
+
+// Düz dikdörtgen yüzey
+export function rectFace(x0, y0, x1, y1, z, yukari = true) {
+  const m = new Mesh();
+  const a = [x0, y0, z], b = [x1, y0, z], c = [x1, y1, z], d = [x0, y1, z];
+  yukari ? m.quad(a, b, c, d) : m.quad(d, c, b, a);
+  return m;
+}
+
+// Kapalı konturun dikey duvarı
+export function wall(pts, z0, z1, disaBakan = true) {
+  const m = new Mesh();
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i], q = pts[(i + 1) % pts.length];
+    const a = [p[0], p[1], z0], b = [q[0], q[1], z0];
+    const c = [q[0], q[1], z1], d = [p[0], p[1], z1];
+    disaBakan ? m.quad(a, b, c, d) : m.quad(d, c, b, a);
+  }
+  return m;
+}
+
+// Yıldız-biçimli konturun merkezden yelpaze ile kapatılması (oyuk tabanı).
+export function fanFace(pts, c, z, yukari = true) {
+  const m = new Mesh();
+  const o = [c[0], c[1], z];
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i], q = pts[(i + 1) % pts.length];
+    const a = [p[0], p[1], z], b = [q[0], q[1], z];
+    yukari ? m.tri(o, a, b) : m.tri(b, a, o);
+  }
+  return m;
+}

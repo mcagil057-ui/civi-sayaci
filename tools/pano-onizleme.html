@@ -18,7 +18,7 @@ const OK_RENK = {
   'ok-h2o':[86,96,190], 'ok-co2':[110,118,70], 'ok-o2':[86,96,190],
   'ok-glikoz':[110,118,70], 'ok-isik':[240,170,40], 'ok-dongu':[70,70,78],
 };
-const dz = P.panoH + P.soketH;
+const dz = P.panoH - P.oyukDerin;
 const gruplar = PANO_PARCALARI.map(p => {
   const s = p.soket ? soket(p.soket) : null;
   return { m: s ? p.yap().translate(s[0], s[1], dz) : p.yap(), renk: RENK[p.id] || [200,200,200] };

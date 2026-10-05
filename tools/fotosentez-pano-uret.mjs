@@ -24,7 +24,7 @@ const soket = ad => SOKETLER.find(s => s[2] === ad);
 const montaj = new Mesh();
 for (const p of PANO_PARCALARI) {
   const s = p.soket ? soket(p.soket) : null;
-  montaj.add(s ? p.yap().translate(s[0], s[1], P.panoH + P.soketH) : p.yap());
+  montaj.add(s ? p.yap().translate(s[0], s[1], P.panoH - P.oyukDerin) : p.yap());
 }
 for (const o of OKLAR) montaj.add(okParcasi(o.id).translate(0, 0, P.panoH + P.kabartma));
 console.log('');

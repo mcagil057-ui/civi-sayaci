@@ -58,7 +58,7 @@ const icte = (cx, cy) => {
   return kose.every(([x, y]) =>
     ((x - OVin.cx) / OVin.rx) ** 2 + ((y - OVin.cy) / OVin.ry) ** 2 < 0.97);
 };
-const sonuc = sadeceIc ? iyi.filter(p => icte(p[0], p[1])) : iyi;
+const sonuc = sadeceIc ? iyi.filter(p => icte(p[0], p[1])) : [...iyi];  // kopya şart: aynı dizi olursa aşağıdaki temizleme sonucu siler
 iyi.length = 0; iyi.push(...sonuc);
 
 const hx = satir[1], hy = satir[2];
