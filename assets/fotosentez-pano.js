@@ -22,18 +22,19 @@ export const P = {
 };
 
 // Kloroplast konturu
-const OV = { cx: 12, cy: -8, rx: 118, ry: 82 };
+const OV = { cx: 13, cy: -8, rx: 118, ry: 85 };
 
 /* ---- yerleşim: dilimlenmiş ızgara. Her hücrede en çok bir oyuk. ---- */
-const KOLON_X = [-132, -92, -53, -24, 12, 62, 132];
+const KOLON_X = [-132, -92, -50, -20, 16, 52, 116, 132];
 // her kolonun satır sınırları ve hangi satırda hangi parça var
 const KOLONLAR = [
-  { satir: [-102, 38, 82, 102], parca: { 1: 'IŞIK' } },
-  { satir: [-102, -70, -26, 32, 102], parca: { 0: 'O2', 2: 'GRANUM' } },
-  { satir: [-102, 70, 102], parca: { 1: 'H2O' } },
-  { satir: [-102, -42, 20, 74, 102], parca: { 0: 'ADP', 2: 'ATP' } },
-  { satir: [-102, -48, -6, 40, 70, 102], parca: { 0: 'P', 1: 'NADP+', 2: 'NADPH', 4: 'CO2' } },
-  { satir: [-102, -68, -36, 36, 102], parca: { 0: 'GLİKOZ', 2: 'KALVİN' } },
+  { satir: [-102, 40, 84, 102], parca: { 1: 'IŞIK' } },
+  { satir: [-102, -80, -20, 30, 102], parca: { 0: 'O2', 2: 'GRANUM' } },
+  { satir: [-102, 82, 102], parca: { 1: 'H2O' } },
+  { satir: [-102, -66, -30, 24, 60, 102], parca: { 1: 'ADP', 3: 'ATP' } },
+  { satir: [-102, -62, -38, -10, 2, 30, 82, 102], parca: { 1: 'P', 2: 'NADP+', 4: 'NADPH', 6: 'CO2' } },
+  { satir: [-102, -82, -36, 32, 102], parca: { 0: 'GLİKOZ', 2: 'KALVİN' } },
+  { satir: [-102, 102], parca: {} },
 ];
 
 // Soket konumu = hücrenin merkezi
@@ -51,9 +52,9 @@ export const SOKETLER = (() => {
 
 // Pano üzerindeki sabit yazılar: [metin, merkez x, alt kenar y, harf boyu]
 export const YAZILAR = [
-  ['GRANUM', -50, -26, 6],
-  ['STROMA', 20.75, 26, 7],
-  ['KLOROPLAST', -60, -106, 6],
+  ['GRANUM', -47, -23, 6],
+  ['STROMA', 26.75, 23, 7],
+  ['KLOROPLAST', -60, -108, 6],
 ];
 
 /* ---- parça konturları: oyuk da bu kontura göre açılır ---- */
@@ -83,8 +84,8 @@ const gunesPts = (R, rayL, n = 8) => {
   return p;
 };
 
-const karoPts = (metin, boy) =>
-  roundedRectPts(yaziGenisligi(metin, boy) + 2 * P.pad, boy + 2 * P.pad, 6, 10);
+const karoPts = (metin, boy, pad = P.pad) =>
+  roundedRectPts(yaziGenisligi(metin, boy) + 2 * pad, boy + 2 * pad, 5, 10);
 
 // Her parçanın adı → { kontur, govde }
 export const PARCA_TANIM = {
@@ -93,13 +94,13 @@ export const PARCA_TANIM = {
   'CO2':    { boy: 7,   metin: 'CO_2',        kontur: () => karoPts('CO_2', 7) },
   'O2':     { boy: 7,   metin: 'O_2',         kontur: () => karoPts('O_2', 7) },
   'GLİKOZ': { boy: 6,   metin: 'C_6H_1_2O_6', kontur: () => karoPts('C_6H_1_2O_6', 6) },
-  'ATP':    { boy: 6.4, metin: 'ATP',         kontur: () => yildizPts(yaziGenisligi('ATP', 6.4) / 2 + 3) },
-  'ADP':    { boy: 6,   metin: 'ADP',         kontur: () => yildizPts(yaziGenisligi('ADP', 6) / 2 + 3) },
+  'ATP':    { boy: 5.6, metin: 'ATP',         kontur: () => yildizPts(yaziGenisligi('ATP', 5.6) / 2 + 3) },
+  'ADP':    { boy: 5.4, metin: 'ADP',         kontur: () => yildizPts(yaziGenisligi('ADP', 5.4) / 2 + 3) },
   'P':      { boy: 7,   metin: 'P',           kontur: () => yildizPts(5.6, 12) },
-  'NADPH':  { boy: 6,   metin: 'NADPH',       kontur: () => karoPts('NADPH', 6) },
-  'NADP+':  { boy: 6,   metin: 'NADP^+',      kontur: () => karoPts('NADP^+', 6) },
+  'NADPH':  { boy: 4.8, metin: 'NADPH',       kontur: () => karoPts('NADPH', 4.8, 4) },
+  'NADP+':  { boy: 4.8, metin: 'NADP^+',      kontur: () => karoPts('NADP^+', 4.8, 4) },
   'GRANUM': { boy: 0,   metin: '',            kontur: () => circlePts(16, 72) },
-  'KALVİN': { boy: 0,   metin: '',            kontur: () => circlePts(32, 96) },
+  'KALVİN': { boy: 0,   metin: '',            kontur: () => circlePts(29, 96) },
 };
 
 // Oyuk konturu: parça konturunun her yönde eşit mesafede dışa ötelenmişi.
@@ -118,20 +119,21 @@ const egikOk = (x, y, aci, uzun, kal, basW, basL) =>
   tasi2(don2(arrowPts(uzun, kal, basW, basL), aci), x, y);
 
 export const OKLAR = [
-  { id: 'ok-h2o',    ad: 'ok H2O',    poly: [dikOkPts(-38.5, 76, 30)] },
-  { id: 'ok-co2',    ad: 'ok CO2',    poly: [dikOkPts(37, 76, 30)] },
-  { id: 'ok-o2',     ad: 'ok O2',     poly: [dikOkPts(-72.5, -16, 60)] },
-  { id: 'ok-glikoz', ad: 'ok glikoz', poly: [dikOkPts(97, -36, 40)] },
+  { id: 'ok-h2o',    ad: 'ok H2O',    poly: [dikOkPts(-35, 82, 28)] },
+  { id: 'ok-co2',    ad: 'ok CO2',    poly: [dikOkPts(34, 82, 24)] },
+  { id: 'ok-o2',     ad: 'ok O2',     poly: [dikOkPts(-71, -14, 68)] },
+  { id: 'ok-glikoz', ad: 'ok glikoz', poly: [dikOkPts(84, -33, 49)] },
   { id: 'ok-isik',   ad: 'ışık okları',
-    // kaydırma, okun DİK yönünde olmalı; yoksa oklar üst üste biner.
-    // yön -40° → dik birim (0.643, 0.766), aralık 20 mm
-    poly: [0, 1, 2].map(i => egikOk(-100 - i * 12.9, 36 - i * 15.3, -40, 20, 7, 16, 10)) },
+    // kaydırma okun DİK yönünde olmalı; yoksa oklar üst üste biner.
+    // yön -40° → dik birim (0.643, 0.766), aralık 22 mm
+    poly: [0, 1, 2].map(i => egikOk(-100 - i * 14.1, 36 - i * 16.9, -40, 18, 7, 16, 10)) },
   { id: 'ok-dongu',  ad: 'döngü okları',
+    // her ok iki parçayı BİRBİRİNE bağlar: granum→ATP→Kalvin→NADP⁺→granum
     poly: [
-      egikOk(-50, 20, 48, 30, 7, 16, 10),
-      egikOk(-30, -50, 150, 26, 7, 16, 10),
-      egikOk(24, 44, -25, 34, 7, 16, 10),
-      egikOk(62, -45, 195, 34, 7, 16, 10),
+      egikOk(-48, 14, 38, 30, 7, 16, 10),     // granum → ATP
+      egikOk(20, 46, -25, 44, 7, 16, 10),     // ATP → Kalvin
+      egikOk(66, -38, 190, 22, 7, 16, 10),    // Kalvin → NADP⁺
+      egikOk(-20, -56, 125, 40, 7, 16, 10),   // ADP+P → granum
     ] },
 ];
 
@@ -252,8 +254,8 @@ export function panoOgeleri() {
 
   const z = P.panoH, kz = z + P.kabartma;
   const oval = (rx, ry) => ellipsePts(rx, ry, 180).map(p => [p[0] + OV.cx, p[1] + OV.cy]);
-  ekle('dış zar', extrudeRing(oval(OV.rx, OV.ry), oval(OV.rx - 2.6, OV.ry - 2.6), z, kz), 'zar');
-  ekle('iç zar', extrudeRing(oval(OV.rx - 6.6, OV.ry - 6.6), oval(OV.rx - 9.2, OV.ry - 9.2), z, kz), 'zar');
+  ekle('dış zar', extrudeRing(oval(OV.rx, OV.ry), oval(OV.rx - 4, OV.ry - 4), z, kz), 'zar');
+  ekle('iç zar', extrudeRing(oval(OV.rx - 9, OV.ry - 9), oval(OV.rx - 13, OV.ry - 13), z, kz), 'zar');
 
   for (const ok of OKLAR) {
     const m = new Mesh();
@@ -275,9 +277,9 @@ export function pano() {
 
 /* ================= TAKILAN PARÇALAR ================= */
 
-function etiket(m, metin, boy, cy = 0, z0 = P.tileH - 0.2) {
+function etiket(m, metin, boy, cy = 0, z0 = P.tileH - 0.2, kal = P.yaziKal) {
   const g = yaziGenisligi(metin, boy);
-  m.add(yazi(metin, { boy, kal: P.yaziKal, h: P.yaziH, z0 }).translate(-g / 2, cy - boy / 2, 0));
+  m.add(yazi(metin, { boy, kal, h: P.yaziH, z0 }).translate(-g / 2, cy - boy / 2, 0));
   return m;
 }
 
@@ -320,11 +322,11 @@ export function kalvin() {
   const m = new Mesh();
   m.add(extrude(PARCA_TANIM['KALVİN'].kontur(), 0, 3.2));   // oyuktan 0,7 mm yüksek: yüzeyle çakışmaz
   for (const [a0, a1] of [[88, -78], [-92, -262]]) {
-    m.add(extrude(yaySerit(0, 0, 25.5, 31, a0, a1, 48), 3.0, P.tileH + 1));
-    m.add(extrude(yayUcu(0, 0, 28.2, a1, -1, 6.5), 3.0, P.tileH + 1));
+    m.add(extrude(yaySerit(0, 0, 23.5, 28, a0, a1, 48), 3.0, P.tileH + 1));
+    m.add(extrude(yayUcu(0, 0, 25.7, a1, -1, 6), 3.0, P.tileH + 1));
   }
   ['IŞIĞIN', 'KULLANILMADIĞI', 'TEPKİMELER'].forEach((t, i) =>
-    etiket(m, t, 4.2, 6.2 - i * 7, 3.0));
+    etiket(m, t, 3.2, 5.0 - i * 5.6, 3.0, 1.0));
   return m;
 }
 

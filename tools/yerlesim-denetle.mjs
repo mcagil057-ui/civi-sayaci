@@ -44,10 +44,9 @@ for (const [x, y, ad] of SOKETLER) {
   // soket çapı kadar daire
 }
 
-// Kasıtlı kesişmeler: oklar zarı geçer (madde zardan girip çıkar).
-const serbest = (a, b) => (a.tur === 'ok' && b.tur === 'zar') || (a.tur === 'zar' && b.tur === 'ok')
-  || (a.tur === 'parça' && b.tur === 'ok') || (a.tur === 'ok' && b.tur === 'parça')
-  || (a.tur === 'parça' && b.tur === 'zar') || (a.tur === 'zar' && b.tur === 'parça');
+// TEK kasıtlı kesişme: oklar zarı geçer (madde zardan girip çıkar).
+// Parçalar zarın üstüne BİNEMEZ — bu daha önce yanlışlıkla muaf tutulmuştu.
+const serbest = (a, b) => (a.tur === 'ok' && b.tur === 'zar') || (a.tur === 'zar' && b.tur === 'ok');
 
 let sorun = 0;
 for (let i = 0; i < oge.length; i++) for (let j = i + 1; j < oge.length; j++) {

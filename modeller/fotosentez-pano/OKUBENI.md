@@ -59,7 +59,7 @@ dosyalarını ayrı renkte basıp kabartmanın üstüne yapıştır — birebir 
 | `parca-nadph.stl` | NADPH | 38 × 16 × 5 |
 | `parca-nadp-arti.stl` | NADP⁺ | 36 × 16 × 5 |
 
-Toplam ≈ 132 g filament. Pano ~5 saat, parçalar ~2 saat, oklar ~1 saat.
+Toplam ≈ 134 g filament. Pano ~5 saat, parçalar ~2 saat, oklar ~1 saat.
 
 ## Baskı ayarları
 
@@ -70,10 +70,20 @@ PLA · katman **0,2 mm** · dolgu %12 · duvar 3 hat · **destek gerekmez**.
 pano beyaz · granum yeşil · Kalvin mavi · ATP ve P sarı · ADP açık yeşil ·
 NADPH ve NADP⁺ beyaz · H₂O ve CO₂ mavi · O₂ ve glikoz kırmızı · güneş sarı
 
+## Zar ve parçalar
+
+Çift zar 4 mm kalınlığında iki şerit, araları 5 mm. **Hiçbir parça zarın
+üstüne binmiyor**: bütün parçalar iç zarın içinde, giren/çıkan maddeler
+(H₂O, CO₂, O₂, glikoz, ışık) dışında. Yalnızca oklar zarı geçiyor — kitapta
+da öyle, madde zardan girip çıkıyor.
+
+Döngü okları artık iki parçayı birbirine bağlıyor:
+granum → ATP → Kalvin → NADP⁺/P → ADP → granum.
+
 ## Denetim
 
 - `node tools/yerlesim-denetle.mjs` → üstten görünüşte çakışma ölçer
-  ("Çakışma yok ✓" demeli)
+  ("Çakışma yok ✓" demeli). Tek muafiyet: okların zarı geçmesi.
 - `node tools/yer-ara.mjs STROMA --ic` → bir yazı için çakışmasız konum arar
 - Bütün STL'ler kapalı yüzey (manifold) olarak doğrulandı
 
