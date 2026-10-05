@@ -7,7 +7,7 @@ Yeniden üretmek / ölçü değiştirmek: `node tools/fotosentez-pano-uret.mjs`
 
 ## Nasıl çalışıyor
 
-- Panoda **12 soket** var; hepsi aynı çapta (Ø8 mm pim).
+- Panoda **11 soket** var; hepsi aynı çapta (Ø8 mm pim).
 - Bütün soketler aynı olduğu için parçalar her yere takılabilir — yani
   **doğru yere takmak öğrencinin işi.** Sunumda hocan "glikoz nereye gider?"
   diye sorabilir, sen takarak gösterirsin.
@@ -18,21 +18,23 @@ Yeniden üretmek / ölçü değiştirmek: `node tools/fotosentez-pano-uret.mjs`
 
 | Dosya | Parça | Ölçü (mm) |
 |---|---|---|
-| `pano-zemin.stl` | Pano (kloroplast şeması, kabartma yazılar, 12 soket) | 200 × 150 × 8 |
-| `parca-granum.stl` | Granum — 6 tilakoit yığını | 32 × 32 × 30 |
-| `parca-kalvin.stl` | Kalvin döngüsü (dairesel ok) | 54 × 54 × 8 |
-| `parca-atp.stl` | ATP | 32 × 34 × 7 |
-| `parca-adp.stl` | ADP | 29 × 30 × 7 |
-| `parca-nadph.stl` | NADPH | 34 × 15 × 7 |
-| `parca-nadp-arti.stl` | NADP⁺ | 34 × 15 × 7 |
-| `parca-fosfat.stl` | Fosfat (P) | 19 × 19 × 7 |
-| `parca-su.stl` | H₂O | 26 × 15 × 7 |
-| `parca-karbondioksit.stl` | CO₂ | 26 × 15 × 7 |
-| `parca-oksijen.stl` | O₂ | 24 × 15 × 7 |
-| `parca-glikoz.stl` | Glikoz C₆H₁₂O₆ | 42 × 15 × 7 |
-| `parca-isik.stl` | Işık (güneş) | 44 × 44 × 7 |
+| `pano-zemin.stl` | Pano (kloroplast şeması, kabartma yazılar, 11 soket) | 200 × 150 × 8 |
+| `parca-granum.stl` | Granum — 6 tilakoit yığını | 30 × 30 × 30 |
+| `parca-kalvin.stl` | Kalvin döngüsü (dairesel ok) | 40 × 40 × 8 |
+| `parca-atp.stl` | ATP | 21 × 22 × 7 |
+| `parca-adp-fosfat.stl` | ADP + P | 38 × 14 × 7 |
+| `parca-nadph.stl` | NADPH | 28 × 13 × 7 |
+| `parca-nadp-arti.stl` | NADP⁺ | 27 × 13 × 7 |
+| `parca-su.stl` | H₂O | 26 × 14 × 7 |
+| `parca-karbondioksit.stl` | CO₂ | 26 × 14 × 7 |
+| `parca-oksijen.stl` | O₂ | 24 × 14 × 7 |
+| `parca-glikoz.stl` | Glikoz C₆H₁₂O₆ | 42 × 14 × 7 |
+| `parca-isik.stl` | Işık (güneş) | 28 × 28 × 7 |
 
-Toplam ≈ 61 g filament. Pano tek başına ~2,5 saat, parçalar toplu ~1,5 saat.
+ADP ile fosfat tek parçada birleştirildi (`ADP + P`): ayrı dururken panoda
+yeterli boşluk kalmıyordu, kimyasal olarak da birlikte anılırlar.
+
+Toplam ≈ 57 g filament. Pano tek başına ~2,5 saat, parçalar toplu ~1,5 saat.
 
 ## Baskı ayarları
 
@@ -45,6 +47,13 @@ Toplam ≈ 61 g filament. Pano tek başına ~2,5 saat, parçalar toplu ~1,5 saat
 ### Renk önerisi
 pano beyaz/gri · granum koyu yeşil · kalvin mavi · ATP ve P sarı · ADP açık yeşil ·
 NADPH ve NADP⁺ beyaz · H₂O ve CO₂ mavi · O₂ ve glikoz kırmızı · ışık sarı
+
+## Yerleşim denetimi
+
+`node tools/yerlesim-denetle.mjs` panodaki bütün kabartmaların ve takılı
+parçaların üstten görünüşteki ayak izlerini 0,4 mm'lik gözlere tarayıp
+çakışma olup olmadığını ölçer. Ölçü değiştirirsen bunu çalıştır; çıktı
+"Çakışma yok ✓" demeli.
 
 ## Pim sıkılığı
 
@@ -62,6 +71,9 @@ sıkı istersen `assets/fotosentez-pano.js` içindeki `bosluk: 0.35` değerini
 6. **Kalvin döngüsü**'nü tak: "Işık gerekmez, stromada olur."
 7. **CO₂** tak: "Karbon buraya girer, tutulur."
 8. **Glikoz** tak: "Ürün budur."
-9. **ADP** ve **P** tak: "Enerji boşalır, granuma geri döner — döngü kapanır."
+9. **ADP + P** tak: "Enerji boşalır, granuma geri döner — döngü kapanır."
+
+Soldaki sütun (ATP, ADP + P) granuma, sağdaki (NADPH, NADP⁺) Kalvin
+döngüsüne yakın durur; yerleşim akış yönünü kendiliğinden anlatır.
 
 Denklem panonun altında yazılı: 6CO₂ + 6H₂O + ışık → C₆H₁₂O₆ + 6O₂

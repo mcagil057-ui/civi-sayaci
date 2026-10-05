@@ -1,0 +1,67 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Pano önizleme</title>
+<style>html,body{margin:0;background:#0e1220}canvas{display:block;max-width:100%}</style></head><body>
+<canvas id="c" width="1500" height="1050"></canvas>
+<script type="module">
+// Panoyu bütün parçaları takılı hâlde gösterir (z-tamponlu yazılımsal çizici).
+// Sunucu gerekir:  python3 -m http.server  →  /tools/pano-onizleme.html
+import { Mesh } from '../assets/mesh.js';
+import { PANO_PARCALARI, SOKETLER, P } from '../assets/fotosentez-pano.js';
+
+const soket = ad => SOKETLER.find(s => s[2] === ad);
+const RENK = {
+  'pano-zemin':[226,228,234], 'parca-granum':[46,138,76], 'parca-kalvin':[60,110,200],
+  'parca-atp':[240,206,60], 'parca-adp-fosfat':[120,206,170], 'parca-nadph':[236,240,246],
+  'parca-nadp-arti':[236,240,246], 'parca-su':[92,150,232], 'parca-karbondioksit':[92,150,232],
+  'parca-oksijen':[214,86,86], 'parca-glikoz':[214,86,86], 'parca-isik':[246,182,44],
+};
+const dz = P.panoH + P.soketH;
+const gruplar = PANO_PARCALARI.map(p => {
+  const s = p.soket ? soket(p.soket) : null;
+  return { m: s ? p.yap().translate(s[0], s[1], dz) : p.yap(), renk: RENK[p.id] || [200,200,200] };
+});
+
+const c = document.getElementById('c'), ctx = c.getContext('2d');
+const tum = new Mesh(); for (const g of gruplar) tum.add(g.m);
+const b = tum.bounds();
+const mrk = [(b.min[0]+b.max[0])/2,(b.min[1]+b.max[1])/2,(b.min[2]+b.max[2])/2];
+const olc = 1/Math.max(...b.size);
+
+window.ciz = (yaw, pitch, zoom = 1) => {
+  const W=c.width, H=c.height;
+  const img=ctx.createImageData(W,H), px=img.data, zb=new Float32Array(W*H).fill(Infinity);
+  for(let i=0;i<W*H;i++){px[i*4]=14;px[i*4+1]=18;px[i*4+2]=32;px[i*4+3]=255;}
+  const ya=yaw*Math.PI/180, pa=pitch*Math.PI/180;
+  const cy=Math.cos(ya),sy=Math.sin(ya),cp=Math.cos(pa),sp=Math.sin(pa);
+  const k=Math.min(W,H)*1.02*zoom, cx=W/2, cz=H/2;
+  const don=p=>{const x=(p[0]-mrk[0])*olc,y=(p[1]-mrk[1])*olc,z=(p[2]-mrk[2])*olc;
+    const x1=x*cy-y*sy, y1=x*sy+y*cy; return [x1, y1*cp-z*sp, y1*sp+z*cp];};
+  const L=[0.32,-0.80,0.51];   // ışık, görüş uzayında (-y izleyiciye doğru)
+  for(const g of gruplar) for(const t of g.m.tris){
+    const A=don(t[0]),B=don(t[1]),C=don(t[2]);
+    const u=[B[0]-A[0],B[1]-A[1],B[2]-A[2]], v=[C[0]-A[0],C[1]-A[1],C[2]-A[2]];
+    let nx=u[1]*v[2]-u[2]*v[1], ny=u[2]*v[0]-u[0]*v[2], nz=u[0]*v[1]-u[1]*v[0];
+    const nl=Math.hypot(nx,ny,nz)||1; nx/=nl;ny/=nl;nz/=nl;
+    if(ny>=0) continue;                       // arka yüz
+    const sh=Math.max(0.12,nx*L[0]+ny*L[1]+nz*L[2]), gg=0.24+0.76*sh;
+    const r=g.renk[0]*gg|0, gr=g.renk[1]*gg|0, bl=g.renk[2]*gg|0;
+    const P0=[cx+A[0]*k, cz-A[2]*k, A[1]], P1=[cx+B[0]*k, cz-B[2]*k, B[1]], P2=[cx+C[0]*k, cz-C[2]*k, C[1]];
+    const minx=Math.max(0,Math.floor(Math.min(P0[0],P1[0],P2[0]))), maxx=Math.min(W-1,Math.ceil(Math.max(P0[0],P1[0],P2[0])));
+    const miny=Math.max(0,Math.floor(Math.min(P0[1],P1[1],P2[1]))), maxy=Math.min(H-1,Math.ceil(Math.max(P0[1],P1[1],P2[1])));
+    const d=(P1[0]-P0[0])*(P2[1]-P0[1])-(P2[0]-P0[0])*(P1[1]-P0[1]);
+    if(Math.abs(d)<1e-9) continue;
+    for(let yy=miny;yy<=maxy;yy++) for(let xx=minx;xx<=maxx;xx++){
+      const pxx=xx+0.5, pyy=yy+0.5;
+      const w0=((P1[0]-pxx)*(P2[1]-pyy)-(P2[0]-pxx)*(P1[1]-pyy))/d;
+      const w1=((P2[0]-pxx)*(P0[1]-pyy)-(P0[0]-pxx)*(P2[1]-pyy))/d;
+      const w2=1-w0-w1;
+      if(w0<-1e-6||w1<-1e-6||w2<-1e-6) continue;
+      const z=w0*P0[2]+w1*P1[2]+w2*P2[2], i=yy*W+xx;
+      if(z>=zb[i]) continue;
+      zb[i]=z; px[i*4]=r; px[i*4+1]=gr; px[i*4+2]=bl;
+    }
+  }
+  ctx.putImageData(img,0,0);
+};
+window.hazir = true;
+ciz(-14, 54, 0.95);
+</script></body></html>
