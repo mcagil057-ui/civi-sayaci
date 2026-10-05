@@ -49,6 +49,10 @@ function tablaya(parcalar, genislik = 210, bosluk = 6) {
 console.log('');
 yaz('baski-1-pano', PANO_PARCALARI[0].yap().center());
 yaz('baski-2-kloroplast-zari', PANO_PARCALARI[1].yap().center());
+// Tek dosya: bütün parçalar yan yana. Dilimleyicide "parçalara ayır" ile
+// ayrılıp gruplar hâlinde basılır.
+yaz('00-HEPSI-TEK-DOSYA', tablaya(PANO_PARCALARI.map(p => p.yap()), 300, 8));
+
 const kalan = PANO_PARCALARI.slice(2).map(p => p.yap());
 yaz('baski-3-parcalar', tablaya(kalan.slice(0, 11), 250));
 yaz('baski-4-oklar', tablaya(kalan.slice(11), 250));

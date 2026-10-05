@@ -140,6 +140,9 @@ for (const o of OK_TANIM) PARCA_TANIM[o.id] = { boy: 0, metin: '', kontur: () =>
 // Ölçekleme yapılırsa uzun kenarda bol, kısa kenarda sıkı olur; öteleme
 // her kenarda aynı payı bırakır.
 const oyukKonturu = ad => offsetPts(PARCA_TANIM[ad].kontur(), P.bosluk);
+export const oyukKonturuDisa = oyukKonturu;        // denetim için
+export const hucreler = () => BOLME.hucreler;
+export { OV, ZAR_KAL };
 
 /* ---- oklar: tek 2B tanımdan hem panoya kabartılır hem renkli parça olur ---- */
 const dikOkPts = (x, y0, uzun) => tasi2(don2(arrowPts(uzun, 5.5, 13, 9), -90), x, y0);

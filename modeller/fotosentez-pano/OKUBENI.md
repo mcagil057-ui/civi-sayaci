@@ -12,6 +12,7 @@ Her STL kendi merkezine hizalı. **Hepsini birden açarsan üst üste görünür
 
 | Ne yapacaksın | Hangi dosya |
 |---|---|
+| **Tek dosyada hepsi** | `00-HEPSI-TEK-DOSYA.stl` — 25 parçanın hepsi yan yana. Dilimleyicide **parçalara ayır** (PrusaSlicer: sağ tık → *Nesnelere ayır*, Cura: *Modeli parçalara böl*), sonra gruplar hâlinde bas. 290 × 568 mm olduğu için tek seferde basılmaz. |
 | **Nasıl göründüğüne bakmak** | `00-MONTAJ-sadece-goruntuleme.stl` — tek dosya, her şey takılı |
 | **Basmak** | `baski-1-pano` · `baski-2-kloroplast-zari` · `baski-3-parcalar` · `baski-4-oklar` — dördünü ayrı ayrı dilimle |
 | **Tek tek renkli basmak** | `parca-*.stl` — her seferinde bir dosya |
@@ -89,7 +90,24 @@ pano beyaz · zar açık mavi · granum yeşil · Kalvin mavi · ATP ve P sarı 
 ADP açık yeşil · NADPH ve NADP⁺ beyaz · H₂O ve CO₂ mavi · O₂ ve glikoz
 kırmızı · güneş sarı
 
-## Denetim
+## Denetim raporu
+
+`DENETIM-RAPORU.txt` dosyasında bu modelin tam denetimi var. `node tools/denetim.mjs`
+ile her an yeniden alınır. **Sonuç: 0 hata, 0 uyarı.** Kontrol edilenler:
+
+1. **Oyuk uyumu** — 27 oyuğun her birinde parça ile oyuk arası pay ölçüldü: **0,40 mm**
+   (güneşin ışın uçlarında 0,30, yıldızların derin köşelerinde 0,59 mm).
+2. **Oyuk–göz boşluğu** — hiçbir oyuk gözünün kenarına değmiyor (en az 0,8 mm).
+3. **Parça çakışması** — 24 parçanın hiçbiri birbirine değmiyor.
+4. **Zar ilişkisi** — içeride olması gerekenlerin hepsi zarın içinde, dışarıdakiler
+   dışında. Hiçbir parça ve hiçbir ok zara binmiyor.
+5. **Çerçeve** — her şey 1 cm'lik çerçevenin içinde (en yakın parça 4 mm).
+6. **Yazılar** — her yazı kendi parçasının içinde kalıyor, hiçbiri taşmıyor.
+7. **Zar pimleri** — dört pim ile dört oyuk aynı noktada; pim Ø6,0 / oyuk Ø7,2 mm.
+8. **Katı doğrulama** — 25 parçanın hepsi kapalı yüzey (manifold).
+9. **Baskı uygunluğu** — her parça 300 × 300 tablaya sığıyor; en ince kesit 4,5 mm.
+
+## Denetim komutları
 
 - `node tools/yerlesim-denetle.mjs` → üstten görünüşte çakışma ölçer.
   **Hiçbir muafiyet yok**; "Çakışma yok ✓" demeli.
