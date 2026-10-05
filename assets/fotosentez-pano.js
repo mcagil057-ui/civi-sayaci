@@ -18,32 +18,30 @@ export const P = {
 const SOKET_IC = P.pimR + P.bosluk;
 
 // Kloroplast ovali
-const OV = { cx: 2, cy: -2, rx: 84, ry: 36 };
+const OV = { cx: 8, cy: -4, rx: 85, ry: 44 };
 
 /* ---- soket konumları: [x, y, etiket] ---- */
 export const SOKETLER = [
-  [-72,  49, 'IŞIK'],
-  [-18,  49, 'H2O'],
-  [ 38,  49, 'CO2'],
-  [-50,  -4, 'GRANUM'],
-  [-18,  12, 'ATP'],
-  [ 14,  12, 'NADPH'],
-  [ 22, -16, 'NADP+'],
-  [-14, -16, 'ADP'],
-  [ 58,  -6, 'KALVİN'],
-  [-34, -58, 'O2'],
-  [ 46, -58, 'GLİKOZ'],
+  [-76,  52, 'IŞIK'],
+  [-16,  62, 'H2O'],
+  [ 58,  62, 'CO2'],
+  [-28,  -2, 'GRANUM'],
+  [ 10,  24, 'ATP'],
+  [ 14,   6, 'NADPH'],
+  [ 14, -14, 'NADP+'],
+  [  4, -32, 'ADP'],
+  [ 24, -32, 'P'],
+  [ 62,  -2, 'KALVİN'],
+  [-28, -62, 'O2'],
+  [ 66, -62, 'GLİKOZ'],
 ];
 
 // Pano üzerindeki sabit yazılar: [metin, merkez x, alt kenar y, harf boyu]
+// Kitaptaki şemada olan yazılar. (Granumun üstündeki yazı istenmedi.)
 export const YAZILAR = [
-  ['FOTOSENTEZ', 0, 66, 7],
-  ['STROMA', 4, 22, 4.2],
-  ['ÇİFT ZAR', 76, 36, 4.6],
-  ['IŞIK TEPKİMELERİ', -48, -45, 3.6],
-  ['IŞIKSIZ TEPKİMELER', 46, -45, 3.6],
-  ['KLOROPLAST', -74, -62, 5],
-  ['6CO_2 + 6H_2O + IŞIK → C_6H_1_2O_6 + 6O_2', 6, -71, 4.0],
+  ['GRANUM', -57, -2, 3.6],
+  ['STROMA', 34, 25, 4.0],
+  ['KLOROPLAST', -74, -66, 4.2],
 ];
 
 const pim = () => cylinder(P.pimR, P.pimH + 0.01, 40).translate(0, 0, -P.pimH);
@@ -120,19 +118,28 @@ export function panoOgeleri() {
   ekle('dış zar', extrudeRing(ovalPts(OV.rx, OV.ry), ovalPts(OV.rx - 1.8, OV.ry - 1.8), z, kz), 'zar');
   ekle('iç zar', extrudeRing(ovalPts(OV.rx - 4.4, OV.ry - 4.4), ovalPts(OV.rx - 6.2, OV.ry - 6.2), z, kz), 'zar');
 
-  // dik oklar: üstten giren (aşağı bakar), alttan çıkan (aşağı bakar)
-  const dikOk = (x, y0, uzun) => extrude(arrowPts(uzun, 5, 11, 7), z, kz)
+  // dik oklar: H2O ve CO2 girer, O2 ve glikoz çıkar (hepsi aşağı bakar)
+  const dikOk = (x, y0, uzun, kal = 5) => extrude(arrowPts(uzun, kal, kal + 6, 8), z, kz)
     .rotateZ(-90).translate(x, y0, 0);
-  ekle('ok H2O', dikOk(-18, 40, 7), 'ok');
-  ekle('ok CO2', dikOk(38, 40, 9), 'ok');
-  ekle('ok O2', dikOk(-34, -34, 7), 'ok');
-  ekle('ok glikoz', dikOk(46, -33, 8), 'ok');
+  ekle('ok H2O', dikOk(-16, 53, 37), 'ok');
+  ekle('ok CO2', dikOk(58, 53, 30), 'ok');
+  ekle('ok O2', dikOk(-28, -20, 33), 'ok');
+  ekle('ok glikoz', dikOk(66, -31, 22), 'ok');
 
+  // ışık: güneşten granuma üç eğik ok
   const isikOk = new Mesh();
   for (let i = 0; i < 3; i++) {
-    isikOk.add(extrude(arrowPts(18, 4, 9, 6), z, kz).translate(-95, 18 - i * 10, 0));
+    isikOk.add(extrude(arrowPts(14, 3.6, 8, 5.5), z, kz).rotateZ(-30).translate(-64 - i * 6, 34 - i * 10.4, 0));
   }
   ekle('ışık okları', isikOk, 'ok');
+
+  // kitaptaki ince döngü okları: granum ↔ moleküller ↔ Kalvin
+  const inceOk = (x, y, aci) => extrude(arrowPts(10, 3, 6.5, 4), z, kz)
+    .rotateZ(aci).translate(x, y, 0);
+  ekle('ok granum→ATP', inceOk(-9, 17, 52), 'ok');
+  ekle('ok ADP→granum', inceOk(-12, -26, 160), 'ok');
+  ekle('ok ATP→Kalvin', inceOk(23, 14, -40), 'ok');
+  ekle('ok Kalvin→NADP', inceOk(31, -22, 200), 'ok');
 
   for (const [t, x, yy, boy] of YAZILAR) {
     ekle('yazı: ' + t, yazi(t, { boy, kal: P.yaziKal, h: P.yaziH, z0: z })
@@ -161,27 +168,31 @@ export function granum(n = 6) {
     z += disk;
     if (i < n - 1) { m.add(cylinder(4.2, bogaz + 0.2, 32).translate(0, 0, z - 0.1)); z += bogaz; }
   }
-  const g = yaziGenisligi('GRANUM', 4.4);
-  m.add(yazi('GRANUM', { boy: 4.4, kal: 0.9, h: 0.7, z0: z }).translate(-g / 2, -2.2, 0));
-  return m;
+  return m;   // granumun üstünde yazı yok: panoda GRANUM etiketi var
+
 }
 
 // Kalvin döngüsü: dairesel ok
 export function kalvin() {
   const m = new Mesh();
-  m.add(extrude(circlePts(20, 64), 0, 2));
+  m.add(extrude(circlePts(29, 72), 0, 2));
   m.add(pim());
-  m.add(extrude(yaySerit(0, 0, 12, 17.5, 125, -200, 50), 2, 2 + P.tileH));
-  m.add(extrude(yayUcu(0, 0, 14.8, -200, -1, 4.5), 2, 2 + P.tileH));
-  const t1 = 'KALVİN', t2 = 'DÖNGÜSÜ';
-  m.add(yazi(t1, { boy: 3.6, kal: 0.85, h: 0.7, z0: 2 }).translate(-yaziGenisligi(t1, 3.6) / 2, 0.8, 0));
-  m.add(yazi(t2, { boy: 3.6, kal: 0.85, h: 0.7, z0: 2 }).translate(-yaziGenisligi(t2, 3.6) / 2, -5.2, 0));
+  // kitaptaki iki kalın mavi yay, uçlarında ok başı
+  for (const [a0, a1] of [[88, -78], [-92, -262]]) {
+    m.add(extrude(yaySerit(0, 0, 23, 28, a0, a1, 40), 2, 2 + P.tileH));
+    m.add(extrude(yayUcu(0, 0, 25.5, a1, -1, 6), 2, 2 + P.tileH));
+  }
+  const satir = ['IŞIĞIN', 'KULLANILMADIĞI', 'TEPKİMELER'];
+  satir.forEach((t, i) => {
+    m.add(yazi(t, { boy: 3.2, kal: 0.85, h: 0.7, z0: 2 })
+      .translate(-yaziGenisligi(t, 3.2) / 2, 3.6 - i * 5.2, 0));
+  });
   return m;
 }
 
-export const atp = () => karo(yildizPts(10, 11, 7.5), 'ATP', { boy: 5 });
-// ADP ile fosfat tek parça: panoda ikisi ayrı durduğunda yer kalmıyordu
-export const adpFosfat = () => karo(roundedRectPts(38, 14, 6, 8), 'ADP + P', { boy: 4.6 });
+export const atp = () => karo(yildizPts(10, 11, 7.5), 'ATP', { boy: 4.6 });
+export const adp = () => karo(yildizPts(10, 10, 6.8), 'ADP', { boy: 4.2 });
+export const fosfat = () => karo(circlePts(7, 36), 'P', { boy: 5 });
 export const nadph = () => karo(roundedRectPts(28, 13, 6, 8), 'NADPH', { boy: 4.6 });
 export const nadpArti = () => karo(roundedRectPts(27, 13, 6, 8), 'NADP^+', { boy: 4.6 });
 export const su = () => karo(roundedRectPts(26, 14, 6, 8), 'H_2O', { boy: 5.2 });
@@ -207,7 +218,8 @@ export const PANO_PARCALARI = [
   { id: 'parca-granum', ad: 'Granum — tilakoit yığını', soket: 'GRANUM', yap: () => granum(6) },
   { id: 'parca-kalvin', ad: 'Kalvin döngüsü', soket: 'KALVİN', yap: kalvin },
   { id: 'parca-atp', ad: 'ATP', soket: 'ATP', yap: atp },
-  { id: 'parca-adp-fosfat', ad: 'ADP + P', soket: 'ADP', yap: adpFosfat },
+  { id: 'parca-adp', ad: 'ADP', soket: 'ADP', yap: adp },
+  { id: 'parca-fosfat', ad: 'Fosfat (P)', soket: 'P', yap: fosfat },
   { id: 'parca-nadph', ad: 'NADPH', soket: 'NADPH', yap: nadph },
   { id: 'parca-nadp-arti', ad: 'NADP⁺', soket: 'NADP+', yap: nadpArti },
   { id: 'parca-su', ad: 'H₂O', soket: 'H2O', yap: su },
