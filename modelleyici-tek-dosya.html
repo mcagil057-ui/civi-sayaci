@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>3D Modelleyici (tek dosya) — baskıya hazır STL üretici</title>
+<meta name="description" content="Ölçü girerek baskıya hazır STL üret. Fotosentez ders modeli hazır parçalarıyla birlikte.">
+<style>
+  :root {
+    --bg: #0b0d18; --yuzey: #151a2e; --yuzey2: #1d2340; --kenar: #2a3156;
+    --metin: #e8ecff; --soluk: #9aa3c7; --vurgu: #ffb020; --yesil: #3ddc97;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--metin);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  header {
+    padding: 14px 16px; border-bottom: 1px solid var(--kenar);
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 17px; margin: 0; }
+  header span { color: var(--soluk); font-size: 13px; }
+  .duzen { display: grid; grid-template-columns: 340px 1fr; gap: 0; min-height: calc(100vh - 52px); }
+  @media (max-width: 860px) { .duzen { grid-template-columns: 1fr; } }
+  .panel { border-right: 1px solid var(--kenar); padding: 14px 16px 60px; }
+  .sekmeler { display: flex; gap: 6px; margin-bottom: 14px; }
+  .sekmeler button {
+    flex: 1; padding: 9px 8px; border-radius: 9px; border: 1px solid var(--kenar);
+    background: var(--yuzey); color: var(--soluk); font-size: 13px; cursor: pointer;
+  }
+  .sekmeler button[aria-selected="true"] { background: var(--vurgu); color: #16130a; border-color: var(--vurgu); font-weight: 600; }
+  label.alan { display: block; margin-bottom: 11px; font-size: 13px; color: var(--soluk); }
+  label.alan input {
+    width: 100%; margin-top: 4px; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--kenar); background: var(--yuzey); color: var(--metin); font-size: 15px;
+  }
+  select {
+    width: 100%; padding: 9px 10px; border-radius: 9px; border: 1px solid var(--kenar);
+    background: var(--yuzey); color: var(--metin); font-size: 14px; margin-bottom: 14px;
+  }
+  .btn {
+    display: block; width: 100%; padding: 11px; border-radius: 10px; border: none;
+    background: var(--vurgu); color: #16130a; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 10px;
+  }
+  .btn.ikincil { background: var(--yuzey2); color: var(--metin); border: 1px solid var(--kenar); font-weight: 500; }
+  .sahne { position: relative; display: flex; flex-direction: column; }
+  canvas { width: 100%; flex: 1; min-height: 340px; display: block; touch-action: none; cursor: grab; }
+  .bilgi {
+    padding: 12px 16px; border-top: 1px solid var(--kenar); font-size: 13px;
+    display: flex; gap: 18px; flex-wrap: wrap; color: var(--soluk);
+  }
+  .bilgi b { color: var(--metin); font-weight: 600; }
+  .rozet { color: var(--yesil); }
+  .rozet.kotu { color: #ff6b6b; }
+  .ipucu { font-size: 12px; color: var(--soluk); line-height: 1.5; margin: 10px 0 0; }
+  .parca-not { font-size: 12px; color: var(--soluk); line-height: 1.5; margin: 0 0 12px; min-height: 2em; }
+  .kilavuz { padding: 16px; border-top: 1px solid var(--kenar); font-size: 13.5px; line-height: 1.65; color: var(--soluk); }
+  .kilavuz h2 { font-size: 15px; color: var(--metin); margin: 0 0 8px; }
+  .kilavuz ol { padding-left: 20px; margin: 0; }
+  .kilavuz code { background: var(--yuzey); padding: 1px 5px; border-radius: 4px; color: var(--vurgu); }
+</style>
+</head>
+<body>
+<header>
+  <h1>3D Modelleyici</h1>
+  <span>ölçü gir → önizle → baskıya hazır STL indir</span>
+</header>
+
+<div class="duzen">
+  <div class="panel">
+    <div class="sekmeler" role="tablist">
+      <button id="sekme-foto" role="tab" aria-selected="true">Fotosentez ödevi</button>
+      <button id="sekme-genel" role="tab" aria-selected="false">Genel parçalar</button>
+    </div>
+
+    <select id="secim" aria-label="Parça seç"></select>
+    <p class="parca-not" id="not"></p>
+    <div id="alanlar"></div>
+
+    <button class="btn" id="indir">STL indir</button>
+    <button class="btn ikincil" id="indir-hepsi">Tüm parçaları indir</button>
+    <p class="ipucu">Modeli döndürmek için sürükle, yakınlaştırmak için tekerlek / iki parmak.</p>
+  </div>
+
+  <div class="sahne">
+    <canvas id="tuval"></canvas>
+    <div class="bilgi">
+      <span>Ölçü: <b id="b-olcu">—</b></span>
+      <span>Hacim: <b id="b-hacim">—</b></span>
+      <span>Filament: <b id="b-filament">—</b></span>
+      <span>Üçgen: <b id="b-ucgen">—</b></span>
+      <span id="b-kapali" class="rozet">—</span>
+    </div>
+    <div class="kilavuz">
+      <h2>Baskı ayarları (PLA, 0,2 mm katman)</h2>
+      <ol>
+        <li>Tüm parçalar düz tabanlı üretilir — <b>destek gerekmez</b>.</li>
+        <li>Dolgu %15–20, duvar 3 hat yeterli.</li>
+        <li>Granumları gövdedeki halka yuvalara oturt; gerekirse birkaç damla yapıştırıcı.</li>
+        <li>Renkli ayrım için parçaları farklı filamentle bas: gövde yeşil, granum koyu yeşil, oklar mavi/kırmızı.</li>
+        <li>Etiket plakalarına <code>CO₂ · H₂O · O₂ · Glikoz · Granum · Stroma</code> yazıp raya geçir.</li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===== assets/mesh.js ===== */
+// Basit üçgen-ağ (mesh) kütüphanesi: parametrik katı modelleme + STL çıktısı.
+// Hem tarayıcıda (<script type="module">) hem Node'da (import) çalışır.
+
+class Mesh {
+  constructor(tris = []) { this.tris = tris; }
+
+  tri(a, b, c) { this.tris.push([a, b, c]); return this; }
+
+  // Dörtgen yüzey: a-b-c-d sırası dışarıdan bakıldığında saat yönünün tersi.
+  quad(a, b, c, d) { return this.tri(a, b, c).tri(a, c, d); }
+
+  add(other) { for (const t of other.tris) this.tris.push(t); return this; }
+
+  map(fn) { return new Mesh(this.tris.map(t => t.map(fn))); }
+
+  translate(dx, dy, dz) { return this.map(p => [p[0] + dx, p[1] + dy, p[2] + dz]); }
+
+  scale(sx, sy = sx, sz = sx) { return this.map(p => [p[0] * sx, p[1] * sy, p[2] * sz]); }
+
+  rotateZ(deg) {
+    const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+    return this.map(p => [p[0] * c - p[1] * s, p[0] * s + p[1] * c, p[2]]);
+  }
+
+  rotateX(deg) {
+    const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+    return this.map(p => [p[0], p[1] * c - p[2] * s, p[1] * s + p[2] * c]);
+  }
+
+  // Modeli XY'de ortalayıp tabanını z=0'a oturtur (yazıcı tablası için).
+  center() {
+    const b = this.bounds();
+    if (!b) return this;
+    return this.translate(-(b.min[0] + b.max[0]) / 2, -(b.min[1] + b.max[1]) / 2, -b.min[2]);
+  }
+
+  bounds() {
+    if (!this.tris.length) return null;
+    const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+    for (const t of this.tris) for (const p of t) for (let i = 0; i < 3; i++) {
+      if (p[i] < min[i]) min[i] = p[i];
+      if (p[i] > max[i]) max[i] = p[i];
+    }
+    return { min, max, size: [max[0] - min[0], max[1] - min[1], max[2] - min[2]] };
+  }
+}
+
+/* ---------- 2B yardımcılar ---------- */
+
+function ellipsePts(rx, ry, seg = 72) {
+  const pts = [];
+  for (let i = 0; i < seg; i++) {
+    const a = 2 * Math.PI * i / seg;
+    pts.push([rx * Math.cos(a), ry * Math.sin(a)]);
+  }
+  return pts;
+}
+
+const circlePts = (r, seg = 48) => ellipsePts(r, r, seg);
+
+// Mercek / yaprak biçimi: iki yayın kesişimi. Kloroplast kesiti için.
+function lensPts(len, width, seg = 80) {
+  const a = len / 2, b = width / 2;
+  const pts = [];
+  for (let i = 0; i <= seg; i++) {
+    const x = -a + 2 * a * i / seg;
+    pts.push([x, b * Math.pow(Math.max(0, 1 - (x / a) ** 2), 0.62)]);
+  }
+  for (let i = seg - 1; i > 0; i--) {
+    const x = -a + 2 * a * i / seg;
+    pts.push([x, -b * Math.pow(Math.max(0, 1 - (x / a) ** 2), 0.62)]);
+  }
+  return pts;
+}
+
+function roundedRectPts(w, h, r = 2, seg = 8) {
+  const pts = [];
+  const corners = [[w / 2 - r, h / 2 - r, 0], [-w / 2 + r, h / 2 - r, 90],
+                   [-w / 2 + r, -h / 2 + r, 180], [w / 2 - r, -h / 2 + r, 270]];
+  for (const [cx, cy, a0] of corners) {
+    for (let i = 0; i <= seg; i++) {
+      const a = (a0 + 90 * i / seg) * Math.PI / 180;
+      pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+  }
+  return pts;
+}
+
+// Ok biçimi (yön: +X). Madde akışını göstermek için.
+function arrowPts(len, shaftW, headW, headLen) {
+  const s = shaftW / 2, hw = headW / 2, x0 = len - headLen;
+  return [[0, -s], [x0, -s], [x0, -hw], [len, 0], [x0, hw], [x0, s], [0, s]];
+}
+
+// Çokgeni içe/dışa ofsetler (ortalama merkeze göre ölçekleme değil, gerçek ofset).
+function offsetPts(pts, d) {
+  const n = pts.length, out = [];
+  for (let i = 0; i < n; i++) {
+    const p = pts[i], a = pts[(i - 1 + n) % n], b = pts[(i + 1) % n];
+    const n1 = normal2(a, p), n2 = normal2(p, b);
+    let nx = n1[0] + n2[0], ny = n1[1] + n2[1];
+    const l = Math.hypot(nx, ny) || 1;
+    nx /= l; ny /= l;
+    const cosHalf = Math.max(0.35, (n1[0] * nx + n1[1] * ny));
+    out.push([p[0] + nx * d / cosHalf, p[1] + ny * d / cosHalf]);
+  }
+  return out;
+}
+
+function normal2(a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
+  return [dy / l, -dx / l]; // CCW çokgen için dışa doğru
+}
+
+function area2(pts) {
+  let s = 0;
+  for (let i = 0, n = pts.length; i < n; i++) {
+    const a = pts[i], b = pts[(i + 1) % n];
+    s += a[0] * b[1] - b[0] * a[1];
+  }
+  return s / 2;
+}
+
+/* ---------- Kulak kırpma (ear clipping) üçgenleştirme ---------- */
+
+function triangulate(pts) {
+  let v = pts.map((p, i) => i);
+  if (area2(pts) < 0) v.reverse();
+  const out = [];
+  let guard = 0;
+  while (v.length > 3 && guard++ < 10000) {
+    let clipped = false;
+    for (let i = 0; i < v.length; i++) {
+      const i0 = v[(i - 1 + v.length) % v.length], i1 = v[i], i2 = v[(i + 1) % v.length];
+      const a = pts[i0], b = pts[i1], c = pts[i2];
+      const cross = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+      if (cross <= 1e-9) continue; // dışbükey değil
+      let ok = true;
+      for (const j of v) {
+        if (j === i0 || j === i1 || j === i2) continue;
+        if (inTri(pts[j], a, b, c)) { ok = false; break; }
+      }
+      if (!ok) continue;
+      out.push([i0, i1, i2]);
+      v.splice(i, 1);
+      clipped = true;
+      break;
+    }
+    if (!clipped) break; // bozuk çokgen: elde kalanı yelpaze ile kapat
+  }
+  for (let i = 1; i < v.length - 1; i++) out.push([v[0], v[i], v[i + 1]]);
+  return out;
+}
+
+function inTri(p, a, b, c) {
+  const d = (x, y, z) => (y[0] - x[0]) * (p[1] - x[1]) - (y[1] - x[1]) * (p[0] - x[0]);
+  const s1 = d(a, b), s2 = d(b, c), s3 = d(c, a);
+  return (s1 >= -1e-9 && s2 >= -1e-9 && s3 >= -1e-9) || (s1 <= 1e-9 && s2 <= 1e-9 && s3 <= 1e-9);
+}
+
+/* ---------- 3B gövdeler ---------- */
+
+// Dolu çokgen prizma (z0..z1 arası). pts: saat yönünün tersi.
+function extrude(pts, z0, z1) {
+  const m = new Mesh();
+  const poly = area2(pts) < 0 ? [...pts].reverse() : pts;
+  const n = poly.length;
+  for (const [a, b, c] of triangulate(poly)) {
+    m.tri([poly[a][0], poly[a][1], z1], [poly[b][0], poly[b][1], z1], [poly[c][0], poly[c][1], z1]);
+    m.tri([poly[c][0], poly[c][1], z0], [poly[b][0], poly[b][1], z0], [poly[a][0], poly[a][1], z0]);
+  }
+  for (let i = 0; i < n; i++) {
+    const p = poly[i], q = poly[(i + 1) % n];
+    m.quad([p[0], p[1], z0], [q[0], q[1], z0], [q[0], q[1], z1], [p[0], p[1], z1]);
+  }
+  return m;
+}
+
+// İçi boş halka prizma: dış ve iç kontur aynı nokta sayısında olmalı.
+function extrudeRing(outer, inner, z0, z1) {
+  const m = new Mesh();
+  const o = area2(outer) < 0 ? [...outer].reverse() : outer;
+  const iRaw = area2(inner) < 0 ? [...inner].reverse() : inner;
+  const n = o.length;
+  for (let k = 0; k < n; k++) {
+    const i = k, j = (k + 1) % n;
+    // üst ve alt yüzükler
+    m.quad([o[i][0], o[i][1], z1], [o[j][0], o[j][1], z1], [iRaw[j][0], iRaw[j][1], z1], [iRaw[i][0], iRaw[i][1], z1]);
+    m.quad([iRaw[i][0], iRaw[i][1], z0], [iRaw[j][0], iRaw[j][1], z0], [o[j][0], o[j][1], z0], [o[i][0], o[i][1], z0]);
+    // dış duvar
+    m.quad([o[i][0], o[i][1], z0], [o[j][0], o[j][1], z0], [o[j][0], o[j][1], z1], [o[i][0], o[i][1], z1]);
+    // iç duvar (ters yön)
+    m.quad([iRaw[j][0], iRaw[j][1], z0], [iRaw[i][0], iRaw[i][1], z0], [iRaw[i][0], iRaw[i][1], z1], [iRaw[j][0], iRaw[j][1], z1]);
+  }
+  return m;
+}
+
+const box = (w, d, h) => extrude(roundedRectPts(w, d, 0.001, 1), 0, h);
+const cylinder = (r, h, seg = 48) => extrude(circlePts(r, seg), 0, h);
+const tube = (ro, ri, h, seg = 48) => extrudeRing(circlePts(ro, seg), circlePts(ri, seg), 0, h);
+
+// Profil döndürme. profile: [[r,z], ...] alttan üste, r>=0.
+function revolve(profile, seg = 48) {
+  const m = new Mesh();
+  const at = (i, k) => {
+    const a = 2 * Math.PI * k / seg;
+    return [profile[i][0] * Math.cos(a), profile[i][0] * Math.sin(a), profile[i][1]];
+  };
+  for (let k = 0; k < seg; k++) {
+    for (let i = 0; i < profile.length - 1; i++) {
+      const a = at(i, k), b = at(i, k + 1), c = at(i + 1, k + 1), d = at(i + 1, k);
+      if (profile[i][0] < 1e-6) m.tri(a, c, d);
+      else if (profile[i + 1][0] < 1e-6) m.tri(a, b, c);
+      else m.quad(a, b, c, d);
+    }
+  }
+  // alt ve üst kapaklar
+  const cap = (idx, up) => {
+    const r = profile[idx][0], z = profile[idx][1];
+    if (r < 1e-6) return;
+    for (let k = 0; k < seg; k++) {
+      const a = at(idx, k), b = at(idx, k + 1), c = [0, 0, z];
+      up ? m.tri(a, b, c) : m.tri(b, a, c);
+    }
+  };
+  cap(0, false);
+  cap(profile.length - 1, true);
+  return m;
+}
+
+function hemisphere(r, seg = 48, rings = 16) {
+  const profile = [];
+  for (let i = 0; i <= rings; i++) {
+    const a = Math.PI / 2 * i / rings;
+    profile.push([r * Math.cos(a), r * Math.sin(a)]);
+  }
+  return revolve(profile, seg);
+}
+
+function sphere(r, seg = 48, rings = 24) {
+  const profile = [];
+  for (let i = 0; i <= rings; i++) {
+    const a = -Math.PI / 2 + Math.PI * i / rings;
+    profile.push([r * Math.cos(a), r * Math.sin(a) + r]);
+  }
+  return revolve(profile, seg);
+}
+
+// Kenarları yuvarlatılmış disk (tilakoit kesesi gibi).
+function pill(r, h, fillet = null, seg = 48, steps = 6) {
+  const f = Math.min(fillet ?? Math.min(r, h) * 0.35, r - 0.2, h / 2 - 0.05);
+  if (f <= 0.05) return cylinder(r, h, seg);
+  const profile = [[0, 0], [r - f, 0]];
+  for (let i = 1; i <= steps; i++) {
+    const a = -Math.PI / 2 + Math.PI / 2 * i / steps;
+    profile.push([r - f + f * Math.cos(a), f + f * Math.sin(a)]);
+  }
+  for (let i = 0; i <= steps; i++) {
+    const a = Math.PI / 2 * i / steps;
+    profile.push([r - f + f * Math.cos(a), h - f + f * Math.sin(a)]);
+  }
+  profile.push([0, h]);
+  return revolve(profile, seg);
+}
+
+// Koni / kesik koni (ışık hüzmesi, huni vb.)
+function cone(r1, r2, h, seg = 48) {
+  return revolve([[0, 0], [r1, 0], [r2, h], [0, h]], seg);
+}
+
+/* ---------- STL ---------- */
+
+function faceNormal(t) {
+  const [a, b, c] = t;
+  const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+  const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+  const l = Math.hypot(n[0], n[1], n[2]) || 1;
+  return [n[0] / l, n[1] / l, n[2] / l];
+}
+
+function toBinarySTL(mesh, header = 'civi-sayaci 3d') {
+  const tris = mesh.tris;
+  const buf = new ArrayBuffer(84 + tris.length * 50);
+  const dv = new DataView(buf);
+  const head = new Uint8Array(buf, 0, 80);
+  for (let i = 0; i < Math.min(79, header.length); i++) head[i] = header.charCodeAt(i) & 0x7f;
+  dv.setUint32(80, tris.length, true);
+  let o = 84;
+  for (const t of tris) {
+    const n = faceNormal(t);
+    for (const x of n) { dv.setFloat32(o, x, true); o += 4; }
+    for (const p of t) for (const x of p) { dv.setFloat32(o, x, true); o += 4; }
+    dv.setUint16(o, 0, true); o += 2;
+  }
+  return new Uint8Array(buf);
+}
+
+/* ---------- kalite kontrolü ---------- */
+
+// Her kenarın tam iki üçgen tarafından paylaşılıp paylaşılmadığını denetler.
+// Baskıya hazır (watertight / manifold) olmanın temel şartı budur.
+function checkWatertight(mesh, eps = 1e-4) {
+  const key = p => p.map(x => Math.round(x / eps)).join(',');
+  const edges = new Map();
+  for (const t of mesh.tris) {
+    for (let i = 0; i < 3; i++) {
+      const a = key(t[i]), b = key(t[(i + 1) % 3]);
+      const k = a < b ? a + '|' + b : b + '|' + a;
+      edges.set(k, (edges.get(k) || 0) + 1);
+    }
+  }
+  let bad = 0;
+  for (const c of edges.values()) if (c !== 2) bad++;
+  return { ok: bad === 0, badEdges: bad, triangles: mesh.tris.length };
+}
+
+// İmzalı tetrahedron toplamı ile hacim (mm³). Kapalı yüzeylerde geçerlidir.
+function volume(mesh) {
+  let v = 0;
+  for (const [a, b, c] of mesh.tris) {
+    v += (a[0] * (b[1] * c[2] - c[1] * b[2])
+        - a[1] * (b[0] * c[2] - c[0] * b[2])
+        + a[2] * (b[0] * c[1] - c[0] * b[1])) / 6;
+  }
+  return Math.abs(v);
+}
+
+/* ===== assets/fotosentez.js ===== */
+// Fotosentez ders modelinin parça tanımları.
+// Hem tarayıcı arayüzü (modelleyici.html) hem de tools/fotosentez-uret.mjs bunu kullanır.
+
+/* ---- ana ölçüler (mm) ---- */
+const L = 140, W = 70;      // kloroplast dış ölçüsü
+const FLOOR = 2.4;          // taban kalınlığı
+const H = 22;               // toplam yükseklik
+const MEM = 1.8;            // zar kalınlığı
+const GAP = 1.6;            // zarlar arası boşluk
+const GR_R = 9;             // granum yarıçapı
+
+// İç konturlar: mercek biçimini küçülterek üretilir (ofset, sivri uçlarda bozulur).
+const SEG = 96;
+const kontur = d => lensPts(L - 2 * d, W - 2 * d, SEG);
+const outer = kontur(0);
+const memIn = kontur(MEM);
+const inner2Out = kontur(MEM + GAP);
+const inner2In = kontur(MEM + GAP + MEM);
+
+// Granum yerleşimi: [x, y, disk sayısı]
+const GRANA = [[-44, 0, 4], [-21, 9, 5], [1, -7, 6], [23, 8, 4], [45, 0, 3]];
+
+/* ---- 1. Kloroplast gövdesi: çift zar + stroma tabanı ---- */
+function govde() {
+  const m = new Mesh();
+  m.add(extrude(kontur(MEM * 0.6), 0, FLOOR));           // stroma tabanı (zarların içine gömülür)
+  m.add(extrudeRing(outer, memIn, 0, H));                // dış zar
+  m.add(extrudeRing(inner2Out, inner2In, 0, H - 3));     // iç zar
+  // granum yuvaları: 1 mm yükseltilmiş konum halkaları
+  for (const [x, y] of GRANA) {
+    m.add(extrudeRing(circlePts(GR_R + 1.2, 48), circlePts(GR_R + 0.4, 48), 0, FLOOR + 1)
+      .translate(x, y, 0));
+  }
+  return m;
+}
+
+/* ---- 2. Granum: üst üste binmiş tilakoit keseleri ---- */
+function granum(n) {
+  const m = new Mesh();
+  const disk = 2.6, bogaz = 1.4, neckR = 3.2;
+  let z = 0;
+  for (let i = 0; i < n; i++) {
+    m.add(pill(GR_R, disk, 0.9).translate(0, 0, z));
+    z += disk;
+    if (i < n - 1) { m.add(cylinder(neckR, bogaz + 0.2, 32).translate(0, 0, z - 0.1)); z += bogaz; }
+  }
+  // tabana oturan 0.6 mm'lik pim: yuvaya geçsin
+  m.add(cylinder(GR_R + 0.25, 0.6, 48).translate(0, 0, -0.6));
+  return m;
+}
+
+/* ---- 3. Stroma lamelleri: granumları bağlayan yassı kanallar ---- */
+function lameller() {
+  const m = new Mesh();
+  const boylar = [26, 30, 24, 28];
+  let y = 0;
+  for (const b of boylar) {
+    m.add(extrude(roundedRectPts(b, 7, 3, 6), 0, 2).translate(0, y, 0));
+    y += 11;
+  }
+  return m;
+}
+
+/* ---- 4. Nişasta granülü ve plastoglobüller ---- */
+function taneler() {
+  const m = new Mesh();
+  m.add(hemisphere(7, 48, 14).scale(1.5, 1, 1).translate(-20, 0, 0));   // nişasta
+  m.add(hemisphere(6, 48, 14).scale(1.3, 1, 1).translate(2, 0, 0));     // nişasta
+  for (let i = 0; i < 4; i++) m.add(hemisphere(2.6, 32, 10).translate(18 + i * 7, 0, 0)); // plastoglobül
+  return m;
+}
+
+/* ---- 5. Madde akış okları: CO2, H2O girer; O2, glikoz çıkar ---- */
+function oklar() {
+  const m = new Mesh();
+  const tanim = [
+    { len: 40, w: 7 },   // CO2
+    { len: 40, w: 7 },   // H2O
+    { len: 34, w: 9 },   // O2
+    { len: 34, w: 9 },   // glikoz
+  ];
+  let y = 0;
+  for (const t of tanim) {
+    m.add(extrude(arrowPts(t.len, t.w, t.w + 7, 11), 0, 3).translate(-t.len / 2, y, 0));
+    y += 20;
+  }
+  return m;
+}
+
+/* ---- 6. Etiket plakaları + ray ayak (üzerine yazıp raya geçir) ---- */
+function etiketler() {
+  const m = new Mesh();
+  for (let i = 0; i < 6; i++) {
+    m.add(extrude(roundedRectPts(34, 12, 2, 6), 0, 1.6).translate(0, i * 15, 0));
+  }
+  return m;
+}
+
+function etiketRayi() {
+  const m = new Mesh();
+  const uzun = 120;
+  m.add(extrude(roundedRectPts(uzun, 14, 2, 6), 0, 3));           // taban
+  m.add(extrude(roundedRectPts(uzun - 10, 2.2, 1, 4), 0, 9).translate(0, -1.6, 0));
+  m.add(extrude(roundedRectPts(uzun - 10, 2.2, 1, 4), 0, 9).translate(0, 2.4, 0));
+  return m;                                                        // arada 1.8 mm yuva kalır
+}
+
+/* ---- 7. Güneş ışığı hüzmesi (kloroplasta yaslanan dekoratif parça) ---- */
+function isik() {
+  const m = new Mesh();
+  m.add(revolve([[0, 0], [16, 0], [16, 3], [0, 3]], 64));          // güneş diski
+  for (let i = 0; i < 8; i++) {
+    m.add(extrude(arrowPts(16, 3.5, 7, 5), 0, 3).translate(17, 0, 0).rotateZ(i * 45));
+  }
+  return m;
+}
+
+
+const PARCALAR = [
+  { id: '1-kloroplast-govdesi', ad: 'Kloroplast gövdesi (çift zar + stroma)',
+    not: 'Desteksiz basılır. Dış ve iç zar ile aralarındaki zarlar arası boşluk görünür.', yap: govde },
+  { id: '2-granum-6-disk', ad: 'Granum — 6 tilakoit', not: 'Tilakoit keseleri ve bağlantı boğazları.', yap: () => granum(6) },
+  { id: '2-granum-5-disk', ad: 'Granum — 5 tilakoit', not: '', yap: () => granum(5) },
+  { id: '2-granum-4-disk', ad: 'Granum — 4 tilakoit', not: '', yap: () => granum(4) },
+  { id: '2-granum-3-disk', ad: 'Granum — 3 tilakoit', not: '', yap: () => granum(3) },
+  { id: '3-stroma-lamelleri', ad: 'Stroma lamelleri (4 adet)', not: 'Granumları birbirine bağlar; yatık yapıştırılır.', yap: lameller },
+  { id: '4-nisasta-ve-plastoglobul', ad: 'Nişasta granülleri + plastoglobüller', not: 'Stroma tabanına serbest yapıştırılır.', yap: taneler },
+  { id: '5-akis-oklari', ad: 'Akış okları (CO₂, H₂O, O₂, glikoz)', not: 'Uzun ikisi giren, kısa ikisi çıkan maddeler.', yap: oklar },
+  { id: '6-etiket-plakalari', ad: 'Etiket plakaları (6 adet)', not: 'Üzerine kalemle yazıp raya geçirilir.', yap: etiketler },
+  { id: '6-etiket-rayi', ad: 'Etiket rayı', not: '1,8 mm yuvaya plakalar dik oturur.', yap: etiketRayi },
+  { id: '7-gunes-isigi', ad: 'Güneş ışığı sembolü', not: 'Modelin yanına dayanır.', yap: isik },
+];
+
+/* ===== assets/genel-parcalar.js ===== */
+// Genel amaçlı parametrik parçalar. Her tanım: alanlar + yap(p) -> Mesh
+
+const n = (ad, etiket, varsayilan, min, max, adim = 0.2) => ({ ad, etiket, varsayilan, min, max, adim });
+
+const GENEL = [
+  {
+    id: 'kutu', ad: 'Kutu / tepsi',
+    alanlar: [n('w', 'Genişlik', 60, 5, 250), n('d', 'Derinlik', 40, 5, 250), n('h', 'Yükseklik', 25, 1, 200),
+              n('t', 'Duvar kalınlığı', 2, 0.8, 10, 0.1), n('r', 'Köşe yarıçapı', 3, 0, 40, 0.5),
+              n('dolu', 'Dolu mu? (0 hayır / 1 evet)', 0, 0, 1, 1)],
+    yap: p => {
+      const dis = roundedRectPts(p.w, p.d, Math.min(p.r, p.w / 2 - 0.1, p.d / 2 - 0.1), 10);
+      if (p.dolu >= 0.5) return extrude(dis, 0, p.h);
+      const ic = roundedRectPts(p.w - 2 * p.t, p.d - 2 * p.t, Math.max(0.1, p.r - p.t), 10);
+      // taban, duvarın içine 0,4t kadar gömülür: çakışan kenar kalmaz, katı tek parça olur
+      const taban = roundedRectPts(p.w - 1.2 * p.t, p.d - 1.2 * p.t, Math.max(0.1, p.r - 0.6 * p.t), 10);
+      return new Mesh().add(extrude(taban, 0, p.t)).add(extrudeRing(dis, ic, 0, p.h));
+    },
+  },
+  {
+    id: 'silindir', ad: 'Silindir',
+    alanlar: [n('r', 'Yarıçap', 15, 1, 120), n('h', 'Yükseklik', 20, 0.4, 250), n('seg', 'Kenar sayısı', 64, 6, 200, 1)],
+    yap: p => cylinder(p.r, p.h, Math.round(p.seg)),
+  },
+  {
+    id: 'boru', ad: 'Boru / halka',
+    alanlar: [n('ro', 'Dış yarıçap', 20, 1, 120), n('ri', 'İç yarıçap', 15, 0.5, 119), n('h', 'Yükseklik', 20, 0.4, 250)],
+    yap: p => tube(Math.max(p.ro, p.ri + 0.4), p.ri, p.h, 72),
+  },
+  {
+    id: 'plaka', ad: 'Plaka / etiket',
+    alanlar: [n('w', 'Genişlik', 60, 5, 250), n('d', 'Derinlik', 25, 5, 250), n('h', 'Kalınlık', 2, 0.4, 30),
+              n('r', 'Köşe yarıçapı', 3, 0, 40, 0.5)],
+    yap: p => extrude(roundedRectPts(p.w, p.d, Math.min(p.r, p.w / 2 - 0.1, p.d / 2 - 0.1), 10), 0, p.h),
+  },
+  {
+    id: 'disk-yigini', ad: 'Disk yığını (granum tipi)',
+    alanlar: [n('r', 'Disk yarıçapı', 9, 1, 60), n('kal', 'Disk kalınlığı', 2.6, 0.4, 20), n('adet', 'Disk sayısı', 5, 1, 30, 1),
+              n('bogaz', 'Ara boğaz yüksekliği', 1.4, 0, 20), n('bogazR', 'Boğaz yarıçapı', 3.2, 0.5, 60)],
+    yap: p => {
+      const m = new Mesh();
+      let z = 0;
+      const adet = Math.round(p.adet);
+      for (let i = 0; i < adet; i++) {
+        m.add(pill(p.r, p.kal, Math.min(0.9, p.kal / 3)).translate(0, 0, z));
+        z += p.kal;
+        if (i < adet - 1 && p.bogaz > 0.01) { m.add(cylinder(Math.min(p.bogazR, p.r - 0.2), p.bogaz + 0.2, 32).translate(0, 0, z - 0.1)); z += p.bogaz; }
+      }
+      return m;
+    },
+  },
+  {
+    id: 'ok', ad: 'Ok',
+    alanlar: [n('len', 'Uzunluk', 40, 5, 250), n('w', 'Gövde genişliği', 7, 1, 60), n('hw', 'Uç genişliği', 14, 2, 80),
+              n('hl', 'Uç uzunluğu', 11, 1, 100), n('h', 'Kalınlık', 3, 0.4, 40)],
+    yap: p => extrude(arrowPts(p.len, p.w, Math.max(p.hw, p.w + 0.5), Math.min(p.hl, p.len - 0.5)), 0, p.h),
+  },
+  {
+    id: 'kubbe', ad: 'Yarım küre / damla',
+    alanlar: [n('r', 'Yarıçap', 12, 1, 100), n('gerX', 'X esnetme', 1, 0.2, 4, 0.05), n('gerZ', 'Yükseklik oranı', 1, 0.2, 4, 0.05)],
+    yap: p => hemisphere(p.r, 64, 20).scale(p.gerX, 1, p.gerZ),
+  },
+  {
+    id: 'koni', ad: 'Koni / kesik koni',
+    alanlar: [n('r1', 'Alt yarıçap', 20, 0.5, 120), n('r2', 'Üst yarıçap', 4, 0, 120), n('h', 'Yükseklik', 30, 1, 250)],
+    yap: p => cone(p.r1, p.r2, p.h, 64),
+  },
+  {
+    id: 'vazo', ad: 'Bardak / vazo (döndürme)',
+    alanlar: [n('rAlt', 'Alt yarıçap', 18, 2, 100), n('rOrta', 'Orta yarıçap', 26, 2, 120), n('rUst', 'Üst yarıçap', 20, 2, 120),
+              n('h', 'Yükseklik', 70, 5, 250), n('t', 'Et kalınlığı', 2, 0.8, 20, 0.1)],
+    yap: p => {
+      const dis = [], ic = [];
+      const N = 24;
+      const r = u => {
+        // alt-orta-üst arasında ikinci dereceden yumuşak geçiş
+        const a = (1 - u) * (1 - u), b = 2 * u * (1 - u), c = u * u;
+        return a * p.rAlt + b * p.rOrta + c * p.rUst;
+      };
+      for (let i = 0; i <= N; i++) dis.push([r(i / N), p.t + (p.h - p.t) * i / N]);
+      for (let i = N; i >= 0; i--) ic.push([Math.max(0.3, r(i / N) - p.t), p.t + (p.h - p.t) * i / N]);
+      const profil = [[0, 0], [p.rAlt, 0], ...dis, ...ic, [0, p.t]];
+      return revolve(profil, 80);
+    },
+  },
+];
+
+/* ===== assets/onizleme.js ===== */
+// Bağımlılıksız 3B önizleme: 2B canvas üzerine yazılımsal düz gölgelendirme.
+// Harici kütüphane yok; çevrimdışı çalışır.
+class Onizleme {
+  constructor(canvas) {
+    this.c = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.yaw = -35; this.pitch = 58; this.zoom = 1; this.pan = [0, 0];
+    this.mesh = null; this.merkez = [0, 0, 0]; this.olcek = 1;
+    this.renk = [255, 176, 32];
+    this._baglan();
+  }
+
+  _baglan() {
+    const c = this.c;
+    let son = null, pinch = null;
+    const nokta = e => (e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.clientX, e.clientY]);
+    const bas = e => { son = nokta(e); if (e.touches?.length === 2) pinch = this._mesafe(e); };
+    const hareket = e => {
+      if (e.touches?.length === 2 && pinch) {
+        const d = this._mesafe(e);
+        this.zoom = Math.min(6, Math.max(0.25, this.zoom * d / pinch));
+        pinch = d; e.preventDefault(); this.ciz(); return;
+      }
+      if (!son) return;
+      const p = nokta(e);
+      this.yaw += (p[0] - son[0]) * 0.5;
+      this.pitch = Math.max(-5, Math.min(95, this.pitch + (p[1] - son[1]) * 0.4));
+      son = p; e.preventDefault(); this.ciz();
+    };
+    const birak = () => { son = null; pinch = null; };
+    c.addEventListener('mousedown', bas); addEventListener('mousemove', hareket); addEventListener('mouseup', birak);
+    c.addEventListener('touchstart', bas, { passive: false });
+    c.addEventListener('touchmove', hareket, { passive: false });
+    c.addEventListener('touchend', birak);
+    c.addEventListener('wheel', e => {
+      e.preventDefault();
+      this.zoom = Math.min(6, Math.max(0.25, this.zoom * (e.deltaY > 0 ? 0.9 : 1.1)));
+      this.ciz();
+    }, { passive: false });
+  }
+
+  _mesafe(e) {
+    const [a, b] = [e.touches[0], e.touches[1]];
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  }
+
+  yukle(mesh) {
+    this.mesh = mesh;
+    const b = mesh.bounds();
+    if (b) {
+      this.merkez = [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2];
+      this.olcek = 1 / Math.max(1e-3, Math.max(...b.size));
+    }
+    this.ciz();
+  }
+
+  boyutlandir() {
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    const r = this.c.getBoundingClientRect();
+    this.c.width = Math.max(1, r.width * dpr);
+    this.c.height = Math.max(1, r.height * dpr);
+    this.ciz();
+  }
+
+  ciz() {
+    const { ctx, c } = this;
+    const W = c.width, H = c.height;
+    ctx.clearRect(0, 0, W, H);
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#141829'); grad.addColorStop(1, '#0a0c16');
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+    if (!this.mesh) return;
+
+    const ya = this.yaw * Math.PI / 180, pa = this.pitch * Math.PI / 180;
+    const cy = Math.cos(ya), sy = Math.sin(ya), cp = Math.cos(pa), sp = Math.sin(pa);
+    const k = Math.min(W, H) * 0.62 * this.zoom;
+    const cx = W / 2, cz = H / 2;
+    const d = this.merkez;
+
+    const don = p => {
+      const x = (p[0] - d[0]) * this.olcek, y = (p[1] - d[1]) * this.olcek, z = (p[2] - d[2]) * this.olcek;
+      const x1 = x * cy - y * sy, y1 = x * sy + y * cy;
+      const y2 = y1 * cp - z * sp, z2 = y1 * sp + z * cp;
+      return [x1, y2, z2];
+    };
+
+    const isik = [0.42, -0.5, 0.76];
+    const yuzler = [];
+    for (const t of this.mesh.tris) {
+      const a = don(t[0]), b = don(t[1]), cc = don(t[2]);
+      const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+      const v = [cc[0] - a[0], cc[1] - a[1], cc[2] - a[2]];
+      let nx = u[1] * v[2] - u[2] * v[1], ny = u[2] * v[0] - u[0] * v[2], nz = u[0] * v[1] - u[1] * v[0];
+      const l = Math.hypot(nx, ny, nz) || 1;
+      nx /= l; ny /= l; nz /= l;
+      if (nz <= 0) continue;                       // arka yüzleri ele
+      const der = (a[1] + b[1] + cc[1]) / 3;       // boyacı algoritması için derinlik
+      const sh = Math.max(0.12, nx * isik[0] + ny * isik[1] + nz * isik[2]);
+      yuzler.push([der, a, b, cc, sh]);
+    }
+    yuzler.sort((p, q) => q[0] - p[0]);
+
+    for (const [, a, b, cc, sh] of yuzler) {
+      const g = 0.25 + 0.75 * sh;
+      ctx.fillStyle = `rgb(${this.renk[0] * g | 0},${this.renk[1] * g | 0},${this.renk[2] * g | 0})`;
+      ctx.beginPath();
+      ctx.moveTo(cx + a[0] * k, cz - a[2] * k);
+      ctx.lineTo(cx + b[0] * k, cz - b[2] * k);
+      ctx.lineTo(cx + cc[0] * k, cz - cc[2] * k);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 0.6; ctx.stroke(); // dikiş boşluklarını kapat
+    }
+  }
+}
+
+/* ===== sayfa ===== */
+
+
+
+
+
+const $ = id => document.getElementById(id);
+const onizleme = new Onizleme($('tuval'));
+let sekme = 'foto', secili = null, aktifMesh = null;
+
+function listeyiKur() {
+  const liste = sekme === 'foto' ? PARCALAR : GENEL;
+  $('secim').innerHTML = liste.map(p => `<option value="${p.id}">${p.ad}</option>`).join('');
+  sec(liste[0].id);
+}
+
+function bul(id) {
+  return (sekme === 'foto' ? PARCALAR : GENEL).find(p => p.id === id);
+}
+
+function sec(id) {
+  secili = bul(id);
+  $('secim').value = id;
+  $('not').textContent = secili.not || (secili.alanlar ? 'Ölçüleri değiştirip STL olarak indir.' : '');
+  const kap = $('alanlar');
+  kap.innerHTML = '';
+  for (const a of secili.alanlar || []) {
+    const l = document.createElement('label');
+    l.className = 'alan';
+    l.innerHTML = `${a.etiket} (mm)`;
+    const i = document.createElement('input');
+    i.type = 'number'; i.value = a.varsayilan; i.min = a.min; i.max = a.max; i.step = a.adim;
+    i.dataset.ad = a.ad;
+    i.addEventListener('input', uret);
+    l.appendChild(i);
+    kap.appendChild(l);
+  }
+  uret();
+}
+
+function degerler() {
+  const p = {};
+  for (const i of $('alanlar').querySelectorAll('input')) {
+    const v = parseFloat(i.value);
+    p[i.dataset.ad] = Number.isFinite(v) ? v : 0;
+  }
+  return p;
+}
+
+function uret() {
+  try {
+    aktifMesh = secili.yap(degerler()).center();
+  } catch (e) {
+    $('b-kapali').textContent = 'üretim hatası: ' + e.message;
+    $('b-kapali').className = 'rozet kotu';
+    return;
+  }
+  const b = aktifMesh.bounds(), q = checkWatertight(aktifMesh), v = volume(aktifMesh) / 1000;
+  $('b-olcu').textContent = b.size.map(x => x.toFixed(1)).join(' × ') + ' mm';
+  $('b-hacim').textContent = v.toFixed(1) + ' cm³';
+  $('b-filament').textContent = '≈ ' + (v * 0.3 * 1.24).toFixed(0) + ' g';
+  $('b-ucgen').textContent = q.triangles;
+  $('b-kapali').textContent = q.ok ? 'kapalı yüzey ✓ baskıya hazır' : `⚠ ${q.badEdges} açık kenar`;
+  $('b-kapali').className = 'rozet' + (q.ok ? '' : ' kotu');
+  onizleme.renk = sekme === 'foto' ? [110, 205, 120] : [255, 176, 32];
+  onizleme.yukle(aktifMesh);
+}
+
+function indirMesh(mesh, ad) {
+  const blob = new Blob([toBinarySTL(mesh, ad)], { type: 'model/stl' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = ad + '.stl';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+$('secim').addEventListener('change', e => sec(e.target.value));
+$('indir').addEventListener('click', () => aktifMesh && indirMesh(aktifMesh, secili.id));
+$('indir-hepsi').addEventListener('click', async () => {
+  const liste = sekme === 'foto' ? PARCALAR : GENEL;
+  for (const p of liste) {
+    const m = sekme === 'foto' ? p.yap().center() : p.yap(Object.fromEntries(p.alanlar.map(a => [a.ad, a.varsayilan]))).center();
+    indirMesh(m, p.id);
+    await new Promise(r => setTimeout(r, 350)); // tarayıcı çoklu indirmeyi boğmasın
+  }
+});
+for (const [el, ad] of [[$('sekme-foto'), 'foto'], [$('sekme-genel'), 'genel']]) {
+  el.addEventListener('click', () => {
+    sekme = ad;
+    $('sekme-foto').setAttribute('aria-selected', String(ad === 'foto'));
+    $('sekme-genel').setAttribute('aria-selected', String(ad === 'genel'));
+    listeyiKur();
+  });
+}
+
+addEventListener('resize', () => onizleme.boyutlandir());
+listeyiKur();
+onizleme.boyutlandir();
+
+</script>
+</body>
+</html>
