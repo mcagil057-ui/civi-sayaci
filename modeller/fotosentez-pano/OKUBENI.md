@@ -6,6 +6,17 @@ yapılar **pimli parçalar** olarak soketlere takılıp çıkarılıyor.
 > **Pano 210 × 165 mm.** Yazıcı tablan bundan küçükse bas**ma**, haber ver —
 > küçültülmüş sürümünü üretirim.
 
+## ÖNCE BUNU OKU — hangi dosyayı açacaksın
+
+Klasörde üç tür dosya var. **Hepsini birden açma**, üst üste binmiş görünürler:
+her STL kendi merkezine hizalıdır, aynı sahneye atılınca hepsi aynı noktaya gelir.
+
+| Ne yapmak istiyorsun | Hangi dosya |
+|---|---|
+| **Nasıl göründüğüne bakmak** | `00-MONTAJ-sadece-goruntuleme.stl` — tek dosya, her şey takılı hâlde. Basmak için değil. |
+| **Basmak** | `baski-1-pano.stl`, `baski-2-parcalar.stl`, `baski-3-renkli-oklar.stl` — üç dosya, parçalar tablaya dizilmiş. Her birini ayrı ayrı dilimle. |
+| **Parçaları farklı renkte basmak** | `parca-*.stl` ve `renkli-ok-*.stl` — teker teker, her seferinde bir dosya. |
+
 Yeniden üretmek: `node tools/fotosentez-pano-uret.mjs`
 Yerleşim denetimi: `node tools/yerlesim-denetle.mjs` → "Çakışma yok ✓" demeli
 
