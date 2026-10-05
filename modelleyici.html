@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>3D Modelleyici — baskıya hazır STL üretici</title>
+<meta name="description" content="Ölçü girerek baskıya hazır STL üret. Fotosentez ders modeli hazır parçalarıyla birlikte.">
+<style>
+  :root {
+    --bg: #0b0d18; --yuzey: #151a2e; --yuzey2: #1d2340; --kenar: #2a3156;
+    --metin: #e8ecff; --soluk: #9aa3c7; --vurgu: #ffb020; --yesil: #3ddc97;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--metin);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  header {
+    padding: 14px 16px; border-bottom: 1px solid var(--kenar);
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 17px; margin: 0; }
+  header span { color: var(--soluk); font-size: 13px; }
+  .duzen { display: grid; grid-template-columns: 340px 1fr; gap: 0; min-height: calc(100vh - 52px); }
+  @media (max-width: 860px) { .duzen { grid-template-columns: 1fr; } }
+  .panel { border-right: 1px solid var(--kenar); padding: 14px 16px 60px; }
+  .sekmeler { display: flex; gap: 6px; margin-bottom: 14px; }
+  .sekmeler button {
+    flex: 1; padding: 9px 8px; border-radius: 9px; border: 1px solid var(--kenar);
+    background: var(--yuzey); color: var(--soluk); font-size: 13px; cursor: pointer;
+  }
+  .sekmeler button[aria-selected="true"] { background: var(--vurgu); color: #16130a; border-color: var(--vurgu); font-weight: 600; }
+  label.alan { display: block; margin-bottom: 11px; font-size: 13px; color: var(--soluk); }
+  label.alan input {
+    width: 100%; margin-top: 4px; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--kenar); background: var(--yuzey); color: var(--metin); font-size: 15px;
+  }
+  select {
+    width: 100%; padding: 9px 10px; border-radius: 9px; border: 1px solid var(--kenar);
+    background: var(--yuzey); color: var(--metin); font-size: 14px; margin-bottom: 14px;
+  }
+  .btn {
+    display: block; width: 100%; padding: 11px; border-radius: 10px; border: none;
+    background: var(--vurgu); color: #16130a; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 10px;
+  }
+  .btn.ikincil { background: var(--yuzey2); color: var(--metin); border: 1px solid var(--kenar); font-weight: 500; }
+  .sahne { position: relative; display: flex; flex-direction: column; }
+  canvas { width: 100%; flex: 1; min-height: 340px; display: block; touch-action: none; cursor: grab; }
+  .bilgi {
+    padding: 12px 16px; border-top: 1px solid var(--kenar); font-size: 13px;
+    display: flex; gap: 18px; flex-wrap: wrap; color: var(--soluk);
+  }
+  .bilgi b { color: var(--metin); font-weight: 600; }
+  .rozet { color: var(--yesil); }
+  .rozet.kotu { color: #ff6b6b; }
+  .ipucu { font-size: 12px; color: var(--soluk); line-height: 1.5; margin: 10px 0 0; }
+  .parca-not { font-size: 12px; color: var(--soluk); line-height: 1.5; margin: 0 0 12px; min-height: 2em; }
+  .kilavuz { padding: 16px; border-top: 1px solid var(--kenar); font-size: 13.5px; line-height: 1.65; color: var(--soluk); }
+  .kilavuz h2 { font-size: 15px; color: var(--metin); margin: 0 0 8px; }
+  .kilavuz ol { padding-left: 20px; margin: 0; }
+  .kilavuz code { background: var(--yuzey); padding: 1px 5px; border-radius: 4px; color: var(--vurgu); }
+</style>
+</head>
+<body>
+<header>
+  <h1>3D Modelleyici</h1>
+  <span>ölçü gir → önizle → baskıya hazır STL indir</span>
+</header>
+
+<div class="duzen">
+  <div class="panel">
+    <div class="sekmeler" role="tablist">
+      <button id="sekme-foto" role="tab" aria-selected="true">Fotosentez ödevi</button>
+      <button id="sekme-genel" role="tab" aria-selected="false">Genel parçalar</button>
+    </div>
+
+    <select id="secim" aria-label="Parça seç"></select>
+    <p class="parca-not" id="not"></p>
+    <div id="alanlar"></div>
+
+    <button class="btn" id="indir">STL indir</button>
+    <button class="btn ikincil" id="indir-hepsi">Tüm parçaları indir</button>
+    <p class="ipucu">Modeli döndürmek için sürükle, yakınlaştırmak için tekerlek / iki parmak.</p>
+  </div>
+
+  <div class="sahne">
+    <canvas id="tuval"></canvas>
+    <div class="bilgi">
+      <span>Ölçü: <b id="b-olcu">—</b></span>
+      <span>Hacim: <b id="b-hacim">—</b></span>
+      <span>Filament: <b id="b-filament">—</b></span>
+      <span>Üçgen: <b id="b-ucgen">—</b></span>
+      <span id="b-kapali" class="rozet">—</span>
+    </div>
+    <div class="kilavuz">
+      <h2>Baskı ayarları (PLA, 0,2 mm katman)</h2>
+      <ol>
+        <li>Tüm parçalar düz tabanlı üretilir — <b>destek gerekmez</b>.</li>
+        <li>Dolgu %15–20, duvar 3 hat yeterli.</li>
+        <li>Granumları gövdedeki halka yuvalara oturt; gerekirse birkaç damla yapıştırıcı.</li>
+        <li>Renkli ayrım için parçaları farklı filamentle bas: gövde yeşil, granum koyu yeşil, oklar mavi/kırmızı.</li>
+        <li>Etiket plakalarına <code>CO₂ · H₂O · O₂ · Glikoz · Granum · Stroma</code> yazıp raya geçir.</li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { toBinarySTL, checkWatertight, volume } from './assets/mesh.js';
+import { PARCALAR } from './assets/fotosentez.js';
+import { GENEL } from './assets/genel-parcalar.js';
+import { Onizleme } from './assets/onizleme.js';
+
+const $ = id => document.getElementById(id);
+const onizleme = new Onizleme($('tuval'));
+let sekme = 'foto', secili = null, aktifMesh = null;
+
+function listeyiKur() {
+  const liste = sekme === 'foto' ? PARCALAR : GENEL;
+  $('secim').innerHTML = liste.map(p => `<option value="${p.id}">${p.ad}</option>`).join('');
+  sec(liste[0].id);
+}
+
+function bul(id) {
+  return (sekme === 'foto' ? PARCALAR : GENEL).find(p => p.id === id);
+}
+
+function sec(id) {
+  secili = bul(id);
+  $('secim').value = id;
+  $('not').textContent = secili.not || (secili.alanlar ? 'Ölçüleri değiştirip STL olarak indir.' : '');
+  const kap = $('alanlar');
+  kap.innerHTML = '';
+  for (const a of secili.alanlar || []) {
+    const l = document.createElement('label');
+    l.className = 'alan';
+    l.innerHTML = `${a.etiket} (mm)`;
+    const i = document.createElement('input');
+    i.type = 'number'; i.value = a.varsayilan; i.min = a.min; i.max = a.max; i.step = a.adim;
+    i.dataset.ad = a.ad;
+    i.addEventListener('input', uret);
+    l.appendChild(i);
+    kap.appendChild(l);
+  }
+  uret();
+}
+
+function degerler() {
+  const p = {};
+  for (const i of $('alanlar').querySelectorAll('input')) {
+    const v = parseFloat(i.value);
+    p[i.dataset.ad] = Number.isFinite(v) ? v : 0;
+  }
+  return p;
+}
+
+function uret() {
+  try {
+    aktifMesh = secili.yap(degerler()).center();
+  } catch (e) {
+    $('b-kapali').textContent = 'üretim hatası: ' + e.message;
+    $('b-kapali').className = 'rozet kotu';
+    return;
+  }
+  const b = aktifMesh.bounds(), q = checkWatertight(aktifMesh), v = volume(aktifMesh) / 1000;
+  $('b-olcu').textContent = b.size.map(x => x.toFixed(1)).join(' × ') + ' mm';
+  $('b-hacim').textContent = v.toFixed(1) + ' cm³';
+  $('b-filament').textContent = '≈ ' + (v * 0.3 * 1.24).toFixed(0) + ' g';
+  $('b-ucgen').textContent = q.triangles;
+  $('b-kapali').textContent = q.ok ? 'kapalı yüzey ✓ baskıya hazır' : `⚠ ${q.badEdges} açık kenar`;
+  $('b-kapali').className = 'rozet' + (q.ok ? '' : ' kotu');
+  onizleme.renk = sekme === 'foto' ? [110, 205, 120] : [255, 176, 32];
+  onizleme.yukle(aktifMesh);
+}
+
+function indirMesh(mesh, ad) {
+  const blob = new Blob([toBinarySTL(mesh, ad)], { type: 'model/stl' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = ad + '.stl';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+$('secim').addEventListener('change', e => sec(e.target.value));
+$('indir').addEventListener('click', () => aktifMesh && indirMesh(aktifMesh, secili.id));
+$('indir-hepsi').addEventListener('click', async () => {
+  const liste = sekme === 'foto' ? PARCALAR : GENEL;
+  for (const p of liste) {
+    const m = sekme === 'foto' ? p.yap().center() : p.yap(Object.fromEntries(p.alanlar.map(a => [a.ad, a.varsayilan]))).center();
+    indirMesh(m, p.id);
+    await new Promise(r => setTimeout(r, 350)); // tarayıcı çoklu indirmeyi boğmasın
+  }
+});
+for (const [el, ad] of [[$('sekme-foto'), 'foto'], [$('sekme-genel'), 'genel']]) {
+  el.addEventListener('click', () => {
+    sekme = ad;
+    $('sekme-foto').setAttribute('aria-selected', String(ad === 'foto'));
+    $('sekme-genel').setAttribute('aria-selected', String(ad === 'genel'));
+    listeyiKur();
+  });
+}
+
+addEventListener('resize', () => onizleme.boyutlandir());
+listeyiKur();
+onizleme.boyutlandir();
+</script>
+</body>
+</html>
