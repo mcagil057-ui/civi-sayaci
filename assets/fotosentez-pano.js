@@ -13,7 +13,7 @@ export const P = {
   panoW: 290, panoD: 240, panoH: 6,
   icX: 136, icY: 111,          // oyukların yerleştiği iç dikdörtgen
   cerceveH: 10, cerceveW: 7,   // dış kenardaki yükselti
-  oyukDerin: 2.5,              // parçanın gömüldüğü derinlik
+  oyukDerin: 3.5,              // parçanın gömüldüğü derinlik (6 mm plakada 2,5 mm taban kalır)
   bosluk: 0.4,                 // oyuk ile parça arasındaki pay
   tileH: 4.5,                  // parça kalınlığı (2 mm dışarıda kalır, kolay tutulur)
   yaziH: 1.0, yaziKal: 1.3,
@@ -248,17 +248,21 @@ function acilardaKontur(pts, c, acilar) {
 function zeminPlakasi() {
   const m = new Mesh();
   const H = P.panoH, D = P.oyukDerin;
-  const disHam = roundedRectPts(P.panoW, P.panoD, 8, 12);
   const ic = cerceveOrnek(-P.icX, -P.icY, P.icX, P.icY, 4);
-  const dis = boyaGoreOrnek(disHam, ic.length);
+  // Dış kontur, iç konturun noktalarıyla AYNI AÇILARDA örneklenmeli.
+  // Yay uzunluğuna göre örneklenirse iki halka farklı yerden başlar,
+  // aradaki yüzey birbirine dolanır ve bütün panoyu kaplar — oyuklar
+  // o yüzeyin altında gömülü kalır.
+  const acilar = ic.map(p => Math.atan2(p[1], p[0]));
+  const dis = acilardaKontur(roundedRectPts(P.panoW, P.panoD, 8, 12), [0, 0], acilar);
 
   m.add(fanFace(dis, [0, 0], 0, false));        // alt yüz
   m.add(wall(dis, 0, H, true));                 // dış duvar
   m.add(ringFace(dis, ic, H, true));            // üstte düz kenar
 
   // dış kenarda 1 cm yükselti: parçalar panodan kaymaz
-  const cIc = boyaGoreOrnek(
-    roundedRectPts(P.panoW - 2 * P.cerceveW, P.panoD - 2 * P.cerceveW, 6, 12), dis.length);
+  const cIc = acilardaKontur(
+    roundedRectPts(P.panoW - 2 * P.cerceveW, P.panoD - 2 * P.cerceveW, 6, 12), [0, 0], acilar);
   m.add(ringFace(dis, cIc, H, false));
   m.add(wall(dis, H, H + P.cerceveH, true));
   m.add(wall(cIc, H, H + P.cerceveH, false));
@@ -342,13 +346,13 @@ function yayUcu(cx, cy, r, aci, yon = 1, b = 7) {
 }
 export function kalvin() {
   const m = new Mesh();
-  m.add(extrude(PARCA_TANIM['KALVİN'].kontur(), 0, 3.2));   // oyuktan 0,7 mm yüksek: yüzeyle çakışmaz
+  m.add(extrude(PARCA_TANIM['KALVİN'].kontur(), 0, P.tileH));   // diğer parçalarla aynı kalınlık
   for (const [a0, a1] of [[88, -78], [-92, -262]]) {
-    m.add(extrude(yaySerit(0, 0, 23.5, 28, a0, a1, 48), 3.0, P.tileH + 1));
-    m.add(extrude(yayUcu(0, 0, 25.7, a1, -1, 6), 3.0, P.tileH + 1));
+    m.add(extrude(yaySerit(0, 0, 23.5, 28, a0, a1, 48), P.tileH - 0.2, P.tileH + 2.5));
+    m.add(extrude(yayUcu(0, 0, 25.7, a1, -1, 6), P.tileH - 0.2, P.tileH + 2.5));
   }
   ['IŞIĞIN', 'KULLANILMADIĞI', 'TEPKİMELER'].forEach((t, i) =>
-    etiket(m, t, 3.2, 5.0 - i * 5.6, 3.0, 1.0));
+    etiket(m, t, 3.2, 5.0 - i * 5.6, P.tileH - 0.2, 1.0));
   return m;
 }
 
@@ -379,7 +383,7 @@ export function kloroplastZari() {
   m.add(wall(olukI, olukZ, h, true));            // oluk iç duvarı
   m.add(ringFace(olukI, ic, h, true));           // üst: iç şerit
   for (const [x, y] of ZAR_PIM) {
-    m.add(cylinder(3, 2.3, 36).translate(x, y, -2.3));   // oyuk 2,5 derin: 0,2 mm pay
+    m.add(cylinder(3, P.oyukDerin - 0.2, 36).translate(x, y, -(P.oyukDerin - 0.2)));
   }
   return m;
 }

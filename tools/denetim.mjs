@@ -31,6 +31,40 @@ function mesafe(p, poly) {
   return d;
 }
 
+/* 0 — oyuklar gerçekten açılmış mı (ışın atarak ölçülür) */
+baslik('0. Oyuklar gerçekten açılmış mı — panoya ışın atıp yüzey kotu ölçülür');
+{
+  const pano = PANO_PARCALARI[0].yap();
+  const yukseklik = (x, y) => {
+    let en = -Infinity;
+    for (const t of pano.tris) {
+      const [a, b, c] = t;
+      const d1 = [b[0] - a[0], b[1] - a[1]], d2 = [c[0] - a[0], c[1] - a[1]];
+      const det = d1[0] * d2[1] - d1[1] * d2[0];
+      if (Math.abs(det) < 1e-12) continue;
+      const px = x - a[0], py = y - a[1];
+      const u = (px * d2[1] - py * d2[0]) / det, v = (py * d1[0] - px * d1[1]) / det;
+      if (u < -1e-9 || v < -1e-9 || u + v > 1 + 1e-9) continue;
+      const z = a[2] + u * (b[2] - a[2]) + v * (c[2] - a[2]);
+      if (z > en) en = z;
+    }
+    return en;
+  };
+  const taban = P.panoH - P.oyukDerin;
+  for (const [x, y, ad] of SOKETLER) {
+    const z = yukseklik(x, y);
+    Math.abs(z - taban) < 0.01
+      ? ok(ad, `derinlik ${(P.panoH - z).toFixed(2)} mm`)
+      : kotu(ad, `oyuk AÇILMAMIŞ — yüzey ${z.toFixed(2)} mm (olması gereken ${taban.toFixed(2)})`);
+  }
+  for (const [x, y] of [[-20, -70], [60, 60], [-100, -60], [110, 60]]) {
+    const z = yukseklik(x, y);
+    Math.abs(z - P.panoH) < 0.01
+      ? ok(`düz yüzey (${x}, ${y})`, `${z.toFixed(2)} mm`)
+      : kotu(`düz yüzey (${x}, ${y})`, `${z.toFixed(2)} mm — beklenen ${P.panoH}`);
+  }
+}
+
 /* 1 — oyuk / parça uyumu */
 baslik('1. Her parça oyuğuna oturuyor mu (hedef: her kenarda 0,40 mm pay)');
 for (const [x, y, ad] of SOKETLER) {

@@ -22,7 +22,7 @@ Her STL kendi merkezine hizalı. **Hepsini birden açarsan üst üste görünür
 Evet — **her parçanın panoda kendi biçiminde bir oyuğu var.** Yıldızın yıldız
 oyuğu, karonun karo oyuğu, granumun daire oyuğu. Yanlış yere girmez.
 
-- Oyuk derinliği **2,5 mm**, parça kalınlığı **5,3 mm** → 2,8 mm dışarıda
+- Oyuk derinliği **3,5 mm**, parça kalınlığı **5,5 mm** → 2 mm dışarıda
   kalır, parmakla rahat çıkar.
 - Her kenarda **0,4 mm** pay var.
 - Kloroplast zarı farklı: pano yüzeyine oturur, **dört pimi** oyuklara girer.
@@ -95,6 +95,8 @@ kırmızı · güneş sarı
 `DENETIM-RAPORU.txt` dosyasında bu modelin tam denetimi var. `node tools/denetim.mjs`
 ile her an yeniden alınır. **Sonuç: 0 hata, 0 uyarı.** Kontrol edilenler:
 
+0. **Oyuklar gerçekten açık mı** — panoya 27 noktadan ışın atılıp yüzey kotu
+   ölçülür. Hepsi **3,5 mm derin**; oyuk dışındaki noktalar 6,00 mm (düz).
 1. **Oyuk uyumu** — 27 oyuğun her birinde parça ile oyuk arası pay ölçüldü: **0,40 mm**
    (güneşin ışın uçlarında 0,30, yıldızların derin köşelerinde 0,59 mm).
 2. **Oyuk–göz boşluğu** — hiçbir oyuk gözünün kenarına değmiyor (en az 0,8 mm).

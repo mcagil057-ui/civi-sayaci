@@ -1,4 +1,38 @@
 
+0. Oyuklar gerçekten açılmış mı — panoya ışın atıp yüzey kotu ölçülür
+─────────────────────────────────────────────────────────────────────
+  ✓ ZAR-SOL                                        derinlik 3.50 mm
+  ✓ ZAR-SAG                                        derinlik 3.50 mm
+  ✓ ZAR-UST                                        derinlik 3.50 mm
+  ✓ ZAR-ALT                                        derinlik 3.50 mm
+  ✓ IŞIK                                           derinlik 3.50 mm
+  ✓ H2O                                            derinlik 3.50 mm
+  ✓ CO2                                            derinlik 3.50 mm
+  ✓ O2                                             derinlik 3.50 mm
+  ✓ GLİKOZ                                         derinlik 3.50 mm
+  ✓ GRANUM                                         derinlik 3.50 mm
+  ✓ KALVİN                                         derinlik 3.50 mm
+  ✓ ATP                                            derinlik 3.50 mm
+  ✓ NADPH                                          derinlik 3.50 mm
+  ✓ NADP+                                          derinlik 3.50 mm
+  ✓ ADP                                            derinlik 3.50 mm
+  ✓ P                                              derinlik 3.50 mm
+  ✓ ok-h2o                                         derinlik 3.50 mm
+  ✓ ok-co2                                         derinlik 3.50 mm
+  ✓ ok-o2                                          derinlik 3.50 mm
+  ✓ ok-glikoz                                      derinlik 3.50 mm
+  ✓ ok-isik-1                                      derinlik 3.50 mm
+  ✓ ok-isik-2                                      derinlik 3.50 mm
+  ✓ ok-isik-3                                      derinlik 3.50 mm
+  ✓ ok-granum-atp                                  derinlik 3.50 mm
+  ✓ ok-atp-kalvin                                  derinlik 3.50 mm
+  ✓ ok-kalvin-nadp                                 derinlik 3.50 mm
+  ✓ ok-adp-granum                                  derinlik 3.50 mm
+  ✓ düz yüzey (-20, -70)                           6.00 mm
+  ✓ düz yüzey (60, 60)                             6.00 mm
+  ✓ düz yüzey (-100, -60)                          6.00 mm
+  ✓ düz yüzey (110, 60)                            6.00 mm
+
 1. Her parça oyuğuna oturuyor mu (hedef: her kenarda 0,40 mm pay)
 ─────────────────────────────────────────────────────────────────
   ✓ ZAR-SOL                                        pay 0.40–0.40 mm
@@ -142,10 +176,10 @@
 
 8. Bütün parçalar kapalı yüzey mi (dilimleyici uyarı verir mi)
 ──────────────────────────────────────────────────────────────
-  ✓ pano-zemin                                     290×240×16 mm · 465.8 cm³
-  ✓ parca-kloroplast-zari                          250×170×7 mm · 36.5 cm³
+  ✓ pano-zemin                                     290×240×16 mm · 456.2 cm³
+  ✓ parca-kloroplast-zari                          250×170×8 mm · 36.6 cm³
   ✓ parca-granum                                   32×32×38 mm · 16.9 cm³
-  ✓ parca-kalvin                                   58×62×6 mm · 10.8 cm³
+  ✓ parca-kalvin                                   58×62×7 mm · 14.4 cm³
   ✓ parca-isik                                     34×34×5 mm · 2.3 cm³
   ✓ parca-su                                       27×17×5 mm · 2.1 cm³
   ✓ parca-karbondioksit                            27×17×5 mm · 2.1 cm³
@@ -196,8 +230,8 @@
   ✓ parca-ok-kalvin-nadp                           22×11 mm tablaya sığar
   ✓ parca-ok-adp-granum                            25×34 mm tablaya sığar
   ✓ en ince kesit                                  4.5 mm (3 duvar hattından kalın)
-  ✓ parça kalınlığı / oyuk derinliği               4.5 / 2.5 mm → 2.0 mm dışarıda
-  ✓ toplam filament                                ≈ 172 g (%25 dolgu, PLA)
+  ✓ parça kalınlığı / oyuk derinliği               4.5 / 3.5 mm → 1.0 mm dışarıda
+  ✓ toplam filament                                ≈ 170 g (%25 dolgu, PLA)
 
 ════════════════════════════════════════════════════════════
 Hata yok. 0 uyarı.
