@@ -35,43 +35,43 @@
 
 1. Her parça oyuğuna oturuyor mu (hedef: her kenarda 0,40 mm pay)
 ─────────────────────────────────────────────────────────────────
-  ✓ ZAR-SOL                                        pay 0.40–0.40 mm
-  ✓ ZAR-SAG                                        pay 0.40–0.40 mm
-  ✓ ZAR-UST                                        pay 0.40–0.40 mm
-  ✓ ZAR-ALT                                        pay 0.40–0.40 mm
-  ✓ IŞIK                                           pay 0.30–0.48 mm
-  ✓ H2O                                            pay 0.40–0.40 mm
-  ✓ CO2                                            pay 0.40–0.40 mm
-  ✓ O2                                             pay 0.40–0.40 mm
-  ✓ GLİKOZ                                         pay 0.40–0.40 mm
-  ✓ GRANUM                                         pay 0.40–0.40 mm
-  ✓ KALVİN                                         pay 0.40–0.40 mm
-  ✓ ATP                                            pay 0.40–0.52 mm
-  ✓ NADPH                                          pay 0.40–0.40 mm
-  ✓ NADP+                                          pay 0.40–0.40 mm
-  ✓ ADP                                            pay 0.40–0.52 mm
-  ✓ P                                              pay 0.40–0.59 mm
-  ✓ ok-h2o                                         pay 0.40–0.57 mm
-  ✓ ok-co2                                         pay 0.40–0.57 mm
-  ✓ ok-o2                                          pay 0.40–0.57 mm
-  ✓ ok-glikoz                                      pay 0.40–0.57 mm
-  ✓ ok-isik-1                                      pay 0.40–0.57 mm
-  ✓ ok-isik-2                                      pay 0.40–0.57 mm
-  ✓ ok-isik-3                                      pay 0.40–0.57 mm
-  ✓ ok-granum-atp                                  pay 0.40–0.57 mm
-  ✓ ok-atp-kalvin                                  pay 0.40–0.57 mm
-  ✓ ok-kalvin-nadp                                 pay 0.40–0.57 mm
-  ✓ ok-adp-granum                                  pay 0.40–0.57 mm
+  ✓ ZAR-SOL                                        pay 0.50–0.50 mm
+  ✓ ZAR-SAG                                        pay 0.50–0.50 mm
+  ✓ ZAR-UST                                        pay 0.50–0.50 mm
+  ✓ ZAR-ALT                                        pay 0.50–0.50 mm
+  ✓ IŞIK                                           pay 0.40–0.62 mm
+  ✓ H2O                                            pay 0.47–0.50 mm
+  ✓ CO2                                            pay 0.47–0.50 mm
+  ✓ O2                                             pay 0.49–0.50 mm
+  ✓ GLİKOZ                                         pay 0.44–0.50 mm
+  ✓ GRANUM                                         pay 0.50–0.50 mm
+  ✓ KALVİN                                         pay 0.50–0.50 mm
+  ✓ ATP                                            pay 0.46–0.62 mm
+  ✓ NADPH                                          pay 0.45–0.50 mm
+  ✓ NADP+                                          pay 0.46–0.50 mm
+  ✓ ADP                                            pay 0.46–0.62 mm
+  ✓ P                                              pay 0.43–0.69 mm
+  ✓ ok-h2o                                         pay 0.37–0.67 mm
+  ✓ ok-co2                                         pay 0.37–0.67 mm
+  ✓ ok-o2                                          pay 0.37–0.67 mm
+  ✓ ok-glikoz                                      pay 0.37–0.67 mm
+  ✓ ok-isik-1                                      pay 0.40–0.67 mm
+  ✓ ok-isik-2                                      pay 0.40–0.67 mm
+  ✓ ok-isik-3                                      pay 0.40–0.67 mm
+  ✓ ok-granum-atp                                  pay 0.40–0.67 mm
+  ✓ ok-atp-kalvin                                  pay 0.40–0.67 mm
+  ✓ ok-kalvin-nadp                                 pay 0.40–0.67 mm
+  ✓ ok-adp-granum                                  pay 0.40–0.67 mm
 
 2. Her oyuk kendi gözünün içinde mi (kenara değerse yüzey bozulur)
 ──────────────────────────────────────────────────────────────────
   ✓ ZAR-SOL                                        göz kenarına 0.8 mm
-  ✓ ok-isik-3                                      göz kenarına 6.5 mm
+  ✓ ok-isik-3                                      göz kenarına 6.4 mm
   ✓ ok-isik-2                                      göz kenarına 0.8 mm
   ✓ ok-isik-1                                      göz kenarına 0.8 mm
   ✓ IŞIK                                           göz kenarına 0.8 mm
   ✓ O2                                             göz kenarına 0.8 mm
-  ✓ ok-o2                                          göz kenarına 3.2 mm
+  ✓ ok-o2                                          göz kenarına 3.0 mm
   ✓ GRANUM                                         göz kenarına 0.8 mm
   ✓ ok-adp-granum                                  göz kenarına 2.2 mm
   ✓ ok-granum-atp                                  göz kenarına 0.8 mm
@@ -82,15 +82,15 @@
   ✓ ATP                                            göz kenarına 0.8 mm
   ✓ ZAR-UST                                        göz kenarına 0.8 mm
   ✓ GLİKOZ                                         göz kenarına 0.8 mm
-  ✓ ok-glikoz                                      göz kenarına 3.2 mm
+  ✓ ok-glikoz                                      göz kenarına 3.1 mm
   ✓ P                                              göz kenarına 0.8 mm
-  ✓ ok-kalvin-nadp                                 göz kenarına 4.9 mm
+  ✓ ok-kalvin-nadp                                 göz kenarına 4.8 mm
   ✓ NADP+                                          göz kenarına 1.4 mm
   ✓ NADPH                                          göz kenarına 0.8 mm
   ✓ KALVİN                                         göz kenarına 0.8 mm
   ✓ ZAR-SAG                                        göz kenarına 0.8 mm
-  ✓ ok-atp-kalvin                                  göz kenarına 4.6 mm
-  ✓ ok-co2                                         göz kenarına 3.9 mm
+  ✓ ok-atp-kalvin                                  göz kenarına 4.5 mm
+  ✓ ok-co2                                         göz kenarına 3.7 mm
   ✓ CO2                                            göz kenarına 0.8 mm
 
 3. Parçalar birbirine değiyor mu
@@ -141,7 +141,7 @@
   ✓ NADP+                                          çerçeveye 83 mm
   ✓ ADP                                            çerçeveye 50 mm
   ✓ P                                              çerçeveye 55 mm
-  ✓ ok-h2o                                         çerçeveye 24 mm
+  ✓ ok-h2o                                         çerçeveye 25 mm
   ✓ ok-co2                                         çerçeveye 28 mm
   ✓ ok-o2                                          çerçeveye 26 mm
   ✓ ok-glikoz                                      çerçeveye 25 mm
@@ -176,11 +176,11 @@
 
 8. Bütün parçalar kapalı yüzey mi (dilimleyici uyarı verir mi)
 ──────────────────────────────────────────────────────────────
-  ✓ pano-zemin                                     290×240×16 mm · 456.2 cm³
+  ✓ pano-zemin                                     290×240×16 mm · 455.1 cm³
   ✓ parca-kloroplast-zari                          250×170×8 mm · 36.6 cm³
   ✓ parca-granum                                   32×32×38 mm · 16.9 cm³
   ✓ parca-kalvin                                   58×62×7 mm · 14.4 cm³
-  ✓ parca-isik                                     34×34×5 mm · 2.3 cm³
+  ✓ parca-isik                                     34×34×5 mm · 2.6 cm³
   ✓ parca-su                                       27×17×5 mm · 2.1 cm³
   ✓ parca-karbondioksit                            27×17×5 mm · 2.1 cm³
   ✓ parca-oksijen                                  20×17×5 mm · 1.5 cm³
@@ -190,7 +190,7 @@
   ✓ parca-fosfat                                   16×16×5 mm · 0.7 cm³
   ✓ parca-nadph                                    30×13×5 mm · 1.8 cm³
   ✓ parca-nadp-arti                                29×13×5 mm · 1.7 cm³
-  ✓ parca-ok-h2o                                   13×11×5 mm · 0.3 cm³
+  ✓ parca-ok-h2o                                   13×10×5 mm · 0.3 cm³
   ✓ parca-ok-co2                                   13×19×5 mm · 0.5 cm³
   ✓ parca-ok-o2                                    13×16×5 mm · 0.4 cm³
   ✓ parca-ok-glikoz                                13×15×5 mm · 0.4 cm³
@@ -218,7 +218,7 @@
   ✓ parca-fosfat                                   16×16 mm tablaya sığar
   ✓ parca-nadph                                    30×13 mm tablaya sığar
   ✓ parca-nadp-arti                                29×13 mm tablaya sığar
-  ✓ parca-ok-h2o                                   13×11 mm tablaya sığar
+  ✓ parca-ok-h2o                                   13×10 mm tablaya sığar
   ✓ parca-ok-co2                                   13×19 mm tablaya sığar
   ✓ parca-ok-o2                                    13×16 mm tablaya sığar
   ✓ parca-ok-glikoz                                13×15 mm tablaya sığar
@@ -235,3 +235,34 @@
 
 ════════════════════════════════════════════════════════════
 Hata yok. 0 uyarı.
+Oyuk                 ölçülen açıklık      parça            pay      sonuç
+──────────────────────────────────────────────────────────────────────────────
+ZAR-SOL                     7.2×7.2 mm        6.4×6.4 mm   0.8 mm  ✓ giriyor
+ZAR-SAG                     7.2×7.2 mm        6.4×6.4 mm   0.8 mm  ✓ giriyor
+ZAR-UST                     7.2×7.2 mm        6.4×6.4 mm   0.8 mm  ✓ giriyor
+ZAR-ALT                     7.2×7.2 mm        6.4×6.4 mm   0.8 mm  ✓ giriyor
+IŞIK                      34.4×34.4 mm      33.9×33.9 mm   0.8 mm  ✓ giriyor
+H2O                       27.6×21.2 mm      26.8×17.0 mm   0.8 mm  ✓ giriyor
+CO2                       27.6×17.6 mm      26.8×17.0 mm   0.8 mm  ✓ giriyor
+O2                        20.4×17.6 mm      19.9×17.0 mm   0.8 mm  ✓ giriyor
+GLİKOZ                    43.6×16.8 mm      42.9×16.0 mm   0.8 mm  ✓ giriyor
+GRANUM                    32.8×32.8 mm      32.0×32.0 mm   0.8 mm  ✓ giriyor
+KALVİN                    58.8×58.8 mm      58.0×58.0 mm   0.8 mm  ✓ giriyor
+ATP                       30.0×31.2 mm      29.0×30.5 mm   0.4 mm  ✓ giriyor
+NADPH                     31.2×13.6 mm      30.4×12.8 mm   0.8 mm  ✓ giriyor
+NADP+                     29.6×13.6 mm      29.0×12.8 mm   0.8 mm  ✓ giriyor
+ADP                       29.2×30.4 mm      28.3×29.7 mm   0.8 mm  ✓ giriyor
+P                         17.2×17.2 mm      16.2×16.2 mm   0.8 mm  ✓ giriyor
+ok-h2o                    20.8×14.0 mm      13.0×10.0 mm   0.8 mm  ✓ giriyor
+ok-co2                    14.0×19.6 mm      13.0×19.0 mm   0.8 mm  ✓ giriyor
+ok-o2                     14.0×16.8 mm      13.0×16.0 mm   0.8 mm  ✓ giriyor
+ok-glikoz                 14.0×15.6 mm      13.0×15.0 mm   0.8 mm  ✓ giriyor
+ok-isik-1                 12.8×11.6 mm      12.2×10.7 mm   0.8 mm  ✓ giriyor
+ok-isik-2                 12.8×11.6 mm      12.2×10.7 mm   0.8 mm  ✓ giriyor
+ok-isik-3                 12.8×11.6 mm      12.2×10.7 mm   0.8 mm  ✓ giriyor
+ok-granum-atp             25.6×20.8 mm      25.0×20.3 mm   0.8 mm  ✓ giriyor
+ok-atp-kalvin             41.6×23.2 mm      40.8×22.7 mm   0.8 mm  ✓ giriyor
+ok-kalvin-nadp            22.8×11.6 mm      22.1×10.8 mm   0.8 mm  ✓ giriyor
+ok-adp-granum             26.0×34.8 mm      25.3×34.1 mm   0.8 mm  ✓ giriyor
+──────────────────────────────────────────────────────────────────────────────
+27 oyuğun hepsi ölçüldü: parçalar içine giriyor.

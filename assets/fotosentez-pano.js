@@ -3,7 +3,7 @@
 import {
   Mesh, circlePts, ellipsePts, roundedRectPts, arrowPts,
   extrude, extrudeRing, cylinder, pill,
-  radyalOrnekle, ringFace, rectFace, wall, fanFace, offsetPts,
+  radyalOrnekle, ringFace, rectFace, wall, fanFace, ringZip, aciyaGoreTemizle,
 } from './mesh.js';
 import { giyotin } from './bolme.js';
 import { yazi, yaziGenisligi } from './yazi.js';
@@ -67,8 +67,12 @@ const gunesPts = (R, rayL, n = 8) => {
       p.push([R * Math.cos(t), R * Math.sin(t)]);
     }
     const b = a + 2 * Math.PI / n;
+    // Işın ucu sivri değil, küçük bir düzlükle biter: baskıda çıkar ve
+    // oyuk köşesinde sıfır alanlı üçgen oluşmaz.
+    const uc = 0.09;
     p.push([R * Math.cos(b - yariv * 0.6), R * Math.sin(b - yariv * 0.6)]);
-    p.push([(R + rayL) * Math.cos(b), (R + rayL) * Math.sin(b)]);
+    p.push([(R + rayL) * Math.cos(b - uc), (R + rayL) * Math.sin(b - uc)]);
+    p.push([(R + rayL) * Math.cos(b + uc), (R + rayL) * Math.sin(b + uc)]);
     p.push([R * Math.cos(b + yariv * 0.6), R * Math.sin(b + yariv * 0.6)]);
   }
   return p;
@@ -86,7 +90,7 @@ const don2 = (pts, deg) => {
 const tasi2 = (pts, dx, dy) => pts.map(p => [p[0] + dx, p[1] + dy]);
 
 export const OK_TANIM = [
-  { id: 'ok-h2o',     ad: 'H₂O oku',        kuyruk: [-36, 89],   aci: -90, uzun: 11, kal: 5.5, basW: 13, basL: 7 },
+  { id: 'ok-h2o',     ad: 'H₂O oku',        kuyruk: [-36, 88],   aci: -90, uzun: 10, kal: 5.5, basW: 13, basL: 7 },
   { id: 'ok-co2',     ad: 'CO₂ oku',        kuyruk: [85, 85],    aci: -90, uzun: 19, kal: 5.5, basW: 13, basL: 7 },
   { id: 'ok-o2',      ad: 'O₂ oku',         kuyruk: [-74, -71],  aci: -90, uzun: 16, kal: 5.5, basW: 13, basL: 7 },
   { id: 'ok-glikoz',  ad: 'Glikoz oku',     kuyruk: [85, -73],   aci: -90, uzun: 15, kal: 5.5, basW: 13, basL: 7 },
@@ -103,8 +107,11 @@ export const OK_TANIM = [
 // Okun konturu bu noktaya göre yıldız-biçimlidir, oyuk doğru çıkar.
 export const okMerkezi = o => {
   const a = o.aci * Math.PI / 180;
-  return [o.kuyruk[0] + (o.uzun - o.basL) * Math.cos(a),
-          o.kuyruk[1] + (o.uzun - o.basL) * Math.sin(a)];
+  // Işın merkezi UCUN İÇİNDE olmalı (ucun %35'i). Birleşim noktasında
+  // gövde ile uç köşeleri aynı açıya düşer, açı sırası bozulur ve oyuk
+  // konturu o köşeleri yutar: ok oyuğa girmez.
+  const d = o.uzun - 0.65 * o.basL;
+  return [o.kuyruk[0] + d * Math.cos(a), o.kuyruk[1] + d * Math.sin(a)];
 };
 // Okun konturu, merkezi orijinde olacak şekilde
 export const okKonturu = o => {
@@ -136,10 +143,30 @@ export const PARCA_TANIM = {
 
 for (const o of OK_TANIM) PARCA_TANIM[o.id] = { boy: 0, metin: '', kontur: () => okKonturu(o) };
 
-// Oyuk konturu: parça konturunun her yönde eşit mesafede dışa ötelenmişi.
-// Ölçekleme yapılırsa uzun kenarda bol, kısa kenarda sıkı olur; öteleme
-// her kenarda aynı payı bırakır.
-const oyukKonturu = ad => offsetPts(PARCA_TANIM[ad].kontur(), P.bosluk);
+// Oyuk konturu: parça konturunun her köşesi, köşe NORMALİ yönünde
+// (kenara dik) bosluk kadar dışarı itilir. Işın yönünde itmek, kenarı
+// ışına paralel olan yerlerde (güneşin ışın kenarları) sıfır pay
+// bırakıyordu. Açı sırası bozulmasın diye küçük bir ışınsal bileşen de
+// eklenir; oyuk konturunun açıları tek yönde artmalı.
+function oyukKonturu(ad) {
+  const pts = PARCA_TANIM[ad].kontur();
+  const n = pts.length;
+  const nrm = (a, b) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
+    return [dy / l, -dx / l];
+  };
+  return pts.map((p, i) => {
+    const o = pts[(i - 1 + n) % n], q = pts[(i + 1) % n];
+    const n1 = nrm(o, p), n2 = nrm(p, q);
+    let nx = n1[0] + n2[0], ny = n1[1] + n2[1];
+    const l = Math.hypot(nx, ny) || 1; nx /= l; ny /= l;
+    const kesim = Math.max(0.5, n1[0] * nx + n1[1] * ny);
+    const it = Math.min(P.bosluk / kesim, P.bosluk * 2);
+    const r = Math.hypot(p[0], p[1]) || 1;
+    return [p[0] + nx * it + (p[0] / r) * P.bosluk * 0.25,
+            p[1] + ny * it + (p[1] / r) * P.bosluk * 0.25];
+  });
+}
 export const oyukKonturuDisa = oyukKonturu;        // denetim için
 export const hucreler = () => BOLME.hucreler;
 export { OV, ZAR_KAL };
@@ -244,36 +271,101 @@ function acilardaKontur(pts, c, acilar) {
   });
 }
 
+// Konturun verilen açıdaki sınır noktası (ışın–çokgen kesişimi).
+function sinirNoktasi(pts, c, a) {
+  const dx = Math.cos(a), dy = Math.sin(a);
+  let enUzak = -1, sonuc = null;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i], q = pts[(i + 1) % pts.length];
+    const ex = q[0] - p[0], ey = q[1] - p[1];
+    const payda = dx * ey - dy * ex;
+    if (Math.abs(payda) < 1e-12) continue;
+    const t = ((p[0] - c[0]) * ey - (p[1] - c[1]) * ex) / payda;
+    const u = ((p[0] - c[0]) * dy - (p[1] - c[1]) * dx) / payda;
+    if (t > 0 && u >= -1e-9 && u <= 1 + 1e-9 && t > enUzak) {
+      enUzak = t; sonuc = [c[0] + dx * t, c[1] + dy * t];
+    }
+  }
+  return sonuc;
+}
+
 // Oyuklu zemin plakası.
+// Oyuk halkası, DIŞ ve İÇ konturun AYNI açı listesinde örneklenmesiyle
+// kurulur: her iki çokgenin de bütün köşeleri bu listede yer alır, böylece
+// oyuk birebir çıkar. Açı listesi gözün kenarına fazladan nokta düşürdüğü
+// için bu noktalar ortak bir kayda alınır ve komşu göz de aynı noktaları
+// kullanır; aksi hâlde kenarda T-bağlantısı kalır ve yüzey kapanmaz.
 function zeminPlakasi() {
   const m = new Mesh();
   const H = P.panoH, D = P.oyukDerin;
-  const ic = cerceveOrnek(-P.icX, -P.icY, P.icX, P.icY, 4);
-  // Dış kontur, iç konturun noktalarıyla AYNI AÇILARDA örneklenmeli.
-  // Yay uzunluğuna göre örneklenirse iki halka farklı yerden başlar,
-  // aradaki yüzey birbirine dolanır ve bütün panoyu kaplar — oyuklar
-  // o yüzeyin altında gömülü kalır.
-  const acilar = ic.map(p => Math.atan2(p[1], p[0]));
-  const dis = acilardaKontur(roundedRectPts(P.panoW, P.panoD, 8, 12), [0, 0], acilar);
+
+  // 1. geçiş: oyuk köşelerinin göz kenarına düşürdüğü noktaları topla
+  const ekNokta = new Map();                       // "d:x" veya "y:y" → Set
+  const kayit = (anahtar, deger) => {
+    if (!ekNokta.has(anahtar)) ekNokta.set(anahtar, new Set());
+    ekNokta.get(anahtar).add(+deger.toFixed(6));
+  };
+  const hucreAcilari = new Map();
+  for (const h of BOLME.hucreler) {
+    if (!h.oyuk) continue;
+    const c = [h.oyuk.x, h.oyuk.y];
+    const kose = [[h.x0, h.y0], [h.x1, h.y0], [h.x1, h.y1], [h.x0, h.y1]];
+    const dikd = kose;
+    const acilar = h.oyuk.kontur.map(p => Math.atan2(p[1] - c[1], p[0] - c[0]));
+    hucreAcilari.set(h, acilar);
+    for (const a of acilar) {
+      const p = sinirNoktasi(dikd, c, a);
+      if (!p) continue;
+      if (Math.abs(p[0] - h.x0) < 1e-6) kayit('d:' + h.x0.toFixed(6), p[1]);
+      else if (Math.abs(p[0] - h.x1) < 1e-6) kayit('d:' + h.x1.toFixed(6), p[1]);
+      else if (Math.abs(p[1] - h.y0) < 1e-6) kayit('y:' + h.y0.toFixed(6), p[0]);
+      else if (Math.abs(p[1] - h.y1) < 1e-6) kayit('y:' + h.y1.toFixed(6), p[0]);
+    }
+  }
+  // gözün çevresi: ızgara + kesikler + kayıtlı ek noktalar
+  const cevreTam = (x0, y0, x1, y1) => {
+    const ek = (anahtar, a, b) => [...(ekNokta.get(anahtar) || [])]
+      .filter(v => v > Math.min(a, b) + 1e-9 && v < Math.max(a, b) - 1e-9);
+    const kenar = (ax, ay, bx, by, kesim, anahtar) => {
+      const temel = kenarOrnek(ax, ay, bx, by, kesim, 4);
+      const yatay = Math.abs(by - ay) < 1e-9;
+      const hepsi = [...temel.map(p => (yatay ? p[0] : p[1])), ...ek(anahtar, yatay ? ax : ay, yatay ? bx : by)];
+      const yon = Math.sign((yatay ? bx - ax : by - ay));
+      return [...new Set(hepsi.map(v => +v.toFixed(6)))]
+        .sort((p, q) => (p - q) * yon)
+        .map(v => (yatay ? [v, ay] : [ax, v]));
+    };
+    return [
+      ...kenar(x0, y0, x1, y0, X_KESIM, 'y:' + y0.toFixed(6)),
+      ...kenar(x1, y0, x1, y1, Y_KESIM, 'd:' + x1.toFixed(6)),
+      ...kenar(x1, y1, x0, y1, X_KESIM, 'y:' + y1.toFixed(6)),
+      ...kenar(x0, y1, x0, y0, Y_KESIM, 'd:' + x0.toFixed(6)),
+    ];
+  };
+
+  const ic = cevreTam(-P.icX, -P.icY, P.icX, P.icY);
+  const acilarDis = ic.map(p => Math.atan2(p[1], p[0]));
+  const dis = acilardaKontur(roundedRectPts(P.panoW, P.panoD, 8, 12), [0, 0], acilarDis);
 
   m.add(fanFace(dis, [0, 0], 0, false));        // alt yüz
   m.add(wall(dis, 0, H, true));                 // dış duvar
   m.add(ringFace(dis, ic, H, true));            // üstte düz kenar
 
-  // dış kenarda 1 cm yükselti: parçalar panodan kaymaz
+  // dış kenarda 1 cm yükselti
   const cIc = acilardaKontur(
-    roundedRectPts(P.panoW - 2 * P.cerceveW, P.panoD - 2 * P.cerceveW, 6, 12), [0, 0], acilar);
+    roundedRectPts(P.panoW - 2 * P.cerceveW, P.panoD - 2 * P.cerceveW, 6, 12), [0, 0], acilarDis);
   m.add(ringFace(dis, cIc, H, false));
   m.add(wall(dis, H, H + P.cerceveH, true));
   m.add(wall(cIc, H, H + P.cerceveH, false));
   m.add(ringFace(dis, cIc, H + P.cerceveH, true));
 
+  // 2. geçiş: gözler
   for (const h of BOLME.hucreler) {
-    const cevre = cerceveOrnek(h.x0, h.y0, h.x1, h.y1, 4);
+    const cevre = cevreTam(h.x0, h.y0, h.x1, h.y1);
     if (!h.oyuk) { m.add(fanFace(cevre, [(h.x0 + h.x1) / 2, (h.y0 + h.y1) / 2], H, true)); continue; }
     const c = [h.oyuk.x, h.oyuk.y];
     const acilar = cevre.map(p => Math.atan2(p[1] - c[1], p[0] - c[0]));
-    const ickontur = acilardaKontur(h.oyuk.kontur, c, acilar);
+    const ickontur = acilar.map(a => sinirNoktasi(h.oyuk.kontur, c, a));
     m.add(ringFace(cevre, ickontur, H, true));          // üst yüz, oyuk kadar boş
     m.add(wall(ickontur, H - D, H, false));             // oyuk duvarı
     m.add(fanFace(ickontur, c, H - D, true));           // oyuk tabanı

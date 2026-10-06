@@ -452,3 +452,74 @@ export function fanFace(pts, c, z, yukari = true) {
   }
   return m;
 }
+
+// İki kapalı halkayı, nokta sayıları FARKLI olsa da birbirine diker.
+// Dış halka ızgaraya (komşu göze) uyarken iç halka oyuğun gerçek
+// köşelerini birebir korur. İki halka da merkeze göre yıldız-biçimli
+// olmalı: açıları tek yönde artmalı.
+export function ringZip(dis, ic, z, c, yukari = true) {
+  const aci = p => Math.atan2(p[1] - c[1], p[0] - c[0]);
+  // açıları, ilk noktadan başlayarak artan biçimde aç
+  const ac = loop => {
+    const a = [aci(loop[0])];
+    for (let i = 1; i < loop.length; i++) {
+      let t = aci(loop[i]);
+      while (t < a[i - 1]) t += 2 * Math.PI;
+      a.push(t);
+    }
+    return a;
+  };
+  // İç halka, dış halkanın başlangıç açısından ÖNCEKİ köşeden başlamalı.
+  // Sonraki köşeden başlatılırsa iki başlangıç arasındaki dilim boş kalır
+  // ve oyuğun o bölgesi üst yüzeyle kapanır.
+  const a0 = aci(dis[0]);
+  let bas = 0, enAz = Infinity;
+  for (let k = 0; k < ic.length; k++) {
+    let f = a0 - aci(ic[k]);
+    while (f < 0) f += 2 * Math.PI;
+    while (f >= 2 * Math.PI) f -= 2 * Math.PI;
+    if (f < enAz) { enAz = f; bas = k; }
+  }
+  const I = [...ic.slice(bas), ...ic.slice(0, bas)];
+  const A = ac(dis), B = ac(I);
+  // B[0] artık A[0]'dan küçük ya da eşit olacak biçimde hizalanır
+  const kaydir = Math.round((A[0] - B[0]) / (2 * Math.PI)) * 2 * Math.PI;
+  for (let i = 0; i < B.length; i++) B[i] += kaydir;
+  while (B[0] > A[0]) for (let i = 0; i < B.length; i++) B[i] -= 2 * Math.PI;
+
+  const N = dis.length, M = I.length;
+  const ileriA = i => (i < N ? A[i] : A[0] + 2 * Math.PI);
+  const ileriB = j => (j < M ? B[j] : B[0] + 2 * Math.PI);
+  const p3 = p => [p[0], p[1], z];
+  const m = new Mesh();
+  const ucgen = (a, b, d) => (yukari ? m.tri(p3(a), p3(b), p3(d)) : m.tri(p3(d), p3(b), p3(a)));
+  let i = 0, j = 0;
+  let guard = 0;
+  while ((i < N || j < M) && guard++ < 10 * (N + M)) {
+    const sonrakiA = ileriA(i + 1), sonrakiB = ileriB(j + 1);
+    if (i < N && (j >= M || sonrakiA <= sonrakiB)) {
+      ucgen(dis[i % N], dis[(i + 1) % N], I[j % M]); i++;
+    } else {
+      ucgen(dis[i % N], I[(j + 1) % M], I[j % M]); j++;
+    }
+  }
+  return m;
+}
+
+// Konturu, merkeze göre açıları tek yönde artacak biçimde temizler.
+// Ötelenmiş konturlarda keskin köşelerde oluşan küçük geri dönüşleri atar.
+export function aciyaGoreTemizle(pts, c) {
+  const aci = p => Math.atan2(p[1] - c[1], p[0] - c[0]);
+  const n = pts.length;
+  let bas = 0, enKucuk = Infinity;
+  for (let i = 0; i < n; i++) { const a = aci(pts[i]); if (a < enKucuk) { enKucuk = a; bas = i; } }
+  const sira = [...pts.slice(bas), ...pts.slice(0, bas)];
+  const out = [sira[0]];
+  let son = aci(sira[0]);
+  for (let i = 1; i < n; i++) {
+    let a = aci(sira[i]);
+    while (a < son - 1e-9) a += 2 * Math.PI;
+    if (a - son > 1e-7 && a - aci(sira[0]) < 2 * Math.PI - 1e-7) { out.push(sira[i]); son = a; }
+  }
+  return out;
+}
