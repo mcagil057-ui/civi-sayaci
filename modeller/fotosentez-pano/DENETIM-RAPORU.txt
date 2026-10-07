@@ -1,3 +1,73 @@
+FOTOSENTEZ PANOSU — SON DENETİM
+Tarih: 2026-10-07
+
+########## A. TESLİM EDİLEN DOSYALAR ##########
+Dosya                                 ölçü (mm)        hacim   üçgen   durum
+────────────────────────────────────────────────────────────────────────────────────
+00-MONTAJ-sadece-goruntuleme         290.0×240.0×40.2   548.5   83628   ✓
+pano-zemin                           290.0×240.0×16.0   455.1   33128   ✓
+parca-adp                               28.3×29.7×5.3     2.2    1792   ✓
+parca-atp                               29.0×30.5×5.3     2.3     802   ✓
+parca-fosfat                            16.2×16.2×5.3     0.7     488   ✓
+parca-glikoz                            42.9×16.0×5.3     3.2    6244   ✓
+parca-granum                           32.0×32.0×37.7    16.9   10436   ✓
+parca-isik                              33.9×33.9×5.3     2.6    1536   ✓
+parca-kalvin                            58.0×62.4×7.0    14.4   12590   ✓
+parca-karbondioksit                     26.8×17.0×5.3     2.1    3208   ✓
+parca-kloroplast-zari                 250.0×170.0×8.3    36.6    4400   ✓
+parca-nadp-arti                         29.0×12.8×5.3     1.7    2218   ✓
+parca-nadph                             30.4×12.8×5.3     1.8    2284   ✓
+parca-ok-adp-granum                     25.3×34.1×4.5     0.8      24   ✓
+parca-ok-atp-kalvin                     40.8×22.7×4.5     0.9      24   ✓
+parca-ok-co2                            13.0×19.0×4.5     0.5      24   ✓
+parca-ok-glikoz                         13.0×15.0×4.5     0.4      24   ✓
+parca-ok-granum-atp                     25.0×20.3×4.5     0.6      24   ✓
+parca-ok-h2o                            13.0×10.0×4.5     0.3      24   ✓
+parca-ok-isik-1                         12.2×10.7×4.5     0.3      24   ✓
+parca-ok-isik-2                         12.2×10.7×4.5     0.3      24   ✓
+parca-ok-isik-3                         12.2×10.7×4.5     0.3      24   ✓
+parca-ok-kalvin-nadp                    22.1×10.8×4.5     0.5      24   ✓
+parca-ok-o2                             13.0×16.0×4.5     0.4      24   ✓
+parca-oksijen                           19.9×17.0×5.3     1.5    2020   ✓
+parca-su                                26.8×17.0×5.3     2.1    2218   ✓
+────────────────────────────────────────────────────────────────────────────────────
+26 dosya · basılacak toplam hacim 548.5 cm³ ≈ 170 g
+Bütün dosyalar kapalı yüzey ve 300×300 tablaya sığıyor.
+
+########## B. OYUKLARIN FİZİKSEL ÖLÇÜMÜ ##########
+Oyuk                 ölçülen açıklık      parça            pay      sonuç
+──────────────────────────────────────────────────────────────────────────────
+ZAR-SOL                     7.2×7.2 mm        6.4×6.4 mm   0.8 mm  ✓ giriyor
+ZAR-SAG                     7.2×7.2 mm        6.4×6.4 mm   0.8 mm  ✓ giriyor
+ZAR-UST                     7.2×7.2 mm        6.4×6.4 mm   0.8 mm  ✓ giriyor
+ZAR-ALT                     7.2×7.2 mm        6.4×6.4 mm   0.8 mm  ✓ giriyor
+IŞIK                      34.4×34.4 mm      33.9×33.9 mm   0.8 mm  ✓ giriyor
+H2O                       27.6×21.2 mm      26.8×17.0 mm   0.8 mm  ✓ giriyor
+CO2                       27.6×17.6 mm      26.8×17.0 mm   0.8 mm  ✓ giriyor
+O2                        20.4×17.6 mm      19.9×17.0 mm   0.8 mm  ✓ giriyor
+GLİKOZ                    43.6×16.8 mm      42.9×16.0 mm   0.8 mm  ✓ giriyor
+GRANUM                    32.8×32.8 mm      32.0×32.0 mm   0.8 mm  ✓ giriyor
+KALVİN                    58.8×58.8 mm      58.0×58.0 mm   0.8 mm  ✓ giriyor
+ATP                       30.0×31.2 mm      29.0×30.5 mm   0.4 mm  ✓ giriyor
+NADPH                     31.2×13.6 mm      30.4×12.8 mm   0.8 mm  ✓ giriyor
+NADP+                     29.6×13.6 mm      29.0×12.8 mm   0.8 mm  ✓ giriyor
+ADP                       29.2×30.4 mm      28.3×29.7 mm   0.8 mm  ✓ giriyor
+P                         17.2×17.2 mm      16.2×16.2 mm   0.8 mm  ✓ giriyor
+ok-h2o                    20.8×14.0 mm      13.0×10.0 mm   0.8 mm  ✓ giriyor
+ok-co2                    14.0×19.6 mm      13.0×19.0 mm   0.8 mm  ✓ giriyor
+ok-o2                     14.0×16.8 mm      13.0×16.0 mm   0.8 mm  ✓ giriyor
+ok-glikoz                 14.0×15.6 mm      13.0×15.0 mm   0.8 mm  ✓ giriyor
+ok-isik-1                 12.8×11.6 mm      12.2×10.7 mm   0.8 mm  ✓ giriyor
+ok-isik-2                 12.8×11.6 mm      12.2×10.7 mm   0.8 mm  ✓ giriyor
+ok-isik-3                 12.8×11.6 mm      12.2×10.7 mm   0.8 mm  ✓ giriyor
+ok-granum-atp             25.6×20.8 mm      25.0×20.3 mm   0.8 mm  ✓ giriyor
+ok-atp-kalvin             41.6×23.2 mm      40.8×22.7 mm   0.8 mm  ✓ giriyor
+ok-kalvin-nadp            22.8×11.6 mm      22.1×10.8 mm   0.8 mm  ✓ giriyor
+ok-adp-granum             26.0×34.8 mm      25.3×34.1 mm   0.8 mm  ✓ giriyor
+──────────────────────────────────────────────────────────────────────────────
+27 oyuğun hepsi ölçüldü: parçalar içine giriyor.
+
+########## C. MODEL DENETİMİ ##########
 
 0. Oyuklar gerçekten açılmış mı — panoya ışın atıp yüzey kotu ölçülür
 ─────────────────────────────────────────────────────────────────────
@@ -235,34 +305,7 @@
 
 ════════════════════════════════════════════════════════════
 Hata yok. 0 uyarı.
-Oyuk                 ölçülen açıklık      parça            pay      sonuç
-──────────────────────────────────────────────────────────────────────────────
-ZAR-SOL                     7.2×7.2 mm        6.4×6.4 mm   0.8 mm  ✓ giriyor
-ZAR-SAG                     7.2×7.2 mm        6.4×6.4 mm   0.8 mm  ✓ giriyor
-ZAR-UST                     7.2×7.2 mm        6.4×6.4 mm   0.8 mm  ✓ giriyor
-ZAR-ALT                     7.2×7.2 mm        6.4×6.4 mm   0.8 mm  ✓ giriyor
-IŞIK                      34.4×34.4 mm      33.9×33.9 mm   0.8 mm  ✓ giriyor
-H2O                       27.6×21.2 mm      26.8×17.0 mm   0.8 mm  ✓ giriyor
-CO2                       27.6×17.6 mm      26.8×17.0 mm   0.8 mm  ✓ giriyor
-O2                        20.4×17.6 mm      19.9×17.0 mm   0.8 mm  ✓ giriyor
-GLİKOZ                    43.6×16.8 mm      42.9×16.0 mm   0.8 mm  ✓ giriyor
-GRANUM                    32.8×32.8 mm      32.0×32.0 mm   0.8 mm  ✓ giriyor
-KALVİN                    58.8×58.8 mm      58.0×58.0 mm   0.8 mm  ✓ giriyor
-ATP                       30.0×31.2 mm      29.0×30.5 mm   0.4 mm  ✓ giriyor
-NADPH                     31.2×13.6 mm      30.4×12.8 mm   0.8 mm  ✓ giriyor
-NADP+                     29.6×13.6 mm      29.0×12.8 mm   0.8 mm  ✓ giriyor
-ADP                       29.2×30.4 mm      28.3×29.7 mm   0.8 mm  ✓ giriyor
-P                         17.2×17.2 mm      16.2×16.2 mm   0.8 mm  ✓ giriyor
-ok-h2o                    20.8×14.0 mm      13.0×10.0 mm   0.8 mm  ✓ giriyor
-ok-co2                    14.0×19.6 mm      13.0×19.0 mm   0.8 mm  ✓ giriyor
-ok-o2                     14.0×16.8 mm      13.0×16.0 mm   0.8 mm  ✓ giriyor
-ok-glikoz                 14.0×15.6 mm      13.0×15.0 mm   0.8 mm  ✓ giriyor
-ok-isik-1                 12.8×11.6 mm      12.2×10.7 mm   0.8 mm  ✓ giriyor
-ok-isik-2                 12.8×11.6 mm      12.2×10.7 mm   0.8 mm  ✓ giriyor
-ok-isik-3                 12.8×11.6 mm      12.2×10.7 mm   0.8 mm  ✓ giriyor
-ok-granum-atp             25.6×20.8 mm      25.0×20.3 mm   0.8 mm  ✓ giriyor
-ok-atp-kalvin             41.6×23.2 mm      40.8×22.7 mm   0.8 mm  ✓ giriyor
-ok-kalvin-nadp            22.8×11.6 mm      22.1×10.8 mm   0.8 mm  ✓ giriyor
-ok-adp-granum             26.0×34.8 mm      25.3×34.1 mm   0.8 mm  ✓ giriyor
-──────────────────────────────────────────────────────────────────────────────
-27 oyuğun hepsi ölçüldü: parçalar içine giriyor.
+
+########## D. YERLEŞİM ##########
+
+Çakışma yok ✓

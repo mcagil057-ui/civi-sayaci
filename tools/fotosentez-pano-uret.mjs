@@ -31,31 +31,5 @@ for (const p of PANO_PARCALARI) {
 console.log('');
 yaz('00-MONTAJ-sadece-goruntuleme', montaj.center());
 
-/* ---- 3) Baskı tablaları: parçalar yan yana dizili, üst üste gelmez ---- */
-// basit raf yerleşimi
-function tablaya(parcalar, genislik = 210, bosluk = 6) {
-  const m = new Mesh();
-  let x = 0, y = 0, rafY = 0;
-  for (const p of parcalar) {
-    const t = p.center();
-    const b = t.bounds();
-    if (x > 0 && x + b.size[0] > genislik) { x = 0; y += rafY + bosluk; rafY = 0; }
-    m.add(t.translate(x + b.size[0] / 2, y + b.size[1] / 2, 0));
-    x += b.size[0] + bosluk;
-    rafY = Math.max(rafY, b.size[1]);
-  }
-  return m.center();
-}
-console.log('');
-yaz('baski-1-pano', PANO_PARCALARI[0].yap().center());
-yaz('baski-2-kloroplast-zari', PANO_PARCALARI[1].yap().center());
-// Tek dosya: bütün parçalar yan yana. Dilimleyicide "parçalara ayır" ile
-// ayrılıp gruplar hâlinde basılır.
-yaz('00-HEPSI-TEK-DOSYA', tablaya(PANO_PARCALARI.map(p => p.yap()), 300, 8));
-
-const kalan = PANO_PARCALARI.slice(2).map(p => p.yap());
-yaz('baski-3-parcalar', tablaya(kalan.slice(0, 11), 250));
-yaz('baski-4-oklar', tablaya(kalan.slice(11), 250));
-
 console.log(`\n${PANO_PARCALARI.length} dosya + 1 montaj + 4 baskı tablası`
   + ` · kaba filament ≈ ${(toplam * 0.25 * 1.24).toFixed(0)} g`);
