@@ -1,6 +1,8 @@
 // Fotosentez PANOSU: baskıya hazır STL üretici.
 // Çalıştır: node tools/fotosentez-pano-uret.mjs
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { Mesh, toBinarySTL, checkWatertight, volume } from '../assets/mesh.js';
 import { PANO_PARCALARI, SOKETLER, P } from '../assets/fotosentez-pano.js';
 
@@ -30,6 +32,17 @@ for (const p of PANO_PARCALARI) {
 }
 console.log('');
 yaz('00-MONTAJ-sadece-goruntuleme', montaj.center());
+
+/* ---- 4) Toplu gönderim için zip ---- */
+// Eski zip silinmeden yenilenirse eski sürümün dosyaları içeride kalır.
+try {
+  const ust = fileURLToPath(new URL('../modeller/', import.meta.url));
+  rmSync(ust + 'fotosentez-pano.zip', { force: true });
+  execFileSync('zip', ['-qr9', 'fotosentez-pano.zip', 'fotosentez-pano'], { cwd: ust });
+  console.log('\nmodeller/fotosentez-pano.zip yenilendi (toplu gönderim için)');
+} catch (e) {
+  console.log('\nzip oluşturulamadı:', e.message);
+}
 
 console.log(`\n${PANO_PARCALARI.length} dosya + 1 montaj + 4 baskı tablası`
   + ` · kaba filament ≈ ${(toplam * 0.25 * 1.24).toFixed(0)} g`);
